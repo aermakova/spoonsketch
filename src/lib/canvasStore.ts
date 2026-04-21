@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Alert } from 'react-native';
 import storage from './canvasStorage';
 import type { BlockOverride } from './blockDefs';
+import { FONT_SCALE_MIN, FONT_SCALE_MAX, FONT_SCALE_STEP } from './blockDefs';
 
 export interface CanvasEl {
   id: string;
@@ -48,14 +49,25 @@ interface CanvasState {
   ingOverrides: Record<string, IngOverride>;
 
   init: (recipeId: string, els?: CanvasEl[]) => void;
+  // Silent hydration from server-resolved cookbook default / recipe override.
+  // Does not push history, does not alert — purely a client-state sync.
+  hydrateTemplateAndFont: (patch: { templateKey?: TemplateKey; recipeFont?: FontPresetKey }) => void;
   addSticker: (key: string, x: number, y: number) => void;
   updateEl: (id: string, patch: Partial<CanvasEl>) => void;
   removeEl: (id: string) => void;
   select: (id: string | null) => void;
   setScrollEnabled: (v: boolean) => void;
-  setTemplateKey: (key: TemplateKey) => void;
+  // onApplied fires after the new template is actually committed. When the
+  // store shows the "Changing the template will reset…" Alert, onApplied
+  // only runs if the user confirms — so it's the right hook for server
+  // persistence (we shouldn't write to recipe_canvases if the user cancels).
+  setTemplateKey: (key: TemplateKey, onApplied?: (key: TemplateKey) => void) => void;
   setRecipeFont: (key: FontPresetKey) => void;
   setBlockOverride: (blockId: string, patch: Partial<BlockOverride>) => void;
+  // Silent height write — for onLayout-driven auto-measurement of text-heavy blocks.
+  // Does NOT push a history snapshot: height is a derived quantity, not a user action.
+  setBlockHeightSilent: (blockId: string, hFrac: number) => void;
+  bumpBlockFontScale: (blockId: string, direction: 1 | -1) => void;
   removeBlock: (blockId: string) => void;
   clearBlockOverrides: () => void;
   saveStepOverride: (stepNum: number, o: StepOverride) => void;
@@ -98,6 +110,14 @@ export const useCanvasStore = create<CanvasState>()(
         set({ recipeId, elements: els, selectedId: null, history: [], blockOverrides: {}, layoutResetVersion: 0, stepOverrides: {}, ingOverrides: {} });
       },
 
+      hydrateTemplateAndFont(patch) {
+        const s = get();
+        const next: Partial<CanvasState> = {};
+        if (patch.templateKey && patch.templateKey !== s.templateKey) next.templateKey = patch.templateKey;
+        if (patch.recipeFont && patch.recipeFont !== s.recipeFont) next.recipeFont = patch.recipeFont;
+        if (Object.keys(next).length) set(next);
+      },
+
       addSticker(key, x, y) {
         pushSnap();
         const { elements } = get();
@@ -127,12 +147,13 @@ export const useCanvasStore = create<CanvasState>()(
 
       setScrollEnabled(v) { set({ scrollEnabled: v }); },
 
-      setTemplateKey(key) {
+      setTemplateKey(key, onApplied) {
         const { blockOverrides } = get();
         const hasOverrides = Object.keys(blockOverrides).length > 0;
         if (!hasOverrides) {
           pushSnap();
           set({ templateKey: key });
+          onApplied?.(key);
           return;
         }
         Alert.alert(
@@ -146,6 +167,7 @@ export const useCanvasStore = create<CanvasState>()(
               onPress: () => {
                 pushSnap();
                 set(s => ({ templateKey: key, blockOverrides: {}, layoutResetVersion: s.layoutResetVersion + 1 }));
+                onApplied?.(key);
               },
             },
           ],
@@ -163,6 +185,34 @@ export const useCanvasStore = create<CanvasState>()(
           blockOverrides: {
             ...s.blockOverrides,
             [blockId]: { ...(s.blockOverrides[blockId] ?? {}), ...patch } as BlockOverride,
+          },
+        }));
+      },
+
+      setBlockHeightSilent(blockId, hFrac) {
+        const current = get().blockOverrides[blockId]?.h;
+        // Skip no-op writes and sub-pixel float noise.
+        if (current != null && Math.abs(current - hFrac) < 0.0005) return;
+        set(s => ({
+          blockOverrides: {
+            ...s.blockOverrides,
+            [blockId]: { ...(s.blockOverrides[blockId] ?? {}), h: hFrac } as BlockOverride,
+          },
+        }));
+      },
+
+      bumpBlockFontScale(blockId, direction) {
+        const current = get().blockOverrides[blockId]?.fontScale ?? 1;
+        const next = Math.max(
+          FONT_SCALE_MIN,
+          Math.min(FONT_SCALE_MAX, +(current + direction * FONT_SCALE_STEP).toFixed(2)),
+        );
+        if (next === current) return;
+        pushSnap();
+        set(s => ({
+          blockOverrides: {
+            ...s.blockOverrides,
+            [blockId]: { ...(s.blockOverrides[blockId] ?? {}), fontScale: next } as BlockOverride,
           },
         }));
       },

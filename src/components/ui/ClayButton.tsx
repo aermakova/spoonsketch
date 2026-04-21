@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, type PressableProps, type ViewStyle } from 'react-native';
+import { Pressable, Text, StyleSheet, ActivityIndicator, type PressableProps, type ViewStyle } from 'react-native';
 import { useThemeStore } from '../../lib/store';
 import { fonts } from '../../theme/fonts';
 
@@ -7,36 +7,49 @@ interface ClayButtonProps extends Omit<PressableProps, 'style'> {
   label: string;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
+  // When true, the button shows a spinner and ignores taps. Pass your
+  // mutation's `isPending` — this is the app-wide double-submit guard.
+  loading?: boolean;
   style?: ViewStyle;
 }
 
-export function ClayButton({ label, variant = 'primary', size = 'md', style, ...rest }: ClayButtonProps) {
+export function ClayButton({ label, variant = 'primary', size = 'md', loading = false, disabled, style, ...rest }: ClayButtonProps) {
   const { palette } = useThemeStore();
+  const isBlocked = loading || disabled;
 
   return (
     <Pressable
+      disabled={isBlocked}
       style={({ pressed }) => [
         styles.base,
         styles[size],
         variant === 'primary' && { backgroundColor: palette.accent },
         variant === 'secondary' && { backgroundColor: palette.bg2, borderColor: palette.accent, borderWidth: 1.5 },
         variant === 'ghost' && { backgroundColor: 'transparent' },
-        pressed && styles.pressed,
+        pressed && !isBlocked && styles.pressed,
+        isBlocked && styles.disabled,
         style,
       ]}
       {...rest}
     >
-      <Text
-        style={[
-          styles.label,
-          styles[`label_${size}`],
-          variant === 'primary' && styles.labelPrimary,
-          variant === 'secondary' && { color: palette.accent },
-          variant === 'ghost' && { color: palette.accent },
-        ]}
-      >
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator
+          color={variant === 'primary' ? '#faf4e6' : palette.accent}
+          size="small"
+        />
+      ) : (
+        <Text
+          style={[
+            styles.label,
+            styles[`label_${size}`],
+            variant === 'primary' && styles.labelPrimary,
+            variant === 'secondary' && { color: palette.accent },
+            variant === 'ghost' && { color: palette.accent },
+          ]}
+        >
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -58,6 +71,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     transform: [{ scale: 0.97 }],
+  },
+  disabled: {
+    opacity: 0.55,
   },
   sm: { paddingHorizontal: 16, paddingVertical: 8 },
   md: { paddingHorizontal: 24, paddingVertical: 13 },

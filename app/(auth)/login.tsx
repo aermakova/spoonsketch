@@ -107,9 +107,10 @@ export default function LoginScreen() {
           )}
 
           <ClayButton
-            label={loading ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            label={mode === 'signin' ? 'Sign in' : 'Create account'}
             onPress={handleSubmit}
-            disabled={loading || !email.trim() || !password}
+            loading={loading}
+            disabled={!email.trim() || !password}
             style={styles.button}
           />
         </ScrollView>

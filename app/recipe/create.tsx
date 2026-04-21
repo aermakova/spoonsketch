@@ -77,10 +77,11 @@ export default function CreateRecipeScreen() {
           </TouchableOpacity>
           <Text style={styles.topTitle}>New recipe</Text>
           <ClayButton
-            label={mutation.isPending ? '…' : 'Save'}
+            label="Save"
             size="sm"
             onPress={handleSave}
-            disabled={mutation.isPending || !title.trim()}
+            loading={mutation.isPending}
+            disabled={!title.trim()}
           />
         </View>
 

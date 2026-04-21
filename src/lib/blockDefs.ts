@@ -11,10 +11,17 @@ export interface BlockAbsoluteLayout {
   scale: number;
 }
 
-// Stored as fractions: cx/pageWidth, cy/pageHeight, w/pageWidth, h/pageWidth
-export interface BlockOverride extends BlockAbsoluteLayout {
-  hidden?: boolean; // soft-delete: block stays in registry but is not rendered
+// Stored as fractions: cx/pageWidth, cy/pageHeight, w/pageWidth, h/pageWidth.
+// All layout fields optional so a fontScale-only override doesn't require writing layout.
+// Resolver falls back to BlockDef.getDefault() for any missing field.
+export interface BlockOverride extends Partial<BlockAbsoluteLayout> {
+  hidden?: boolean;
+  fontScale?: number; // 1 = default, clamped 0.6–1.8
 }
+
+export const FONT_SCALE_MIN = 0.6;
+export const FONT_SCALE_MAX = 1.8;
+export const FONT_SCALE_STEP = 0.1;
 
 export interface BlockDef {
   blockId: string;
@@ -22,6 +29,9 @@ export interface BlockDef {
   getDefault: (pw: number) => BlockAbsoluteLayout;
   minScale: number;
   maxScale: number;
+  // Text-heavy blocks get side-drag width handles and the font-size toolbar.
+  // Blocks containing a fixed-aspect-ratio photo set this false.
+  isTextHeavy: boolean;
 }
 
 const PAD = 16;   // matches canvas padding in editor and scrapbook view
@@ -47,6 +57,7 @@ const classicBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'header',
@@ -57,6 +68,7 @@ const classicBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + titleH + GAP + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'image',
@@ -72,6 +84,7 @@ const classicBlocks: BlockDef[] = [
       return { cx, cy, w, h: rowH, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: false,
   },
   {
     blockId: 'ingredients',
@@ -89,6 +102,7 @@ const classicBlocks: BlockDef[] = [
       return { cx, cy, w, h: rowH, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'steps',
@@ -103,6 +117,7 @@ const classicBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'tags',
@@ -119,6 +134,7 @@ const classicBlocks: BlockDef[] = [
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 
@@ -133,6 +149,7 @@ const photoHeroBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + h / 2, w: pw, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 2,
+    isTextHeavy: false,
   },
   {
     blockId: 'ingredients',
@@ -145,6 +162,7 @@ const photoHeroBlocks: BlockDef[] = [
       return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'method',
@@ -158,6 +176,7 @@ const photoHeroBlocks: BlockDef[] = [
       return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 
@@ -172,6 +191,7 @@ const minimalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'header',
@@ -183,6 +203,7 @@ const minimalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'ingredients',
@@ -195,6 +216,7 @@ const minimalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'method',
@@ -208,6 +230,7 @@ const minimalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 
@@ -222,6 +245,7 @@ const twoColumnBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'left-col',
@@ -234,6 +258,7 @@ const twoColumnBlocks: BlockDef[] = [
       return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: false,
   },
   {
     blockId: 'right-col',
@@ -247,6 +272,7 @@ const twoColumnBlocks: BlockDef[] = [
       return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 
@@ -261,6 +287,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'description',
@@ -271,6 +298,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: PAD + titleH + GAP + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'photo',
@@ -284,6 +312,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: PAD + imgW / 2, cy: top + rowH / 2, w: imgW, h: rowH, rotation: 0.017, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: false,
   },
   {
     blockId: 'meta',
@@ -299,6 +328,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: xStart + w / 2, cy: top + rowH / 2, w, h: rowH, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'steps',
@@ -313,6 +343,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'tags',
@@ -329,6 +360,7 @@ const journalBlocks: BlockDef[] = [
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 
@@ -343,6 +375,7 @@ const recipeCardBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: h / 2, w: pw, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: false,
   },
   {
     blockId: 'image',
@@ -355,6 +388,7 @@ const recipeCardBlocks: BlockDef[] = [
       return { cx: PAD + imgW / 2, cy: top + rowH / 2, w: imgW, h: rowH, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: false,
   },
   {
     blockId: 'ingredients',
@@ -369,6 +403,7 @@ const recipeCardBlocks: BlockDef[] = [
       return { cx: xStart + w / 2, cy: top + rowH / 2, w, h: rowH, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'steps',
@@ -382,6 +417,7 @@ const recipeCardBlocks: BlockDef[] = [
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
   {
     blockId: 'tags',
@@ -397,6 +433,7 @@ const recipeCardBlocks: BlockDef[] = [
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
   },
 ];
 

@@ -6,8 +6,10 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchRecipe } from '../../src/api/recipes';
+import { fetchCookbook } from '../../src/api/cookbooks';
+import { fetchRecipeCanvas, upsertRecipeCanvas } from '../../src/api/recipeCanvases';
 import { CanvasElement } from '../../src/components/canvas/CanvasElement';
 import { StickerTray } from '../../src/components/canvas/StickerTray';
 import { SkiaCanvas } from '../../src/components/canvas/SkiaCanvas';
@@ -18,6 +20,7 @@ import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
 import { FontPicker } from '../../src/components/canvas/FontPicker';
 import { useCanvasStore } from '../../src/lib/canvasStore';
 import type { BlockOverride } from '../../src/lib/blockDefs';
+import { getBlockDefs, FONT_SCALE_MIN, FONT_SCALE_MAX } from '../../src/lib/blockDefs';
 
 import { useDrawingStore } from '../../src/lib/drawingStore';
 import { useThemeStore } from '../../src/lib/store';
@@ -42,19 +45,45 @@ export default function EditorScreen() {
   const canvasWidth = sw - 48;
   const canvasHeight = Math.round(canvasWidth * 1.4142);
 
+  const queryClient = useQueryClient();
+
   const { data: recipe } = useQuery({
     queryKey: ['recipe', recipeId],
     queryFn: () => fetchRecipe(recipeId),
     enabled: !!recipeId,
   });
 
+  // Per-recipe canvas override row — may not exist until the user picks
+  // a template or font for this specific recipe.
+  const { data: canvasRow } = useQuery({
+    queryKey: ['recipeCanvas', recipeId],
+    queryFn: () => fetchRecipeCanvas(recipeId),
+    enabled: !!recipeId,
+  });
+
+  // Book defaults.
+  const cookbookId = recipe?.cookbook_id ?? null;
+  const { data: cookbook } = useQuery({
+    queryKey: ['cookbook', cookbookId],
+    queryFn: () => fetchCookbook(cookbookId!),
+    enabled: !!cookbookId,
+  });
+
+  const upsertCanvasMutation = useMutation({
+    mutationFn: (patch: { template_key?: string | null; recipe_font?: string | null }) =>
+      upsertRecipeCanvas(recipeId, patch as never),
+    onSuccess: (row) => queryClient.setQueryData(['recipeCanvas', recipeId], row),
+  });
+
   const {
     elements, selectedId, scrollEnabled, templateKey, recipeFont,
     blockOverrides, layoutResetVersion,
     stepOverrides, ingOverrides,
-    init, addSticker, updateEl, removeEl, select, setScrollEnabled,
+    init, hydrateTemplateAndFont,
+    addSticker, updateEl, removeEl, select, setScrollEnabled,
     setTemplateKey, setRecipeFont,
-    setBlockOverride, removeBlock, clearBlockOverrides,
+    setBlockOverride, setBlockHeightSilent, removeBlock, clearBlockOverrides,
+    bumpBlockFontScale,
     saveStepOverride, saveIngOverride,
     undo: undoSticker,
   } = useCanvasStore();
@@ -67,6 +96,27 @@ export default function EditorScreen() {
       initDrawing(recipeId);
     }
   }, [recipeId]);
+
+  // Precedence: per-recipe override (recipe_canvases) → cookbook default → fallback.
+  // Server is authoritative; runs silently, without pushing a history snapshot.
+  useEffect(() => {
+    if (!recipe) return;
+    const resolvedTemplate =
+      canvasRow?.template_key ?? cookbook?.default_template_key ?? undefined;
+    const resolvedFont =
+      canvasRow?.recipe_font ?? cookbook?.default_recipe_font ?? undefined;
+    hydrateTemplateAndFont({
+      templateKey: resolvedTemplate ?? undefined,
+      recipeFont: resolvedFont ?? undefined,
+    });
+  }, [
+    recipe?.id,
+    canvasRow?.template_key,
+    canvasRow?.recipe_font,
+    cookbook?.default_template_key,
+    cookbook?.default_recipe_font,
+    hydrateTemplateAndFont,
+  ]);
 
   const switchMode = useCallback((mode: EditorMode) => {
     if (mode === 'draw') {
@@ -113,13 +163,42 @@ export default function EditorScreen() {
     setSelectedBlockId(null);
   }, [removeBlock]);
 
+  // Picker handlers: update Zustand + persist the override to recipe_canvases.
+  // For template, the store's Alert gates the server write via the onApplied
+  // callback — cancelling leaves the server row unchanged.
+  const handleTemplateChange = useCallback((key: Parameters<typeof setTemplateKey>[0]) => {
+    setTemplateKey(key, (applied) => {
+      upsertCanvasMutation.mutate({ template_key: applied });
+    });
+  }, [setTemplateKey, upsertCanvasMutation]);
+
+  const handleFontChange = useCallback((key: Parameters<typeof setRecipeFont>[0]) => {
+    setRecipeFont(key);
+    upsertCanvasMutation.mutate({ recipe_font: key });
+  }, [setRecipeFont, upsertCanvasMutation]);
+
   const hasBlockOverrides =
     Object.keys(blockOverrides).length > 0 ||
     Object.keys(stepOverrides).length > 0 ||
     Object.keys(ingOverrides).length > 0;
 
+  const selectedBlockDef = useMemo(() => {
+    if (!selectedBlockId) return null;
+    return getBlockDefs(templateKey).find(d => d.blockId === selectedBlockId) ?? null;
+  }, [selectedBlockId, templateKey]);
+  const selectedFontScale = selectedBlockId
+    ? (blockOverrides[selectedBlockId]?.fontScale ?? 1)
+    : 1;
+  const showFontToolbar =
+    editorMode === 'layout' && blockEditMode && !!selectedBlockId && !!selectedBlockDef?.isTextHeavy;
+
   // Panel height: layout mode grows to fit template + font pickers + arrange row
-  const panelHeight = (editorMode === 'draw' ? 210 : editorMode === 'layout' ? 264 : 148) + insets.bottom;
+  // (+ font toolbar row when a text-heavy block is selected).
+  const panelHeight = (
+    editorMode === 'draw' ? 210
+    : editorMode === 'layout' ? (showFontToolbar ? 312 : 264)
+    : 148
+  ) + insets.bottom;
 
   return (
     <ErrorBoundary fallbackLabel="Editor crashed — your work is safe">
@@ -161,6 +240,7 @@ export default function EditorScreen() {
                 selectedBlockId={selectedBlockId}
                 onSelectBlock={setSelectedBlockId}
                 onUpdateBlock={handleUpdateBlock}
+                onMeasuredHeight={setBlockHeightSilent}
                 onDeleteBlock={handleDeleteBlock}
                 onDragStart={() => setScrollEnabled(false)}
                 onDragEnd={() => setScrollEnabled(true)}
@@ -236,8 +316,8 @@ export default function EditorScreen() {
         {/* Panel content */}
         {editorMode === 'layout' && (
           <>
-            <TemplatePicker selected={templateKey} onSelect={setTemplateKey} />
-            <FontPicker selected={recipeFont} onSelect={setRecipeFont} />
+            <TemplatePicker selected={templateKey} onSelect={handleTemplateChange} />
+            <FontPicker selected={recipeFont} onSelect={handleFontChange} />
 
             {/* Arrange Blocks row */}
             <View style={styles.arrangeRow}>
@@ -258,6 +338,26 @@ export default function EditorScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {showFontToolbar && selectedBlockId && (
+              <View style={styles.fontRow}>
+                <TouchableOpacity
+                  style={[styles.fontBtn, selectedFontScale <= FONT_SCALE_MIN + 1e-6 && styles.fontBtnDisabled]}
+                  onPress={() => bumpBlockFontScale(selectedBlockId, -1)}
+                  disabled={selectedFontScale <= FONT_SCALE_MIN + 1e-6}
+                >
+                  <Text style={styles.fontBtnTextSmall}>A−</Text>
+                </TouchableOpacity>
+                <Text style={styles.fontPct}>{Math.round(selectedFontScale * 100)}%</Text>
+                <TouchableOpacity
+                  style={[styles.fontBtn, selectedFontScale >= FONT_SCALE_MAX - 1e-6 && styles.fontBtnDisabled]}
+                  onPress={() => bumpBlockFontScale(selectedBlockId, 1)}
+                  disabled={selectedFontScale >= FONT_SCALE_MAX - 1e-6}
+                >
+                  <Text style={styles.fontBtnTextLarge}>A+</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
         {editorMode === 'stickers' && (
@@ -375,5 +475,43 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 12,
     color: 'rgba(196,106,76,0.7)',
+  },
+  fontRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    gap: 12,
+  },
+  fontBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  fontBtnDisabled: {
+    opacity: 0.35,
+  },
+  fontBtnTextSmall: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: '#e8d8c0',
+  },
+  fontBtnTextLarge: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    color: '#e8d8c0',
+  },
+  fontPct: {
+    minWidth: 56,
+    textAlign: 'center',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
   },
 });

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, RefreshControl, Modal, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -69,6 +70,7 @@ function CookbookFormModal({
   onClose,
   onSave,
   mode,
+  submitting = false,
   initialTitle = '',
   initialPalette = 'terracotta',
 }: {
@@ -76,6 +78,7 @@ function CookbookFormModal({
   onClose: () => void;
   onSave: (title: string, palette: Cookbook['palette']) => void;
   mode: 'create' | 'edit';
+  submitting?: boolean;
   initialTitle?: string;
   initialPalette?: Cookbook['palette'];
 }) {
@@ -83,13 +86,18 @@ function CookbookFormModal({
   const [palette, setPalette] = useState<Cookbook['palette']>(initialPalette);
 
   function handleSave() {
-    if (!title.trim()) return;
+    if (submitting || !title.trim()) return;
     onSave(title.trim(), palette);
   }
 
+  const saveBlocked = submitting || !title.trim();
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={modal.overlay}>
+      <KeyboardAvoidingView
+        style={modal.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={modal.sheet}>
           <Text style={modal.heading}>{mode === 'create' ? 'New Cookbook' : 'Edit Cookbook'}</Text>
 
@@ -120,18 +128,30 @@ function CookbookFormModal({
           </View>
 
           <View style={modal.actions}>
-            <TouchableOpacity style={modal.cancelBtn} onPress={onClose}>
+            <TouchableOpacity
+              style={modal.cancelBtn}
+              onPress={onClose}
+              disabled={submitting}
+            >
               <Text style={modal.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[modal.createBtn, { backgroundColor: PALETTE_ACCENT[palette] }]}
+              style={[
+                modal.createBtn,
+                { backgroundColor: PALETTE_ACCENT[palette] },
+                saveBlocked && modal.disabled,
+              ]}
               onPress={handleSave}
+              disabled={saveBlocked}
             >
-              <Text style={modal.createText}>{mode === 'create' ? 'Create' : 'Save'}</Text>
+              {submitting
+                ? <ActivityIndicator color={colors.paper} />
+                : <Text style={modal.createText}>{mode === 'create' ? 'Create' : 'Save'}</Text>
+              }
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -204,6 +224,7 @@ export default function ShelvesScreen() {
   }, [filtered]);
 
   function handleDeleteCookbook(cb: Cookbook) {
+    if (deleteMutation.isPending) return;
     Alert.alert('Delete cookbook?', 'This will delete all pages. Recipes are kept.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(cb.id) },
@@ -363,16 +384,21 @@ export default function ShelvesScreen() {
             renderRightActions={() => (
               <View style={swipe.actions}>
                 <TouchableOpacity
-                  style={swipe.editBtn}
+                  style={[swipe.editBtn, updateMutation.isPending && swipe.disabled]}
                   onPress={() => setEditingCookbook(cb)}
+                  disabled={updateMutation.isPending}
                 >
                   <Text style={swipe.editText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={swipe.deleteBtn}
+                  style={[swipe.deleteBtn, deleteMutation.isPending && swipe.disabled]}
                   onPress={() => handleDeleteCookbook(cb)}
+                  disabled={deleteMutation.isPending}
                 >
-                  <Text style={swipe.deleteText}>Delete</Text>
+                  {deleteMutation.isPending
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={swipe.deleteText}>Delete</Text>
+                  }
                 </TouchableOpacity>
               </View>
             )}
@@ -388,7 +414,11 @@ export default function ShelvesScreen() {
       <CookbookFormModal
         visible={showCreateModal}
         mode="create"
-        onClose={() => setShowCreateModal(false)}
+        submitting={createMutation.isPending}
+        onClose={() => {
+          if (createMutation.isPending) return;
+          setShowCreateModal(false);
+        }}
         onSave={(title, pal) => createMutation.mutate({ title, palette: pal })}
       />
 
@@ -397,12 +427,18 @@ export default function ShelvesScreen() {
           key={editingCookbook.id}
           visible
           mode="edit"
+          submitting={updateMutation.isPending}
           initialTitle={editingCookbook.title}
           initialPalette={editingCookbook.palette}
-          onClose={() => setEditingCookbook(null)}
-          onSave={(title, pal) => {
-            updateMutation.mutate({ id: editingCookbook.id, title, palette: pal });
+          onClose={() => {
+            if (updateMutation.isPending) return;
             setEditingCookbook(null);
+          }}
+          onSave={(title, pal) => {
+            updateMutation.mutate(
+              { id: editingCookbook.id, title, palette: pal },
+              { onSuccess: () => setEditingCookbook(null) },
+            );
           }}
         />
       )}
@@ -556,6 +592,7 @@ const swipe = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
+  disabled: { opacity: 0.55 },
 });
 
 const modal = StyleSheet.create({
@@ -605,4 +642,5 @@ const modal = StyleSheet.create({
     alignItems: 'center',
   },
   createText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.paper },
+  disabled: { opacity: 0.55 },
 });

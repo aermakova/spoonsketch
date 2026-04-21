@@ -12,9 +12,11 @@ import { fetchBookPages, addBookPage, deleteBookPage, reorderBookPages } from '.
 import { fetchRecipes } from '../../src/api/recipes';
 import { BookPageRow } from '../../src/components/book/BookPageRow';
 import { PageTypePicker } from '../../src/components/book/PageTypePicker';
+import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
+import { FontPicker } from '../../src/components/canvas/FontPicker';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
-import type { BookPage, PageType } from '../../src/types/cookbook';
+import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey } from '../../src/types/cookbook';
 
 function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }) {
   const entries = pages
@@ -44,6 +46,70 @@ function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }
   );
 }
 
+// Book-level defaults for new recipes. A recipe can still override template +
+// font per-page via the editor; that override lives in recipe_canvases.
+function SettingsModal({
+  cookbook,
+  onClose,
+  onChangeTemplate,
+  onChangeFont,
+}: {
+  cookbook: Cookbook;
+  onClose: () => void;
+  onChangeTemplate: (key: CookbookTemplateKey) => void;
+  onChangeFont: (key: CookbookFontKey) => void;
+}) {
+  const template = (cookbook.default_template_key ?? 'classic') as CookbookTemplateKey;
+  const font = (cookbook.default_recipe_font ?? 'caveat') as CookbookFontKey;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <TouchableOpacity style={settings.backdrop} onPress={onClose} activeOpacity={1} />
+      <View style={settings.modal}>
+        <View style={settings.headerRow}>
+          <Text style={settings.heading}>Book settings</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <Text style={settings.closeX}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={settings.section}>Default template</Text>
+        <Text style={settings.hint}>Applied to every new recipe added to this book.</Text>
+        <TemplatePicker selected={template} onSelect={onChangeTemplate} />
+
+        <Text style={[settings.section, { marginTop: 12 }]}>Default handwriting font</Text>
+        <Text style={settings.hint}>Used for recipe headings and flourishes.</Text>
+        <FontPicker selected={font} onSelect={onChangeFont} />
+
+        <View style={settings.comingSoon}>
+          <Text style={settings.comingSoonText}>
+            Section titles and paper type are coming next.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const settings = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  modal: {
+    position: 'absolute', left: 16, right: 16, top: '12%',
+    backgroundColor: colors.paper, borderRadius: 16, padding: 18,
+    shadowColor: colors.ink, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  heading: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink },
+  closeX: { fontSize: 18, color: colors.inkFaint, paddingHorizontal: 4 },
+  section: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.ink, marginTop: 4 },
+  hint: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, marginBottom: 4 },
+  comingSoon: {
+    marginTop: 14, paddingVertical: 8, paddingHorizontal: 10,
+    backgroundColor: colors.bg2, borderRadius: 8,
+  },
+  comingSoonText: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, textAlign: 'center' },
+});
+
 const toc = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   modal: {
@@ -68,6 +134,7 @@ export default function BookBuilderScreen() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
 
@@ -125,6 +192,23 @@ export default function BookBuilderScreen() {
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       updateCookbook(id, { title }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] }),
+  });
+
+  // Optimistic patch — the picker feels instant even on slow networks.
+  // On error we fall back to refetch so the UI doesn't lie.
+  const settingsMutation = useMutation({
+    mutationFn: (patch: { default_template_key?: CookbookTemplateKey; default_recipe_font?: CookbookFontKey }) =>
+      updateCookbook(cookbookId, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: ['cookbook', cookbookId] });
+      const prev = qc.getQueryData<Cookbook>(['cookbook', cookbookId]);
+      if (prev) qc.setQueryData<Cookbook>(['cookbook', cookbookId], { ...prev, ...patch });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['cookbook', cookbookId], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] }),
   });
 
   const handleDragEnd = useCallback(({ data }: { data: BookPage[] }) => {
@@ -223,6 +307,14 @@ export default function BookBuilderScreen() {
             </TouchableOpacity>
           )}
 
+          <TouchableOpacity
+            style={styles.gearBtn}
+            onPress={() => setSettingsOpen(true)}
+            hitSlop={8}
+          >
+            <Text style={styles.gearIcon}>⚙︎</Text>
+          </TouchableOpacity>
+
           {/* Export stub */}
           <TouchableOpacity style={styles.exportBtn} onPress={() =>
             Alert.alert('Coming soon', 'PDF export will be available in a future update.')
@@ -278,6 +370,16 @@ export default function BookBuilderScreen() {
 
         {/* TOC modal */}
         {tocOpen && <TocModal pages={pages} onClose={() => setTocOpen(false)} />}
+
+        {/* Book settings modal */}
+        {settingsOpen && cookbook && (
+          <SettingsModal
+            cookbook={cookbook}
+            onClose={() => setSettingsOpen(false)}
+            onChangeTemplate={(key) => settingsMutation.mutate({ default_template_key: key })}
+            onChangeFont={(key) => settingsMutation.mutate({ default_recipe_font: key })}
+          />
+        )}
       </View>
   );
 }
@@ -335,6 +437,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.terracotta,
     paddingVertical: 2,
+  },
+  gearBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  gearIcon: {
+    fontSize: 18,
+    color: colors.inkSoft,
   },
   exportBtn: {
     paddingHorizontal: 12,

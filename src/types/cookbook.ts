@@ -8,6 +8,10 @@ export type PageType =
   | 'table_of_contents'
   | 'closing';
 
+export type CookbookTemplateKey =
+  | 'classic' | 'photo-hero' | 'minimal' | 'two-column' | 'journal' | 'recipe-card';
+export type CookbookFontKey = 'caveat' | 'marck' | 'bad-script' | 'amatic';
+
 export interface Cookbook {
   id: string;
   user_id: string;
@@ -15,6 +19,8 @@ export interface Cookbook {
   description: string | null;
   cover_url: string | null;
   palette: 'terracotta' | 'sage' | 'blush' | 'cobalt';
+  default_template_key: CookbookTemplateKey | null;
+  default_recipe_font: CookbookFontKey | null;
   is_public: boolean;
   sort_order: number;
   created_at: string;
@@ -23,6 +29,8 @@ export interface Cookbook {
 
 export type CookbookInsert = Pick<Cookbook, 'title' | 'palette'> & {
   description?: string | null;
+  default_template_key?: CookbookTemplateKey | null;
+  default_recipe_font?: CookbookFontKey | null;
 };
 
 export interface BookPage {
