@@ -14,6 +14,7 @@ import { BookPageRow } from '../../src/components/book/BookPageRow';
 import { PageTypePicker } from '../../src/components/book/PageTypePicker';
 import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
 import { FontPicker } from '../../src/components/canvas/FontPicker';
+import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey } from '../../src/types/cookbook';
@@ -126,7 +127,7 @@ const toc = StyleSheet.create({
   closeBtnText: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.ink },
 });
 
-export default function BookBuilderScreen() {
+function BookBuilderScreen() {
   const { cookbookId } = useLocalSearchParams<{ cookbookId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -191,7 +192,11 @@ export default function BookBuilderScreen() {
   const renameMutation = useMutation({
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       updateCookbook(id, { title }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] }),
+    // Shelves list also shows the title.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] });
+      qc.invalidateQueries({ queryKey: ['cookbooks'] });
+    },
   });
 
   // Optimistic patch — the picker feels instant even on slow networks.
@@ -208,7 +213,11 @@ export default function BookBuilderScreen() {
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(['cookbook', cookbookId], ctx.prev);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] }),
+    // Keep shelves list in sync in case it starts surfacing defaults later.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['cookbook', cookbookId] });
+      qc.invalidateQueries({ queryKey: ['cookbooks'] });
+    },
   });
 
   const handleDragEnd = useCallback(({ data }: { data: BookPage[] }) => {
@@ -505,3 +514,5 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+export default withErrorBoundary(BookBuilderScreen, 'Book builder crashed');

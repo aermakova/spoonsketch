@@ -9,11 +9,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createRecipe } from '../../src/api/recipes';
 import { ClayButton } from '../../src/components/ui/ClayButton';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
+import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { useThemeStore } from '../../src/lib/store';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
-export default function CreateRecipeScreen() {
+function CreateRecipeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { palette } = useThemeStore();
@@ -237,3 +238,5 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 10 },
 });
+
+export default withErrorBoundary(CreateRecipeScreen, 'Recipe form crashed');

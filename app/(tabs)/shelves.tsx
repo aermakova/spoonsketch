@@ -10,6 +10,7 @@ import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeabl
 import { fetchRecipes } from '../../src/api/recipes';
 import { fetchCookbooks, createCookbook, updateCookbook, deleteCookbook } from '../../src/api/cookbooks';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
+import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { RecipeCard } from '../../src/components/ui/RecipeCard';
 import { FoodImage } from '../../src/components/ui/FoodImage';
 import { CookbookCard } from '../../src/components/book/CookbookCard';
@@ -158,7 +159,7 @@ function CookbookFormModal({
 
 // ─── Main screen ─────────────────────────────────────────────────
 
-export default function ShelvesScreen() {
+function ShelvesScreen() {
   const { palette } = useThemeStore();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -193,12 +194,20 @@ export default function ShelvesScreen() {
   const updateMutation = useMutation({
     mutationFn: ({ id, title, palette }: { id: string; title: string; palette: Cookbook['palette'] }) =>
       updateCookbook(id, { title, palette }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cookbooks'] }),
+    // Both the list and any detail view reading ['cookbook', id] must refresh.
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['cookbooks'] });
+      queryClient.invalidateQueries({ queryKey: ['cookbook', vars.id] });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCookbook,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cookbooks'] }),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ['cookbooks'] });
+      queryClient.removeQueries({ queryKey: ['cookbook', id] });
+      queryClient.removeQueries({ queryKey: ['book-pages', id] });
+    },
   });
 
   const filtered = useMemo(() => {
@@ -644,3 +653,5 @@ const modal = StyleSheet.create({
   createText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.paper },
   disabled: { opacity: 0.55 },
 });
+
+export default withErrorBoundary(ShelvesScreen, 'Shelves crashed');

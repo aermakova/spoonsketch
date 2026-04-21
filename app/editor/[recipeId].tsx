@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -73,6 +74,10 @@ export default function EditorScreen() {
     mutationFn: (patch: { template_key?: string | null; recipe_font?: string | null }) =>
       upsertRecipeCanvas(recipeId, patch as never),
     onSuccess: (row) => queryClient.setQueryData(['recipeCanvas', recipeId], row),
+    // TanStack keeps mutations alive across unmount, so the save still
+    // completes if the user taps Done mid-flight — but they'd never see
+    // a failure. Surface it here so silent drops are visible.
+    onError: (e: any) => Alert.alert('Save failed', e?.message ?? 'Could not save your changes.'),
   });
 
   const {
@@ -205,7 +210,11 @@ export default function EditorScreen() {
     <View style={styles.root}>
       {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => goBack()} style={styles.closeBtn}>
+        <TouchableOpacity
+          onPress={() => goBack()}
+          style={[styles.closeBtn, upsertCanvasMutation.isPending && styles.disabledBtn]}
+          disabled={upsertCanvasMutation.isPending}
+        >
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
         <Text style={styles.topTitle} numberOfLines={1}>{recipe?.title ?? '…'}</Text>
@@ -213,8 +222,19 @@ export default function EditorScreen() {
           <TouchableOpacity style={styles.undoBtn} onPress={editorMode === 'draw' ? undoDrawing : undoSticker}>
             <Text style={styles.undoText}>↩</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: palette.accent }]} onPress={() => goBack()}>
-            <Text style={styles.saveBtnText}>Done</Text>
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              { backgroundColor: palette.accent },
+              upsertCanvasMutation.isPending && styles.disabledBtn,
+            ]}
+            onPress={() => goBack()}
+            disabled={upsertCanvasMutation.isPending}
+          >
+            {upsertCanvasMutation.isPending
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.saveBtnText}>Done</Text>
+            }
           </TouchableOpacity>
         </View>
       </View>
@@ -391,8 +411,9 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   undoBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   undoText: { color: '#a89070', fontSize: 18 },
-  saveBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  saveBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, minWidth: 58, alignItems: 'center' },
   saveBtnText: { fontFamily: fonts.bodyBold, fontSize: 14, color: '#fff' },
+  disabledBtn: { opacity: 0.55 },
   canvasScroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   canvas: {
     borderRadius: 3,

@@ -37,6 +37,21 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 }
 
+// HOC sugar — screens export `withErrorBoundary(Screen, 'label')` so a
+// render-time crash in one tab doesn't take down siblings.
+export function withErrorBoundary<P extends object>(
+  Component: React.ComponentType<P>,
+  fallbackLabel?: string,
+) {
+  const Wrapped = (props: P) => (
+    <ErrorBoundary fallbackLabel={fallbackLabel}>
+      <Component {...props} />
+    </ErrorBoundary>
+  );
+  Wrapped.displayName = `withErrorBoundary(${Component.displayName ?? Component.name ?? 'Component'})`;
+  return Wrapped;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1, alignItems: 'center', justifyContent: 'center',

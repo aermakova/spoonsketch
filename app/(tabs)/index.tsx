@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRecipes } from '../../src/api/recipes';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
+import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { FoodImage } from '../../src/components/ui/FoodImage';
 import { Sticker } from '../../src/components/stickers/Sticker';
 import { useThemeStore } from '../../src/lib/store';
@@ -24,7 +25,7 @@ function totalTime(r: Recipe) {
   return t > 0 ? `${t} min` : null;
 }
 
-export default function HomeScreen() {
+function HomeScreen() {
   const { palette } = useThemeStore();
   const { session } = useAuth();
   const router = useRouter();
@@ -271,3 +272,5 @@ const styles = StyleSheet.create({
   },
   favIcon: { fontSize: 16, color: '#d97b7b' },
 });
+
+export default withErrorBoundary(HomeScreen, 'Home crashed');
