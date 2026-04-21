@@ -25,6 +25,19 @@ export async function addBookPage(input: BookPageInsert): Promise<BookPage> {
     .select()
     .single();
   if (error) throw new ApiError(error.message, error.code);
+
+  // Link the recipe to this cookbook on first add so the editor's
+  // hydration (per-recipe override → cookbook default → fallback)
+  // can find the book defaults. Only backfills when the recipe has
+  // no home book yet — being added to a second book doesn't overwrite.
+  if (input.page_type === 'recipe' && input.recipe_id) {
+    await supabase
+      .from('recipes')
+      .update({ cookbook_id: input.cookbook_id })
+      .eq('id', input.recipe_id)
+      .is('cookbook_id', null);
+  }
+
   return data as BookPage;
 }
 

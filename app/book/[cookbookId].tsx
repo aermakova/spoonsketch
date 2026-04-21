@@ -52,16 +52,27 @@ function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }
 function SettingsModal({
   cookbook,
   onClose,
-  onChangeTemplate,
-  onChangeFont,
+  onSave,
+  saving,
 }: {
   cookbook: Cookbook;
   onClose: () => void;
-  onChangeTemplate: (key: CookbookTemplateKey) => void;
-  onChangeFont: (key: CookbookFontKey) => void;
+  onSave: (patch: { default_template_key: CookbookTemplateKey; default_recipe_font: CookbookFontKey }) => void;
+  saving: boolean;
 }) {
-  const template = (cookbook.default_template_key ?? 'classic') as CookbookTemplateKey;
-  const font = (cookbook.default_recipe_font ?? 'caveat') as CookbookFontKey;
+  // Draft state so the user can preview without committing; only
+  // Save writes to the server. Prevents the "did it save?" confusion.
+  const initialTemplate = (cookbook.default_template_key ?? 'classic') as CookbookTemplateKey;
+  const initialFont = (cookbook.default_recipe_font ?? 'caveat') as CookbookFontKey;
+  const [template, setTemplate] = useState<CookbookTemplateKey>(initialTemplate);
+  const [font, setFont] = useState<CookbookFontKey>(initialFont);
+
+  const dirty = template !== initialTemplate || font !== initialFont;
+
+  const handleSave = () => {
+    if (!dirty || saving) { onClose(); return; }
+    onSave({ default_template_key: template, default_recipe_font: font });
+  };
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -69,24 +80,38 @@ function SettingsModal({
       <View style={settings.modal}>
         <View style={settings.headerRow}>
           <Text style={settings.heading}>Book settings</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={8}>
+          <TouchableOpacity onPress={onClose} hitSlop={8} disabled={saving}>
             <Text style={settings.closeX}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={settings.section}>Default template</Text>
         <Text style={settings.hint}>Applied to every new recipe added to this book.</Text>
-        <TemplatePicker selected={template} onSelect={onChangeTemplate} />
+        <TemplatePicker selected={template} onSelect={setTemplate} />
 
         <Text style={[settings.section, { marginTop: 12 }]}>Default handwriting font</Text>
         <Text style={settings.hint}>Used for recipe headings and flourishes.</Text>
-        <FontPicker selected={font} onSelect={onChangeFont} />
+        <FontPicker selected={font} onSelect={setFont} />
 
-        <View style={settings.comingSoon}>
-          <Text style={settings.comingSoonText}>
-            Section titles and paper type are coming next.
-          </Text>
+        <View style={settings.actions}>
+          <TouchableOpacity onPress={onClose} style={settings.cancelBtn} disabled={saving}>
+            <Text style={settings.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={[settings.saveBtn, (!dirty || saving) && settings.saveBtnIdle]}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={settings.saveText}>{dirty ? 'Save' : 'Done'}</Text>
+            }
+          </TouchableOpacity>
         </View>
+
+        <Text style={settings.comingSoonText}>
+          Section titles and paper type are coming next.
+        </Text>
       </View>
     </View>
   );
@@ -104,11 +129,19 @@ const settings = StyleSheet.create({
   closeX: { fontSize: 18, color: colors.inkFaint, paddingHorizontal: 4 },
   section: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.ink, marginTop: 4 },
   hint: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, marginBottom: 4 },
-  comingSoon: {
-    marginTop: 14, paddingVertical: 8, paddingHorizontal: 10,
-    backgroundColor: colors.bg2, borderRadius: 8,
+  actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    backgroundColor: colors.bg2, alignItems: 'center',
   },
-  comingSoonText: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, textAlign: 'center' },
+  cancelText: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.inkSoft },
+  saveBtn: {
+    flex: 2, paddingVertical: 12, borderRadius: 10,
+    backgroundColor: colors.terracotta, alignItems: 'center',
+  },
+  saveBtnIdle: { opacity: 0.55 },
+  saveText: { fontFamily: fonts.bodyBold, fontSize: 15, color: '#fff' },
+  comingSoonText: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, textAlign: 'center', marginTop: 10 },
 });
 
 const toc = StyleSheet.create({
@@ -178,7 +211,15 @@ function BookBuilderScreen() {
 
   const addMutation = useMutation({
     mutationFn: addBookPage,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['book-pages', cookbookId] }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['book-pages', cookbookId] });
+      // addBookPage backfills recipes.cookbook_id on first-add, so the
+      // recipe query needs to refetch for the editor to see the link.
+      if (vars.page_type === 'recipe' && vars.recipe_id) {
+        qc.invalidateQueries({ queryKey: ['recipe', vars.recipe_id] });
+        qc.invalidateQueries({ queryKey: ['recipes'] });
+      }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -385,8 +426,10 @@ function BookBuilderScreen() {
           <SettingsModal
             cookbook={cookbook}
             onClose={() => setSettingsOpen(false)}
-            onChangeTemplate={(key) => settingsMutation.mutate({ default_template_key: key })}
-            onChangeFont={(key) => settingsMutation.mutate({ default_recipe_font: key })}
+            saving={settingsMutation.isPending}
+            onSave={(patch) => settingsMutation.mutate(patch, {
+              onSuccess: () => setSettingsOpen(false),
+            })}
           />
         )}
       </View>

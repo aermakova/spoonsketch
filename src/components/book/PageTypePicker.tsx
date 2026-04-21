@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated,
-  FlatList, Pressable, TextInput,
+  FlatList, Pressable, TextInput, Keyboard, Platform,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/fonts';
@@ -35,7 +35,11 @@ interface Props {
 }
 
 export function PageTypePicker({ visible, onClose, onSelect, recipes, existingPageTypes }: Props) {
-  const translateY = useRef(new Animated.Value(500)).current;
+  const entryY = useRef(new Animated.Value(500)).current;
+  // Keyboard offset: negative value pushes the sheet up when the keyboard is shown.
+  // Kept separate from entryY so open/close spring and keyboard slide can't fight.
+  const kbY = useRef(new Animated.Value(0)).current;
+  const combinedY = useMemo(() => Animated.add(entryY, kbY), [entryY, kbY]);
   const [mounted, setMounted] = useState(false);
   const [pickingRecipe, setPickingRecipe] = useState(false);
   const [recipeSearch, setRecipeSearch] = useState('');
@@ -45,14 +49,14 @@ export function PageTypePicker({ visible, onClose, onSelect, recipes, existingPa
       setMounted(true);
       setPickingRecipe(false);
       setRecipeSearch('');
-      Animated.spring(translateY, {
+      Animated.spring(entryY, {
         toValue: 0,
         useNativeDriver: true,
         tension: 80,
         friction: 12,
       }).start();
     } else {
-      Animated.spring(translateY, {
+      Animated.spring(entryY, {
         toValue: 500,
         useNativeDriver: true,
         tension: 80,
@@ -60,6 +64,26 @@ export function PageTypePicker({ visible, onClose, onSelect, recipes, existingPa
       }).start(() => setMounted(false));
     }
   }, [visible]);
+
+  // Rise above the iOS keyboard when the search input focuses.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      Animated.timing(kbY, {
+        toValue: -e.endCoordinates.height,
+        duration: e.duration ?? 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', (e) => {
+      Animated.timing(kbY, {
+        toValue: 0,
+        duration: e.duration ?? 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [kbY]);
 
   const hasOne = (type: PageType) => existingPageTypes.includes(type);
   const isDisabled = (type: PageType) =>
@@ -84,7 +108,7 @@ export function PageTypePicker({ visible, onClose, onSelect, recipes, existingPa
     <>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY: combinedY }] }]}>
         <View style={styles.handle} />
 
         {pickingRecipe ? (
