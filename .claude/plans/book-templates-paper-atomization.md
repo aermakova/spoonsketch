@@ -25,13 +25,25 @@
 - **Keyboard avoidance** — `CookbookFormModal` in `app/(tabs)/shelves.tsx` was covered by the keyboard; wrapped in `KeyboardAvoidingView` (iOS `behavior="padding"`).
 - **Double-submit guard (app-wide)** — new `loading` prop on `ClayButton` (spinner + disable), new `useSubmitGuard` hook for raw async handlers, every create/delete/save button now blocks second taps while a request is in flight. Sites fixed: cookbook create/edit modal, cookbook swipe delete, sign-out, login, recipe create, editor pickers already safe via upsert.
 
+### Stability cleanup (landed 2026-04-21, commit `37e3618`)
+
+- ✅ Editor save-in-flight UX: `Done` button spinner + disabled close/Done while `upsertCanvasMutation.isPending`; `onError` Alert surfaces silent failures.
+- ✅ TanStack cache invalidation audit — fixed three gaps: shelves `updateMutation` and `deleteMutation` now invalidate `['cookbook', id]` + remove `['book-pages', id]`; book-builder `renameMutation` + `settingsMutation` now invalidate `['cookbooks']` too.
+- ✅ RLS audit — `supabase/migrations/20260418000002_rls_and_auth.sql` uses row-level `auth.uid() = user_id` policies; new columns are auto-covered (no column-level restrictions). Clean.
+- ✅ Error boundaries on every tab root — new `withErrorBoundary` HOC in `src/components/ui/ErrorBoundary.tsx`; applied to `app/(tabs)/index.tsx`, `shelves.tsx`, `elements.tsx`, `me.tsx`, `app/book/[cookbookId].tsx`, `app/recipe/create.tsx`. Editor and recipe detail already had one. `app/(tabs)/add.tsx` is a `<Redirect>` stub, skipped.
+
+### Phase C follow-up bugs (found during device test 2026-04-21)
+
+All fixed, uncommitted at time of writing — see `.claude/test-plans/bug-log.md` for details.
+
+- ✅ **BUG-006** — `PageTypePicker` (Add page → Choose Recipe) recipe list covered by iOS keyboard. Fixed with `Keyboard.addListener` + animated offset pattern (custom absolute-positioned sheets can't use `KeyboardAvoidingView`).
+- ✅ **BUG-007** — Book Settings modal had no Save button and auto-saved per-tap. Reworked to draft state + explicit **Cancel / Save** buttons.
+- ✅ **BUG-008** — Book default never flowed to recipes because `addBookPage` didn't link `recipes.cookbook_id`. Editor's hydration (`per-recipe override → cookbook default → fallback`) had nothing to resolve to. Fixed: `addBookPage` backfills `recipes.cookbook_id` on first-add; book builder `addMutation` invalidates `['recipe', id]` + `['recipes']`.
+- ✅ **BUG-009** — SecureStore "User interaction is not allowed" crash when iOS is locked / app backgrounded. Fixed via `AppState` listener that starts/stops Supabase's auto-refresh (canonical pattern).
+
 ### Next up (in order)
 
-1. **Stability cleanup** (prerequisite for anything else):
-   - Navigation-during-mutation safety in the editor (block back-nav while save in flight; or await via mutateAsync).
-   - TanStack cache invalidation audit — anywhere a mutation changes a row that other queries depend on.
-   - RLS audit of the new columns (`default_template_key`, `default_recipe_font`, `recipe_font`).
-   - Error boundaries on every tab root (CLAUDE.md rule; only editor has one today).
+1. **Commit BUG-006…009 fixes** + re-run Phase C phone test end-to-end.
 2. **Phase D** — cookbook-level section titles.
 3. **Phase E** — paper type.
 4. **Phases A + B** — canvas atomization (one PR).
