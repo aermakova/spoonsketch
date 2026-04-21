@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Spoon & Sketch",
+    "slug": "spoonsketch",
+    "version": "1.0.0",
+    "scheme": "spoonsketch",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f4ecdc"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.spoonsketch.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f4ecdc"
+      },
+      "package": "com.spoonsketch.app",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store"
+    ]
+  }
+}

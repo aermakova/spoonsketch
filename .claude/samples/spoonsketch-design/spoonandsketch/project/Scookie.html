@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Scookie — Scrapbook Cookbook</title>
+<link rel="stylesheet" href="styles.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+  body { margin: 0; background: #f0eee9; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+
+  /* Tweaks panel */
+  #tweaks {
+    position: fixed; right: 20px; bottom: 20px; width: 280px;
+    background: rgba(250,244,230,0.97); border-radius: 22px;
+    padding: 16px; z-index: 9999;
+    font-family: 'Nunito', sans-serif;
+    box-shadow: 0 20px 40px rgba(80,50,30,0.25), inset 1px 1px 0 rgba(255,255,255,0.8);
+    border: 1px solid rgba(180,140,90,0.2);
+    display: none;
+  }
+  #tweaks.on { display: block; }
+  #tweaks .tw-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; margin-bottom: 8px; letter-spacing: -0.01em; }
+  #tweaks .tw-row { margin-bottom: 12px; }
+  #tweaks .tw-label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #a39080; margin-bottom: 6px; }
+  #tweaks .tw-options { display: flex; gap: 6px; flex-wrap: wrap; }
+  #tweaks .tw-opt { padding: 6px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #f4ecdc; color: #6b5747; cursor: pointer; }
+  #tweaks .tw-opt.active { background: #c46a4c; color: #fff6e8; }
+  #tweaks .tw-swatch { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3); }
+  #tweaks .tw-swatch.active { box-shadow: 0 0 0 2px #3b2a1f, inset 0 0 0 2px rgba(255,255,255,0.5); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Tweaks panel -->
+<div id="tweaks">
+  <div class="tw-title">Tweaks</div>
+  <div class="tw-row">
+    <div class="tw-label">Palette</div>
+    <div class="tw-options" id="tw-palette"></div>
+  </div>
+  <div class="tw-row">
+    <div class="tw-label">Texture</div>
+    <div class="tw-options" id="tw-texture"></div>
+  </div>
+  <div class="tw-row">
+    <div class="tw-label">Sticker density</div>
+    <div class="tw-options" id="tw-stickers"></div>
+  </div>
+</div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="stickers.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="screens-core.jsx"></script>
+<script type="text/babel" src="screens-creative.jsx"></script>
+
+<script type="text/babel">
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "palette": "terracotta",
+  "texture": "low",
+  "stickers": "balanced"
+}/*EDITMODE-END*/;
+
+const PALETTES = {
+  terracotta: { bg: '#f4ecdc', bg2: '#ede2ce', paper: '#faf4e6', terra: '#c46a4c', terraDark: '#b85a3e', terraLight: '#d87a5c', label: 'Terracotta' },
+  sage:       { bg: '#eef0e4', bg2: '#e4e8d4', paper: '#f7f8ec', terra: '#6f8a52', terraDark: '#567040', terraLight: '#88a06a', label: 'Sage & Linen' },
+  blush:      { bg: '#f5e7e1', bg2: '#eed6cd', paper: '#faefe9', terra: '#c66a78', terraDark: '#a84f5e', terraLight: '#d98598', label: 'Blush' },
+  cobalt:     { bg: '#e8e5dc', bg2: '#dcd8ca', paper: '#f5f1e6', terra: '#2f5c8f', terraDark: '#214470', terraLight: '#3f75b0', label: 'Cobalt ink' },
+};
+
+function applyPalette(p) {
+  const pal = PALETTES[p];
+  if (!pal) return;
+  const r = document.documentElement.style;
+  r.setProperty('--bg', pal.bg);
+  r.setProperty('--bg-2', pal.bg2);
+  r.setProperty('--paper', pal.paper);
+  r.setProperty('--terracotta', pal.terra);
+  // derive dark/light
+  r.setProperty('--terracotta-soft', pal.terraLight);
+  // repaint clay-btn-primary
+  const style = document.getElementById('palette-style') || (() => {
+    const s = document.createElement('style'); s.id = 'palette-style'; document.head.appendChild(s); return s;
+  })();
+  style.textContent = `.clay-btn-primary { background: linear-gradient(180deg, ${pal.terraLight} 0%, ${pal.terraDark} 100%) !important; }`;
+}
+
+function applyTexture(level) {
+  const s = document.getElementById('texture-style') || (() => {
+    const el = document.createElement('style'); el.id = 'texture-style'; document.head.appendChild(el); return el;
+  })();
+  const opacity = { low: 0.1, medium: 0.35, high: 0.6 }[level] || 0.35;
+  s.textContent = `.paper-grain::after { opacity: ${opacity} !important; }`;
+}
+
+function applyStickerDensity(level) {
+  const s = document.getElementById('sticker-style') || (() => {
+    const el = document.createElement('style'); el.id = 'sticker-style'; document.head.appendChild(el); return el;
+  })();
+  if (level === 'minimal') s.textContent = `svg[viewBox="0 0 100 100"] { opacity: 0.55; }`;
+  else if (level === 'max') s.textContent = ``;
+  else s.textContent = ``;
+}
+
+function initTweaks() {
+  applyPalette(TWEAKS.palette);
+  applyTexture(TWEAKS.texture);
+  applyStickerDensity(TWEAKS.stickers);
+
+  // build controls
+  const pPal = document.getElementById('tw-palette');
+  pPal.innerHTML = '';
+  Object.entries(PALETTES).forEach(([k, v]) => {
+    const el = document.createElement('div');
+    el.className = 'tw-swatch' + (TWEAKS.palette === k ? ' active' : '');
+    el.style.background = `linear-gradient(135deg, ${v.bg}, ${v.terra})`;
+    el.title = v.label;
+    el.onclick = () => {
+      TWEAKS.palette = k;
+      applyPalette(k);
+      [...pPal.children].forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      persist();
+    };
+    pPal.appendChild(el);
+  });
+
+  const pTex = document.getElementById('tw-texture');
+  pTex.innerHTML = '';
+  ['low','medium','high'].forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'tw-opt' + (TWEAKS.texture === k ? ' active' : '');
+    el.textContent = k;
+    el.onclick = () => {
+      TWEAKS.texture = k;
+      applyTexture(k);
+      [...pTex.children].forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      persist();
+    };
+    pTex.appendChild(el);
+  });
+
+  const pSt = document.getElementById('tw-stickers');
+  pSt.innerHTML = '';
+  ['minimal','balanced','max'].forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'tw-opt' + (TWEAKS.stickers === k ? ' active' : '');
+    el.textContent = k;
+    el.onclick = () => {
+      TWEAKS.stickers = k;
+      applyStickerDensity(k);
+      [...pSt.children].forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      persist();
+    };
+    pSt.appendChild(el);
+  });
+}
+
+function persist() {
+  window.parent.postMessage({ type: '__edit_mode_set_keys', edits: TWEAKS }, '*');
+}
+
+// edit-mode protocol
+window.addEventListener('message', (e) => {
+  if (!e.data || !e.data.type) return;
+  if (e.data.type === '__activate_edit_mode') document.getElementById('tweaks').classList.add('on');
+  if (e.data.type === '__deactivate_edit_mode') document.getElementById('tweaks').classList.remove('on');
+});
+window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+// ─────────────────────────────────────────────────────────────
+// Main app
+// ─────────────────────────────────────────────────────────────
+function Frame({ label, children }) {
+  return (
+    <DCArtboard label={label} width={360} height={760} style={{ background: 'transparent', boxShadow: 'none', borderRadius: 0, overflow: 'visible' }}>
+      <Phone>{children}</Phone>
+    </DCArtboard>
+  );
+}
+
+// Tablet frame (1024x768)
+function Tablet({ children, bg = 'var(--bg)' }) {
+  return (
+    <div style={{
+      width: 900, height: 660, borderRadius: 30, overflow: 'hidden',
+      position: 'relative', background: bg,
+      boxShadow: '0 40px 80px rgba(80,50,30,0.18), 0 0 0 8px #2a2018',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// Tablet editor — bigger canvas, side panels
+function TabletEditor() {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', background: '#1d140c' }}>
+      {/* left tools */}
+      <div style={{ width: 70, background: '#14100a', padding: '18px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg,#d87a5c,#b85a3e)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 1px 1px 0 rgba(255,220,200,0.4)' }}>
+          <Icon name="book" size={18} color="#fff6e8"/>
+        </div>
+        {[
+          { icon: 'layout' },
+          { icon: 'sticker', active: true },
+          { icon: 'image' },
+          { icon: 'text' },
+          { icon: 'brush' },
+        ].map((t, i) => (
+          <div key={i} style={{
+            width: 46, height: 46, borderRadius: 12,
+            background: t.active ? 'rgba(242,217,141,0.15)' : 'transparent',
+            color: t.active ? '#f2d98d' : 'rgba(255,248,232,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name={t.icon} size={20}/>
+          </div>
+        ))}
+      </div>
+
+      {/* canvas */}
+      <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* top chrome */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ color: '#fff8e8' }}>
+            <div style={{ fontSize: 11, opacity: 0.6, fontWeight: 600 }}>Page editor · auto-saved</div>
+            <div className="font-display" style={{ fontSize: 18, fontWeight: 600 }}>Tomato Basil Galette</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ padding: '8px 14px', borderRadius: 12, background: 'rgba(255,250,240,0.12)', color: '#fff8e8', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="eye" size={14} color="#fff8e8"/> Preview
+            </div>
+            <div style={{ padding: '8px 14px', borderRadius: 12, background: 'linear-gradient(180deg,#d87a5c,#b85a3e)', color: '#fff6e8', fontSize: 12, fontWeight: 700 }}>Save</div>
+          </div>
+        </div>
+
+        {/* page canvas */}
+        <div style={{ flex: 1, background: '#faf4e6', borderRadius: 14, position: 'relative', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', overflow: 'hidden' }} className="paper-grain">
+          {/* hero */}
+          <div style={{ position: 'absolute', top: 20, left: 22, width: 320, height: 200, borderRadius: 10, overflow: 'hidden', transform: 'rotate(-1.5deg)', boxShadow: '0 6px 14px rgba(80,50,30,0.2)' }}>
+            <FoodImage palette={['#e8a88a','#d9a441','#8c9f6e']} style={{ width: '100%', height: '100%' }}/>
+          </div>
+          {/* selection */}
+          <div style={{ position: 'absolute', top: 16, left: 18, width: 328, height: 208, border: '2px dashed #c46a4c', borderRadius: 12, transform: 'rotate(-1.5deg)', pointerEvents: 'none' }}>
+            {[[0,0],[1,0],[0,1],[1,1]].map(([x,y]) => (
+              <div key={`${x}${y}`} style={{
+                position: 'absolute',
+                [x ? 'right' : 'left']: -6,
+                [y ? 'bottom' : 'top']: -6,
+                width: 12, height: 12, borderRadius: 3,
+                background: '#fff', border: '2px solid #c46a4c',
+              }}/>
+            ))}
+          </div>
+          {/* title */}
+          <div style={{ position: 'absolute', top: 240, left: 28 }}>
+            <div className="font-hand" style={{ fontSize: 26, color: 'var(--terracotta)' }}>late summer·</div>
+            <div className="font-display" style={{ fontSize: 42, fontWeight: 600, lineHeight: 1.02, maxWidth: 380 }}>Tomato Basil<br/>Galette</div>
+          </div>
+          {/* stickers */}
+          <div style={{ position: 'absolute', top: 10, right: 40 }}>
+            <Sticker kind="tomato" size={70} rotate={16}/>
+          </div>
+          <div style={{ position: 'absolute', top: 220, right: 20 }}>
+            <Sticker kind="basil" size={76} rotate={-18}/>
+          </div>
+          <div style={{ position: 'absolute', top: 380, left: 28, width: 280, padding: 12, border: '1.5px dashed #bca079', borderRadius: 10, background: 'rgba(217,164,65,0.08)' }}>
+            <div className="font-hand" style={{ fontSize: 20, color: 'var(--terracotta)' }}>ingredients</div>
+            {['· 1½ cups flour','· 6 tbsp cold butter','· 4 ripe tomatoes, sliced','· 1 cup fresh ricotta','· Handful basil leaves'].map(t => <div key={t} style={{ fontSize: 13 }}>{t}</div>)}
+          </div>
+          <div style={{ position: 'absolute', top: 380, right: 28, width: 240, padding: 12, border: '1.5px dashed #bca079', borderRadius: 10, background: 'rgba(217,164,65,0.08)' }}>
+            <div className="font-hand" style={{ fontSize: 20, color: 'var(--terracotta)' }}>method</div>
+            <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <div>1. Whisk flour & salt. Cut cold butter.</div>
+              <div>2. Rest dough 30 min.</div>
+              <div>3. Roll, fill, fold edges.</div>
+              <div>4. Bake 400°F · 25–30m.</div>
+            </div>
+          </div>
+          {/* tape corners */}
+          <div style={{ position: 'absolute', top: 4, left: 60, width: 80, height: 22, transform: 'rotate(-8deg)', background: 'repeating-linear-gradient(45deg,rgba(255,255,255,0.4) 0 8px, transparent 8px 16px), #d97b7b', opacity: 0.82 }}/>
+          <div style={{ position: 'absolute', bottom: 14, right: 30 }}>
+            <Sticker kind="cherry" size={52} rotate={14}/>
+          </div>
+        </div>
+      </div>
+
+      {/* right panel — stickers */}
+      <div style={{ width: 220, background: '#14100a', padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ color: '#fff8e8' }}>
+          <div className="font-display" style={{ fontSize: 14, fontWeight: 600 }}>Stickers</div>
+          <div style={{ fontSize: 10, opacity: 0.6, fontWeight: 600 }}>Painted flora & kitchen</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {['All','Flora','Food','Tools'].map((t, i) => (
+            <div key={t} style={{
+              padding: '5px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+              background: i === 0 ? 'rgba(242,217,141,0.18)' : 'transparent',
+              color: i === 0 ? '#f2d98d' : 'rgba(255,248,232,0.5)',
+            }}>{t}</div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, flex: 1 }}>
+          {ALL_STICKERS.map((s, i) => (
+            <div key={s} style={{
+              aspectRatio: '1/1', borderRadius: 10,
+              background: 'rgba(255,250,240,0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: i === 0 ? '1.5px solid #f2d98d' : '1.5px solid transparent',
+            }}>
+              <Sticker kind={s} size={38} shadow={false} rotate={(i * 11) % 36 - 18}/>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      {/* Title block */}
+      <div style={{ padding: '30px 60px 30px', maxWidth: 900 }}>
+        <div className="font-hand" style={{ fontSize: 30, color: '#c46a4c' }}>a scrapbook cookbook</div>
+        <div className="font-display" style={{ fontSize: 64, fontWeight: 600, lineHeight: 0.95, letterSpacing: -1, color: '#3b2a1f' }}>Scookie</div>
+        <div style={{ fontSize: 15, color: '#6b5747', maxWidth: 640, marginTop: 12, lineHeight: 1.5 }}>
+          Structured recipes on the bottom, a creative scrapbook layer on top. Practical to cook from, beautiful to keep. Designed for phone-first with a more expansive tablet editor. Rounded Nunito for cozy UI, Fraunces for cookbook titles, Caveat for the handwritten marginalia.
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          {['warm','creative','cozy','personal'].map(t => (
+            <div key={t} style={{ padding: '5px 12px', borderRadius: 999, background: '#faf4e6', fontSize: 12, fontWeight: 700, color: '#6b5747', boxShadow: '0 1px 2px rgba(80,50,30,0.08)' }}>{t}</div>
+          ))}
+        </div>
+      </div>
+
+      <DCSection title="Welcome & Library" subtitle="Two library variants — magazine shelf and journal index">
+        <Frame label="01 · Welcome"><WelcomeScreen/></Frame>
+        <Frame label="02a · Library — Shelf (magazine)"><LibraryShelf/></Frame>
+        <Frame label="02b · Library — Index (list)"><LibraryIndex/></Frame>
+      </DCSection>
+
+      <DCSection title="Create & Read" subtitle="Structured creation · then two ways to read a recipe">
+        <Frame label="03 · Create Recipe"><CreateRecipe/></Frame>
+        <Frame label="04a · Detail — Scrapbook"><DetailScrapbook/></Frame>
+        <Frame label="04b · Detail — Clean"><DetailClean/></Frame>
+      </DCSection>
+
+      <DCSection title="Page Editor" subtitle="Two entry points — visual canvas and guided templates">
+        <Frame label="05a · Editor — Canvas-first"><EditorCanvas/></Frame>
+        <Frame label="05b · Editor — Templates-first"><EditorTemplates/></Frame>
+      </DCSection>
+
+      <DCSection title="Cook, Collect, Decorate" subtitle="Practical cook mode · organization · personal elements">
+        <Frame label="06 · Cook Mode"><CookMode/></Frame>
+        <Frame label="07 · Collections"><Collections/></Frame>
+        <Frame label="08 · My Elements"><MyElements/></Frame>
+        <Frame label="09 · PDF Export"><PDFExport/></Frame>
+      </DCSection>
+
+      <DCSection title="Tablet experience" subtitle="The page editor opens up — larger canvas, side panels, more room to arrange">
+        <DCArtboard label="Tablet · Page editor" width={900} height={660} style={{ background: 'transparent', boxShadow: 'none', borderRadius: 0 }}>
+          <Tablet><TabletEditor/></Tablet>
+        </DCArtboard>
+      </DCSection>
+
+      <DCPostIt top={50} right={60} rotate={4} width={220}>
+        Toggle <b>Tweaks</b> in the toolbar to swap palette, texture intensity, and sticker density.
+      </DCPostIt>
+    </DesignCanvas>
+  );
+}
+
+// mount + init tweaks
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+initTweaks();
+</script>
+</body>
+</html>
