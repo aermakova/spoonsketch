@@ -91,8 +91,13 @@ function GestureBlock({
     });
   }, [pageWidth, pageHeight, w, h]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Only transform gestures (pan/rotate/pinch) when selected — otherwise a tap
+  // on an unselected block must select it without also moving it.
   const gesture = useMemo(() => {
+    const tap = Gesture.Tap().onEnd(() => runOnJS(stableSelect)());
+
+    if (!selected) return tap;
+
     const pan = Gesture.Pan()
       .onBegin(() => runOnJS(stableDragStart)())
       .onChange(e => {
@@ -114,13 +119,12 @@ function GestureBlock({
       .onChange(e => { sc.value = Math.max(0.4, Math.min(3, savedSc.value * e.scale)); })
       .onEnd(() => { runOnJS(stableCommit)(); });
 
-    const tap = Gesture.Tap().onEnd(() => runOnJS(stableSelect)());
-
     return Gesture.Exclusive(
       Gesture.Simultaneous(pan, rotation, pinch),
       tap,
     );
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rotHandle = useMemo(() =>
