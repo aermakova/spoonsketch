@@ -2,18 +2,20 @@ import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, RefreshControl, Modal, Alert,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { fetchRecipes } from '../../src/api/recipes';
-import { fetchCookbooks, createCookbook, updateCookbook, deleteCookbook } from '../../src/api/cookbooks';
+import { fetchCookbooksWithCounts, createCookbook, updateCookbook, deleteCookbook } from '../../src/api/cookbooks';
+import type { CookbookWithCount } from '../../src/api/cookbooks';
+import { BookCover } from '../../src/components/shelves/BookCover';
+import { EmptySlot } from '../../src/components/shelves/EmptySlot';
+import { WoodShelf } from '../../src/components/shelves/WoodShelf';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
 import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { RecipeCard } from '../../src/components/ui/RecipeCard';
 import { FoodImage } from '../../src/components/ui/FoodImage';
-import { CookbookCard } from '../../src/components/book/CookbookCard';
 import { useThemeStore } from '../../src/lib/store';
 import type { Palette } from '../../src/lib/store';
 import { colors } from '../../src/theme/colors';
@@ -171,9 +173,17 @@ function ShelvesScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCookbook, setEditingCookbook] = useState<Cookbook | null>(null);
 
-  const { data: cookbooks = [], isRefetching: cbRefetching, refetch: refetchCookbooks } = useQuery({
+  const { width: screenWidth } = useWindowDimensions();
+  // styles.content uses padding: 16 — keep the layout math aligned.
+  const shelfPadding = 16;
+  const slotGap = 14;
+  const shelfContentW = screenWidth - shelfPadding * 2;
+  const slotWidth = Math.floor((shelfContentW - slotGap) / 2);
+  const slotHeight = Math.round(slotWidth * 1.32); // ~3:4 aspect, slightly taller
+
+  const { data: cookbooks = [], isRefetching: cbRefetching, refetch: refetchCookbooks } = useQuery<CookbookWithCount[]>({
     queryKey: ['cookbooks'],
-    queryFn: fetchCookbooks,
+    queryFn: fetchCookbooksWithCounts,
   });
 
   const { data: recipes = [], isRefetching: recRefetching, refetch: refetchRecipes } = useQuery({
@@ -239,6 +249,30 @@ function ShelvesScreen() {
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(cb.id) },
     ]);
   }
+
+  // Long-press action sheet on a cookbook — replaces the old swipe-to-delete.
+  function handleLongPressCookbook(cb: CookbookWithCount) {
+    Alert.alert(cb.title, undefined, [
+      { text: 'Rename', onPress: () => setEditingCookbook(cb) },
+      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteCookbook(cb) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  // Pack the cookbooks into rows of 2, with the "+ New Cookbook" empty slot as the
+  // final entry so it always appears after the user's last book.
+  const shelfRows = useMemo(() => {
+    type Slot = { kind: 'book'; cookbook: CookbookWithCount } | { kind: 'empty' } | null;
+    const slots: Slot[] = [
+      ...cookbooks.map(c => ({ kind: 'book' as const, cookbook: c })),
+      { kind: 'empty' as const },
+    ];
+    const rows: Slot[][] = [];
+    for (let i = 0; i < slots.length; i += 2) {
+      rows.push([slots[i] ?? null, slots[i + 1] ?? null]);
+    }
+    return rows;
+  }, [cookbooks]);
 
   return (
     <PaperGrain style={{ ...styles.root, backgroundColor: palette.bg }}>
@@ -375,49 +409,42 @@ function ShelvesScreen() {
           </View>
         )}
 
-        {/* Cookbooks section */}
+        {/* Cookbooks section — books on wooden shelves */}
         <Text style={styles.sectionLabel}>Cookbooks</Text>
 
-        {cookbooks.length === 0 && (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No cookbooks yet</Text>
-            <Text style={styles.emptySub}>Tap + New to build your first one</Text>
-          </View>
-        )}
-
-        {cookbooks.map(cb => (
-          <ReanimatedSwipeable
-            key={cb.id}
-            friction={2}
-            rightThreshold={40}
-            renderRightActions={() => (
-              <View style={swipe.actions}>
-                <TouchableOpacity
-                  style={[swipe.editBtn, updateMutation.isPending && swipe.disabled]}
-                  onPress={() => setEditingCookbook(cb)}
-                  disabled={updateMutation.isPending}
-                >
-                  <Text style={swipe.editText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[swipe.deleteBtn, deleteMutation.isPending && swipe.disabled]}
-                  onPress={() => handleDeleteCookbook(cb)}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={swipe.deleteText}>Delete</Text>
+        <View style={styles.shelvesStack}>
+          {shelfRows.map((row, rowIdx) => (
+            <View key={rowIdx} style={styles.shelfRow}>
+              <View style={[styles.slotRow, { gap: slotGap }]}>
+                {row.map((slot, i) => {
+                  if (!slot) return <View key={i} style={{ width: slotWidth, height: slotHeight }} />;
+                  if (slot.kind === 'empty') {
+                    return (
+                      <EmptySlot
+                        key="empty"
+                        width={slotWidth}
+                        height={slotHeight}
+                        onPress={() => setShowCreateModal(true)}
+                      />
+                    );
                   }
-                </TouchableOpacity>
+                  return (
+                    <BookCover
+                      key={slot.cookbook.id}
+                      cookbook={slot.cookbook}
+                      recipeCount={slot.cookbook.recipe_count}
+                      width={slotWidth}
+                      height={slotHeight}
+                      onPress={() => router.push(`/book/${slot.cookbook.id}`)}
+                      onLongPress={() => handleLongPressCookbook(slot.cookbook)}
+                    />
+                  );
+                })}
               </View>
-            )}
-          >
-            <CookbookCard
-              cookbook={cb}
-              onPress={() => router.push(`/book/${cb.id}`)}
-            />
-          </ReanimatedSwipeable>
-        ))}
+              <WoodShelf width={shelfContentW} />
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
       <CookbookFormModal
@@ -530,6 +557,9 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: fonts.hand, fontSize: 20, color: colors.inkFaint },
   gridRow: { flexDirection: 'row', gap: 14, marginBottom: 8 },
   gridCell: { flex: 1 },
+  shelvesStack: { marginTop: 4 },
+  shelfRow: { marginBottom: 26 },
+  slotRow: { flexDirection: 'row' },
   shelfDivider: { marginVertical: 18 },
   shelfBar: {
     height: 10,
@@ -570,38 +600,6 @@ const styles = StyleSheet.create({
   tag: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { fontFamily: fonts.body, fontSize: 11, color: colors.inkSoft },
   heart: { fontSize: 16, color: '#d97b7b', alignSelf: 'center' },
-});
-
-const swipe = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  editBtn: {
-    backgroundColor: '#4a90d9',
-    width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: '#fff',
-  },
-  deleteBtn: {
-    backgroundColor: colors.tomato,
-    width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: '#fff',
-  },
-  disabled: { opacity: 0.55 },
 });
 
 const modal = StyleSheet.create({

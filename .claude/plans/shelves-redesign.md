@@ -195,12 +195,13 @@ Phase 2 ships when:
 - [ ] Editing a cookbook in Book Settings shows the same pickers populated with current values.
 - [ ] Covers reflect the stored `cover_color` + `cover_sprig`.
 
-## Open questions
+## Open questions — resolved 2026-04-22
 
-1. **Long-press vs. swipe for delete.** Current shelves use swipe-to-delete. With book covers on shelves, swiping feels wrong. Proposal: long-press → action sheet (Rename / Change cover / Delete). Confirm or keep swipe somehow.
-2. **Recipe count source.** Today Shelves doesn't show per-cookbook recipe count — it's derived. Need a `count(book_pages where page_type='recipe')` somewhere. Either (a) add a `recipe_count` computed column, (b) fetch `book_pages` per cookbook on Shelves render (N+1 query), or (c) use a single Supabase view/RPC. Recommend (c).
-3. **Sprig count.** 4 or 6 sprigs? More = more variety, less = less design work for you. Plan assumes 6.
-4. **Cover text colour.** Auto-pick light/dark based on colour luminance, or always dark with a translucent paper overlay behind the text? Mockup looks like per-colour baked-in text colour.
+1. **Delete:** **long-press → action sheet** (Rename / Change cover / Delete). Swipe-to-delete retired here.
+2. **Recipe count:** use a single aggregated query — `supabase.from('cookbooks').select('*, book_pages(count)')` via PostgREST — one network round trip regardless of cookbook count. New helper `fetchCookbooksWithCounts()` returns `Cookbook & { recipe_count: number }`.
+3. **Sprig count:** 6. User provides **PNGs**, not SVGs. Drop into `assets/sprigs/sprig-1.png` … `sprig-6.png`. Each ~300×300 @3x, transparent background.
+4. **Cover text colour:** each of the 6 defined cover colours has a paired title colour baked in. Example: sage green → butter yellow title. Stored in a single constant `COVER_COLOUR_PAIRS` in `src/components/shelves/coverColours.ts`.
+5. **Tab IA:** keep 4 tabs + FAB (Home / Shelves / + / Elements / Me). Only the **visual** matches the mockup.
 
 ## Next steps once you approve the plan
 
