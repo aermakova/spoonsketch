@@ -121,7 +121,7 @@ Every template is now built from the 9-atom set. Atoms per template:
 
 ### Next up (in order)
 
-1. **Remaining 5 templates.** Port Photo Hero / Minimal / Two Column / Journal / Recipe Card render functions into `renderRecipePage.ts`. Follow the Classic pattern.
+1. ✅ **Remaining 5 templates landed 2026-04-22.** Photo Hero / Minimal / Two Column / Journal / Recipe Card render functions ported into `renderRecipePage.ts`. Each has its own template-specific CSS (`.t-photo-hero`, `.t-minimal`, `.t-two-column`, `.t-journal`, `.t-recipe-card`) and shared helpers (`pillsInline`, `ingRowsDotted`/`Plain`/`Journal`, `stepRowsBadged`/`Numeric`). Render dispatch in `renderTemplate` now picks the right function per template.
 2. **Stickers + drawing strokes.** Inline SVG per sticker kind (16 built-ins, same SVG sources the RN canvas uses). Drawing strokes via `perfect-freehand` → SVG path `d` attribute (same library already in deps, no new dependency needed).
 3. ✅ **Client wiring landed 2026-04-22.** `src/lib/exportRecipePdf.ts` ties `serializeRecipePage` → `renderRecipePage` → `expo-print.printAsync`. Recipe Detail screen gained "⤓ Export PDF" buttons in both Clean (next to Share) and Scrapbook (under the page preview) views. Tapping opens the iOS native print dialog so the user saves to Files, prints, AirDrops, or emails. Reads per-recipe canonical state from `canvasStore.recipeStates[id]` and `drawingStore.drawings[id]` so you can export a recipe without having the editor open.
 4. **Server renderer (later).** Puppeteer on Railway (not Deno Edge Function — Chromium isn't Deno-compatible). Supabase Edge Function acts as a proxy. Needed for bulk book export + Lulu ordering.

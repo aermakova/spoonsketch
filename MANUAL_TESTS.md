@@ -247,8 +247,11 @@ Classic template only in this commit. Other 5 templates fall back to Classic lay
 - Export PDF from the recipe detail screen.
 - ✅ Expect: export succeeds with default Classic layout, default palette, no stickers, no drawings.
 
+### 6. All 6 templates render (added 2026-04-22)
+- Repeat test 1 (Clean → Export PDF) on a recipe set to each template in turn: Classic, Photo Hero, Minimal, Two Column, Journal, Recipe Card.
+- ✅ Expect: each PDF shows the template's distinct style — Photo Hero with dark-overlay hero image; Minimal with the accent line under title; Two Column with side-by-side layout; Journal with rotated photo and dashed method lines; Recipe Card with accent-banner title.
+
 ### Known scope of this commit
-- Only the Classic template renders fully; other 5 templates fall back to Classic (explicitly noted in MANUAL_TESTS). Fix as each template's render function lands.
 - Stickers and drawing strokes are **not** in the PDF yet — schema captures them but the renderer's sticker/stroke output is in a follow-up commit.
 - Images use the recipe's `cover_image_url` directly — they print whatever the URL resolves to. For Supabase Storage URLs that requires the PDF renderer (expo-print's embedded WebView here) to be online.
 

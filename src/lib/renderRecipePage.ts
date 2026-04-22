@@ -194,6 +194,186 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       border-radius: 2px;
     }
 
+    /* ── Photo Hero template ─────────────────────────────────────────── */
+    .t-photo-hero .block-image {
+      overflow: hidden;
+    }
+    .t-photo-hero .block-image .img-wrap { position: relative; width: 100%; height: 100%; }
+    .t-photo-hero .block-image img { width: 100%; height: 100%; object-fit: cover; }
+    .t-photo-hero .block-image .overlay {
+      position: absolute; inset: 0;
+      background: ${paletteAccent}; opacity: 0.6;
+    }
+    .t-photo-hero .block-title {
+      font-family: 'Fraunces', serif; font-weight: 700;
+      color: ${paletteInk}; font-size: 26px; line-height: 30px;
+      text-align: center;
+    }
+    .t-photo-hero .block-description {
+      font-family: 'Caveat', cursive; color: ${paletteInkSoft};
+      font-size: 17px; line-height: 22px; text-align: center;
+    }
+    .t-photo-hero .block-pills { display: flex; gap: 6px; justify-content: center; }
+    .t-photo-hero .pill {
+      display: inline-flex; gap: 4px; padding: 3px 8px; border-radius: 6px;
+      background: ${paletteAccent}22; font-size: 11px; color: ${paletteInkSoft};
+    }
+    .t-photo-hero .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-photo-hero .block-ingredients-heading,
+    .t-photo-hero .block-method-heading {
+      font-family: 'Caveat', cursive; color: ${paletteAccent};
+      font-size: 18px; line-height: 22px;
+    }
+    .t-photo-hero .block-ingredients-list,
+    .t-photo-hero .block-method-list {
+      font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 17px; color: ${paletteInk};
+    }
+    .t-photo-hero .ing-row { display: flex; gap: 5px; margin-bottom: 3px; align-items: flex-start; }
+    .t-photo-hero .ing-row .dot { width: 4px; height: 4px; border-radius: 50%; background: ${paletteAccent}; margin-top: 6px; flex-shrink: 0; }
+    .t-photo-hero .step-row { display: flex; gap: 6px; margin-bottom: 5px; align-items: flex-start; }
+    .t-photo-hero .step-badge {
+      width: 16px; height: 16px; border-radius: 50%; background: ${paletteAccent};
+      color: #fff; font-weight: 700; font-size: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    }
+
+    /* ── Minimal template ────────────────────────────────────────────── */
+    .t-minimal .block-title {
+      font-family: 'Fraunces', serif; font-weight: 400;
+      color: ${paletteInk}; font-size: 30px; line-height: 36px;
+      border-bottom: 2px solid ${paletteAccent}; padding-bottom: 6px;
+    }
+    .t-minimal .block-description {
+      font-family: 'Nunito', sans-serif; color: ${paletteInkSoft};
+      font-size: 14px; line-height: 20px; font-style: italic;
+    }
+    .t-minimal .block-pills { display: flex; gap: 10px; }
+    .t-minimal .pill {
+      display: inline-flex; gap: 4px; font-size: 11px; color: ${paletteInkSoft};
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .t-minimal .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-minimal .block-ingredients-heading,
+    .t-minimal .block-method-heading {
+      font-family: 'Nunito', sans-serif; font-weight: 700;
+      color: ${paletteAccent}; font-size: 12px; line-height: 16px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .t-minimal .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 20px; color: ${paletteInk}; }
+    .t-minimal .ing-row { margin-bottom: 2px; }
+    .t-minimal .block-method-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 19px; color: ${paletteInk}; }
+    .t-minimal .step-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: flex-start; }
+    .t-minimal .step-num { color: ${paletteAccent}; font-weight: 700; }
+
+    /* ── Two Column template ─────────────────────────────────────────── */
+    .t-two-column .block-title {
+      font-family: 'Fraunces', serif; font-weight: 700;
+      color: ${paletteInk}; font-size: 26px; line-height: 30px;
+      border-bottom: 2px solid ${paletteAccent}44; padding-bottom: 4px;
+    }
+    .t-two-column .block-description {
+      font-family: 'Caveat', cursive; color: ${paletteInkSoft};
+      font-size: 16px; line-height: 20px;
+    }
+    .t-two-column .block-image img {
+      width: 100%; height: 100%; object-fit: cover; border-radius: 6px;
+    }
+    .t-two-column .block-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .t-two-column .pill {
+      display: inline-flex; gap: 3px; padding: 2px 6px; border-radius: 4px;
+      background: ${paletteAccent}22; font-size: 10px; color: ${paletteInkSoft};
+    }
+    .t-two-column .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-two-column .block-ingredients-heading,
+    .t-two-column .block-method-heading {
+      font-family: 'Caveat', cursive; color: ${paletteAccent};
+      font-size: 18px; line-height: 22px;
+    }
+    .t-two-column .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 17px; color: ${paletteInk}; }
+    .t-two-column .ing-row { display: flex; gap: 5px; margin-bottom: 3px; align-items: flex-start; }
+    .t-two-column .ing-row .dot { width: 4px; height: 4px; border-radius: 50%; background: ${paletteAccent}; margin-top: 6px; flex-shrink: 0; }
+    .t-two-column .block-method-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
+    .t-two-column .step-row { display: flex; gap: 5px; margin-bottom: 4px; align-items: flex-start; }
+    .t-two-column .step-badge {
+      width: 14px; height: 14px; border-radius: 50%; background: ${paletteAccent};
+      color: #fff; font-weight: 700; font-size: 9px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    }
+
+    /* ── Journal template ────────────────────────────────────────────── */
+    .t-journal .block-title {
+      font-family: 'Fraunces', serif; font-weight: 700;
+      color: ${paletteAccent}; font-size: 28px; line-height: 32px;
+    }
+    .t-journal .block-description {
+      font-family: 'Caveat', cursive; color: ${paletteInkSoft};
+      font-size: 16px; line-height: 20px;
+    }
+    .t-journal .block-photo img {
+      width: 100%; height: 100%; object-fit: cover; border-radius: 4px;
+    }
+    .t-journal .block-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+    .t-journal .pill {
+      display: inline-flex; gap: 3px; padding: 2px 7px; border-radius: 4px;
+      background: ${paletteAccent}22; font-size: 10px; color: ${paletteInkSoft};
+    }
+    .t-journal .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-journal .block-ingredients-heading,
+    .t-journal .block-method-heading {
+      font-family: 'Caveat', cursive; color: ${paletteAccent};
+      font-size: 16px; line-height: 20px;
+    }
+    .t-journal .block-ingredients-list {
+      font-family: 'Caveat', cursive; font-size: 16px; line-height: 22px; color: ${paletteInk};
+    }
+    .t-journal .ing-row { margin-bottom: 2px; }
+    .t-journal .block-method-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 22px; color: ${paletteInk}; }
+    .t-journal .step-row {
+      display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;
+      border-bottom: 1px dashed ${paletteAccent}22;
+      padding-bottom: 4px;
+    }
+    .t-journal .step-num { color: ${paletteAccent}; font-weight: 700; font-family: 'Fraunces', serif; font-size: 15px; }
+    .t-journal .block-tags {
+      background: #fff; padding: 4px 10px; transform: rotate(-1.2deg);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08); font-family: 'Caveat', cursive;
+      color: ${paletteInkSoft}; font-size: 14px; border-radius: 2px;
+    }
+
+    /* ── Recipe Card template ────────────────────────────────────────── */
+    .t-recipe-card .block-title {
+      background: ${paletteAccent}; color: #fff;
+      font-family: 'Fraunces', serif; font-weight: 700;
+      font-size: 24px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+    }
+    .t-recipe-card .block-description {
+      font-family: 'Nunito', sans-serif; color: ${paletteInkSoft};
+      font-size: 13px; line-height: 18px; font-style: italic; text-align: center;
+    }
+    .t-recipe-card .block-image img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+    .t-recipe-card .block-ingredients-heading,
+    .t-recipe-card .block-method-heading {
+      font-family: 'Nunito', sans-serif; font-weight: 700;
+      color: ${paletteAccent}; font-size: 13px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .t-recipe-card .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
+    .t-recipe-card .ing-row { margin-bottom: 2px; }
+    .t-recipe-card .block-method-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
+    .t-recipe-card .step-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: flex-start; }
+    .t-recipe-card .step-badge {
+      width: 16px; height: 16px; border-radius: 50%; background: ${paletteAccent};
+      color: #fff; font-weight: 700; font-size: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    }
+    .t-recipe-card .block-tags {
+      background: #fff; padding: 6px 12px; transform: rotate(-1.2deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08); font-family: 'Caveat', cursive;
+      color: ${paletteInkSoft}; font-size: 15px; border-radius: 2px;
+    }
+
     .page-number {
       position: absolute;
       bottom: 18px;
@@ -255,13 +435,13 @@ function renderPaperPattern(page: RecipePage, pageWidth: number, pageHeight: num
 
 function renderTemplate(page: RecipePage, pageWidth: number, pageHeight: number): string {
   switch (page.style.template) {
+    case 'photo-hero':  return renderPhotoHero(page, pageWidth, pageHeight);
+    case 'minimal':     return renderMinimal(page, pageWidth, pageHeight);
+    case 'two-column':  return renderTwoColumn(page, pageWidth, pageHeight);
+    case 'journal':     return renderJournal(page, pageWidth, pageHeight);
+    case 'recipe-card': return renderRecipeCard(page, pageWidth, pageHeight);
     case 'classic':
-      return renderClassic(page, pageWidth, pageHeight);
-    default:
-      // Phase F HTML renderer ships Classic only in this commit. Until the
-      // other templates land, fall back to Classic layout so the page still
-      // renders something sensible in preview / export.
-      return renderClassic(page, pageWidth, pageHeight);
+    default:            return renderClassic(page, pageWidth, pageHeight);
   }
 }
 
@@ -382,6 +562,313 @@ function renderClassic(page: RecipePage, pageWidth: number, pageHeight: number):
 
   parts.push(`<div class="page-number">1</div>`);
 
+  return parts.join('\n    ');
+}
+
+// ─── Shared render helpers ───────────────────────────────────────────────────
+
+function pillsInline(c: RecipePage['content']): string {
+  const parts: string[] = [];
+  if (c.prepMinutes != null) parts.push(`<span class="pill">prep <strong>${c.prepMinutes}m</strong></span>`);
+  if (c.cookMinutes != null) parts.push(`<span class="pill">cook <strong>${c.cookMinutes}m</strong></span>`);
+  if (c.servings != null)    parts.push(`<span class="pill">serves <strong>${c.servings}</strong></span>`);
+  return parts.join('');
+}
+
+function ingRowsDotted(ingredients: RecipePage['content']['ingredients']): string {
+  return ingredients
+    .map(i => `<div class="ing-row"><span class="dot"></span><span>${escapeHtml(i.text)}</span></div>`)
+    .join('');
+}
+
+function ingRowsPlain(ingredients: RecipePage['content']['ingredients']): string {
+  return ingredients
+    .map(i => `<div class="ing-row">${escapeHtml(i.text)}</div>`)
+    .join('');
+}
+
+function ingRowsJournal(ingredients: RecipePage['content']['ingredients']): string {
+  return ingredients
+    .map(i => `<div class="ing-row">— ${escapeHtml(i.text)}</div>`)
+    .join('');
+}
+
+function stepRowsBadged(instructions: RecipePage['content']['instructions']): string {
+  return instructions
+    .map(s => `<div class="step-row"><span class="step-badge">${s.step}</span><span>${escapeHtml(s.text)}</span></div>`)
+    .join('');
+}
+
+function stepRowsNumeric(instructions: RecipePage['content']['instructions']): string {
+  return instructions
+    .map(s => `<div class="step-row"><span class="step-num">${s.step}.</span><span>${escapeHtml(s.text)}</span></div>`)
+    .join('');
+}
+
+// ─── Photo Hero ──────────────────────────────────────────────────────────────
+
+function renderPhotoHero(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  const c = page.content;
+  const titles = page.style.sectionTitles;
+  const fontClass = `f-${page.style.font}`;
+  const parts: string[] = [];
+
+  const image = resolveBlock(page, 'image', pageWidth, pageHeight);
+  if (image) {
+    const img = c.coverImageUrl
+      ? `<img src="${escapeAttr(c.coverImageUrl)}" alt="">`
+      : `<div style="width:100%;height:100%;background:${page.style.paletteAccent}44"></div>`;
+    parts.push(`<div class="block block-image" style="${blockStyle(image, true, false)}"><div class="img-wrap">${img}<div class="overlay"></div></div></div>`);
+  }
+
+  const title = resolveBlock(page, 'title', pageWidth, pageHeight);
+  if (title) {
+    parts.push(`<div class="block block-title ${fontClass}" style="${blockStyle(title, false)}">${escapeHtml(c.title)}</div>`);
+  }
+
+  const description = resolveBlock(page, 'description', pageWidth, pageHeight);
+  if (description && c.description) {
+    parts.push(`<div class="block block-description" style="${blockStyle(description, false)}">${escapeHtml(c.description)}</div>`);
+  }
+
+  const pills = resolveBlock(page, 'pills', pageWidth, pageHeight);
+  if (pills) {
+    parts.push(`<div class="block block-pills" style="${blockStyle(pills, false)}">${pillsInline(c)}</div>`);
+  }
+
+  const ingHeading = resolveBlock(page, 'ingredients-heading', pageWidth, pageHeight);
+  if (ingHeading) {
+    parts.push(`<div class="block block-ingredients-heading" style="${blockStyle(ingHeading, false)}">${escapeHtml(titles.ingredients)}</div>`);
+  }
+
+  const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
+  if (ingList && c.ingredients.length > 0) {
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients)}</div>`);
+  }
+
+  const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
+  if (methodHeading) {
+    parts.push(`<div class="block block-method-heading" style="${blockStyle(methodHeading, false)}">${escapeHtml(titles.method)}</div>`);
+  }
+
+  const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
+  if (methodList && c.instructions.length > 0) {
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+  }
+
+  parts.push(`<div class="page-number">1</div>`);
+  return parts.join('\n    ');
+}
+
+// ─── Minimal ─────────────────────────────────────────────────────────────────
+
+function renderMinimal(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  const c = page.content;
+  const titles = page.style.sectionTitles;
+  const fontClass = `f-${page.style.font}`;
+  const parts: string[] = [];
+
+  const title = resolveBlock(page, 'title', pageWidth, pageHeight);
+  if (title) {
+    parts.push(`<div class="block block-title" style="${blockStyle(title, false)}">${escapeHtml(c.title)}</div>`);
+  }
+
+  const description = resolveBlock(page, 'description', pageWidth, pageHeight);
+  if (description && c.description) {
+    parts.push(`<div class="block block-description" style="${blockStyle(description, false)}">${escapeHtml(c.description)}</div>`);
+  }
+
+  const pills = resolveBlock(page, 'pills', pageWidth, pageHeight);
+  if (pills) {
+    parts.push(`<div class="block block-pills" style="${blockStyle(pills, false)}">${pillsInline(c)}</div>`);
+  }
+
+  const ingHeading = resolveBlock(page, 'ingredients-heading', pageWidth, pageHeight);
+  if (ingHeading) {
+    parts.push(`<div class="block block-ingredients-heading" style="${blockStyle(ingHeading, false)}">${escapeHtml(titles.ingredients)}</div>`);
+  }
+
+  const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
+  if (ingList && c.ingredients.length > 0) {
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsPlain(c.ingredients)}</div>`);
+  }
+
+  const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
+  if (methodHeading) {
+    parts.push(`<div class="block block-method-heading" style="${blockStyle(methodHeading, false)}">${escapeHtml(titles.method)}</div>`);
+  }
+
+  const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
+  if (methodList && c.instructions.length > 0) {
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsNumeric(c.instructions)}</div>`);
+  }
+
+  parts.push(`<div class="page-number">1</div>`);
+  // Silence unused in this template — kept for parity with other templates if font-preset title ever reintroduced
+  void fontClass;
+  return parts.join('\n    ');
+}
+
+// ─── Two Column ──────────────────────────────────────────────────────────────
+
+function renderTwoColumn(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  const c = page.content;
+  const titles = page.style.sectionTitles;
+  const parts: string[] = [];
+
+  const title = resolveBlock(page, 'title', pageWidth, pageHeight);
+  if (title) {
+    parts.push(`<div class="block block-title" style="${blockStyle(title, false)}">${escapeHtml(c.title)}</div>`);
+  }
+
+  const description = resolveBlock(page, 'description', pageWidth, pageHeight);
+  if (description && c.description) {
+    parts.push(`<div class="block block-description" style="${blockStyle(description, false)}">${escapeHtml(c.description)}</div>`);
+  }
+
+  const image = resolveBlock(page, 'image', pageWidth, pageHeight);
+  if (image && c.coverImageUrl) {
+    parts.push(`<div class="block block-image" style="${blockStyle(image, true, false)}"><img src="${escapeAttr(c.coverImageUrl)}" alt=""></div>`);
+  }
+
+  const pills = resolveBlock(page, 'pills', pageWidth, pageHeight);
+  if (pills) {
+    parts.push(`<div class="block block-pills" style="${blockStyle(pills, false)}">${pillsInline(c)}</div>`);
+  }
+
+  const ingHeading = resolveBlock(page, 'ingredients-heading', pageWidth, pageHeight);
+  if (ingHeading) {
+    parts.push(`<div class="block block-ingredients-heading" style="${blockStyle(ingHeading, false)}">${escapeHtml(titles.ingredients)}</div>`);
+  }
+
+  const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
+  if (ingList && c.ingredients.length > 0) {
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients)}</div>`);
+  }
+
+  const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
+  if (methodHeading) {
+    parts.push(`<div class="block block-method-heading" style="${blockStyle(methodHeading, false)}">${escapeHtml(titles.method)}</div>`);
+  }
+
+  const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
+  if (methodList && c.instructions.length > 0) {
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+  }
+
+  parts.push(`<div class="page-number">1</div>`);
+  return parts.join('\n    ');
+}
+
+// ─── Journal ─────────────────────────────────────────────────────────────────
+
+function renderJournal(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  const c = page.content;
+  const titles = page.style.sectionTitles;
+  const fontClass = `f-${page.style.font}`;
+  const parts: string[] = [];
+
+  const title = resolveBlock(page, 'title', pageWidth, pageHeight);
+  if (title) {
+    parts.push(`<div class="block block-title ${fontClass}" style="${blockStyle(title, false)}">${escapeHtml(c.title)}</div>`);
+  }
+
+  const description = resolveBlock(page, 'description', pageWidth, pageHeight);
+  if (description && c.description) {
+    parts.push(`<div class="block block-description" style="${blockStyle(description, false)}">${escapeHtml(c.description)}</div>`);
+  }
+
+  const photo = resolveBlock(page, 'photo', pageWidth, pageHeight);
+  if (photo && c.coverImageUrl) {
+    parts.push(`<div class="block block-photo" style="${blockStyle(photo, true, false)}"><img src="${escapeAttr(c.coverImageUrl)}" alt=""></div>`);
+  }
+
+  const pills = resolveBlock(page, 'pills', pageWidth, pageHeight);
+  if (pills) {
+    parts.push(`<div class="block block-pills" style="${blockStyle(pills, false)}">${pillsInline(c)}</div>`);
+  }
+
+  const ingHeading = resolveBlock(page, 'ingredients-heading', pageWidth, pageHeight);
+  if (ingHeading) {
+    parts.push(`<div class="block block-ingredients-heading" style="${blockStyle(ingHeading, false)}">${escapeHtml(titles.ingredients)}:</div>`);
+  }
+
+  const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
+  if (ingList && c.ingredients.length > 0) {
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsJournal(c.ingredients)}</div>`);
+  }
+
+  const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
+  if (methodHeading) {
+    parts.push(`<div class="block block-method-heading" style="${blockStyle(methodHeading, false)}">${escapeHtml(titles.method)}:</div>`);
+  }
+
+  const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
+  if (methodList && c.instructions.length > 0) {
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsNumeric(c.instructions)}</div>`);
+  }
+
+  const tags = resolveBlock(page, 'tags', pageWidth, pageHeight);
+  if (tags && c.tags.length > 0) {
+    parts.push(`<div class="block block-tags" style="${blockStyle(tags, false)}">${escapeHtml(c.tags.join(' · '))}</div>`);
+  }
+
+  parts.push(`<div class="page-number">1</div>`);
+  return parts.join('\n    ');
+}
+
+// ─── Recipe Card ─────────────────────────────────────────────────────────────
+
+function renderRecipeCard(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  const c = page.content;
+  const titles = page.style.sectionTitles;
+  const fontClass = `f-${page.style.font}`;
+  const parts: string[] = [];
+
+  const title = resolveBlock(page, 'title', pageWidth, pageHeight);
+  if (title) {
+    parts.push(`<div class="block block-title ${fontClass}" style="${blockStyle(title, true, false)}">${escapeHtml(c.title)}</div>`);
+  }
+
+  const description = resolveBlock(page, 'description', pageWidth, pageHeight);
+  if (description && c.description) {
+    parts.push(`<div class="block block-description" style="${blockStyle(description, false)}">${escapeHtml(c.description)}</div>`);
+  }
+
+  const image = resolveBlock(page, 'image', pageWidth, pageHeight);
+  if (image && c.coverImageUrl) {
+    parts.push(`<div class="block block-image" style="${blockStyle(image, true, false)}"><img src="${escapeAttr(c.coverImageUrl)}" alt=""></div>`);
+  }
+
+  const ingHeading = resolveBlock(page, 'ingredients-heading', pageWidth, pageHeight);
+  if (ingHeading) {
+    parts.push(`<div class="block block-ingredients-heading" style="${blockStyle(ingHeading, false)}">${escapeHtml(titles.ingredients)}</div>`);
+  }
+
+  const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
+  if (ingList && c.ingredients.length > 0) {
+    const rows = c.ingredients
+      .map(i => `<div class="ing-row">· ${escapeHtml(i.text)}</div>`)
+      .join('');
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${rows}</div>`);
+  }
+
+  const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
+  if (methodHeading) {
+    parts.push(`<div class="block block-method-heading" style="${blockStyle(methodHeading, false)}">${escapeHtml(titles.method)}</div>`);
+  }
+
+  const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
+  if (methodList && c.instructions.length > 0) {
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+  }
+
+  const tags = resolveBlock(page, 'tags', pageWidth, pageHeight);
+  if (tags && c.tags.length > 0) {
+    parts.push(`<div class="block block-tags" style="${blockStyle(tags, false)}">${escapeHtml(c.tags.join(' · '))}</div>`);
+  }
+
+  parts.push(`<div class="page-number">1</div>`);
   return parts.join('\n    ');
 }
 
