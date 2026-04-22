@@ -9,7 +9,7 @@
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
 | **D** — Cookbook-level section titles | ✅ **Shipped** | Migration applied; landed in commit `20330e7` |
 | **E** — Paper type at cookbook level | ✅ **Shipped** | Initial landing `6eb9810`; pattern geometry polish + BUG-010 logged in follow-up commit |
-| **F** — Print alignment contract | ⏳ Not started | Large slice, separate PR |
+| **F** — Print alignment contract | 🟡 **In progress** | Foundation (RecipePage JSON schema + serializer) landed; HTML renderer + Edge Function pending |
 
 ### Phase C — what's landed
 
@@ -100,9 +100,19 @@ Every template is now built from the 9-atom set. Atoms per template:
 - `blockDefs.ts` rewrote all 6 template block arrays; removed mega-block IDs (`header`, `hero`, `banner`, `meta`, `left-col`, `right-col`, `ingredients`, `steps`, `method`).
 - `PageTemplates.tsx` every template's render split into per-atom `<BlockElement>` wrappers. Photo Hero keeps its dark image overlay as a child of the `image` block so the overlay travels with the image when user drags. Recipe Card keeps the accent banner as a child of the `title` block.
 
+### Phase F — foundation landed (2026-04-22)
+
+- `src/lib/recipePage.ts` *(new)* — canonical `RecipePage` JSON schema that both renderers (RN editor + HTML/CSS print) consume. Positions stored as fractions of page dimensions so any physical size (A4, Letter, Lulu custom) scales cleanly.
+- `serializeRecipePage(input)` snapshots the editor state (recipe + cookbook + canvas state + drawing state + palette + authoring canvas size) into a `RecipePage`. Applies `stepOverrides` / `ingOverrides` so the serialized content matches what the user sees. Normalizes sticker positions and stroke coordinates into fractions. Pass-through for `blockOverrides` (already fractions per canvasStore convention).
+- Schema covers: style (template / font / palette / paper type / section titles), content (title + description + pills + visible ingredients + visible instructions + tags), block position overrides, stickers (`cx/cy/rotation/scale/zIndex`), drawing layers with per-stroke fractional width and normalized points.
+- Resolver helpers: `resolveStickerPosition`, `resolveStrokeWidth`, `resolveStrokePoint` convert fractions back to pixels for any physical render size.
+- `RECIPE_PAGE_VERSION = 1`. Bump on shape changes.
+
 ### Next up (in order)
 
-1. **Phase F** — print contract. Unblocks BUG-010 and Phase 9 PDF export quality. Biggest remaining refactor.
+1. **Phase F — HTML renderer.** Build an HTML/CSS template that consumes a `RecipePage` and produces an A4 page. Embed Google Fonts (Fraunces + Caveat + Nunito + Marck / Bad / Amatic for handwriting). SVG background for paper pattern. SVG paths for drawing strokes. SVG for built-in stickers.
+2. **Phase F — export path.** Client-side: `serializeRecipePage` → render to HTML in a WebView → user taps iOS native share → "Save to Files" produces a PDF. Ships before we need server-side Puppeteer.
+3. **Phase F — server renderer (later).** Puppeteer on Railway (not Deno Edge Function — Puppeteer's Chromium isn't Deno-compatible). Supabase Edge Function acts as a proxy. Needed for bulk book export + Lulu ordering.
 
 ---
 
