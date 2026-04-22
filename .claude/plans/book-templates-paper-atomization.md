@@ -108,11 +108,23 @@ Every template is now built from the 9-atom set. Atoms per template:
 - Resolver helpers: `resolveStickerPosition`, `resolveStrokeWidth`, `resolveStrokePoint` convert fractions back to pixels for any physical render size.
 - `RECIPE_PAGE_VERSION = 1`. Bump on shape changes.
 
+### Phase F — HTML renderer (Classic template) landed (2026-04-22)
+
+- `src/lib/renderRecipePage.ts` *(new)* — pure function `renderRecipePage(page, opts?): string` returning a self-contained HTML document.
+- A4 geometry (default 794×1123 @ 96 DPI; `widthPx` opt for higher-DPI print).
+- `@page { size: A4; margin: 0; }` + `@media print` block so the same HTML opens cleanly in iOS native print or Puppeteer's headless renderer.
+- Google Fonts link tag loads Fraunces / Nunito / Caveat / Marck Script / Bad Script / Amatic SC with latin + cyrillic subsets.
+- Paper pattern rendered as inline SVG (same 8mm line / 5mm dot / 5mm grid geometry as the editor's `PaperPattern`).
+- Block layout driven by `TEMPLATE_BLOCKS` + `page.blocks` override merge — mirrors the editor's `useBlockResolver` so positions match 1:1.
+- Classic template fully wired: title / description / pills / image / ingredients-heading / ingredients-list / method-heading / method-list / tags.
+- Handles `previewChrome` opt: subtle grey background + page shadow for WebView preview; turned off for print.
+
 ### Next up (in order)
 
-1. **Phase F — HTML renderer.** Build an HTML/CSS template that consumes a `RecipePage` and produces an A4 page. Embed Google Fonts (Fraunces + Caveat + Nunito + Marck / Bad / Amatic for handwriting). SVG background for paper pattern. SVG paths for drawing strokes. SVG for built-in stickers.
-2. **Phase F — export path.** Client-side: `serializeRecipePage` → render to HTML in a WebView → user taps iOS native share → "Save to Files" produces a PDF. Ships before we need server-side Puppeteer.
-3. **Phase F — server renderer (later).** Puppeteer on Railway (not Deno Edge Function — Puppeteer's Chromium isn't Deno-compatible). Supabase Edge Function acts as a proxy. Needed for bulk book export + Lulu ordering.
+1. **Remaining 5 templates.** Port Photo Hero / Minimal / Two Column / Journal / Recipe Card render functions into `renderRecipePage.ts`. Follow the Classic pattern.
+2. **Stickers + drawing strokes.** Inline SVG per sticker kind (16 built-ins, same SVG sources the RN canvas uses). Drawing strokes via `perfect-freehand` → SVG path `d` attribute (same library already in deps, no new dependency needed).
+3. **Client wiring.** Editor export button: `serializeRecipePage` → `renderRecipePage` → open in `expo-print` or a full-screen `WebView` with native print share; user picks "Save to Files" to get a PDF.
+4. **Server renderer (later).** Puppeteer on Railway (not Deno Edge Function — Chromium isn't Deno-compatible). Supabase Edge Function acts as a proxy. Needed for bulk book export + Lulu ordering.
 
 ---
 
