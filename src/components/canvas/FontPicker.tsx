@@ -31,7 +31,7 @@ export function FontPicker({ selected, onSelect }: Props) {
                 {preset.preview}
               </Text>
             </View>
-            <Text style={[styles.label, active && styles.labelActive]}>{preset.label}</Text>
+            <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>{preset.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.inkFaint,
     textAlign: 'center',
-    maxWidth: 72,
+    maxWidth: 88,
   },
   labelActive: {
     color: colors.terracotta,
