@@ -216,6 +216,44 @@ Repeat in each of the 6 templates (Classic, Photo Hero, Minimal, Two Column, Jou
 
 ---
 
+## PDF export (Phase F, landed 2026-04-22)
+
+Classic template only in this commit. Other 5 templates fall back to Classic layout until their render functions land.
+
+### 1. Export from Clean view
+- Open any recipe with full content (title, description, ingredients, method, tags). Ensure it's on the **Classic** template (Layout → Classic).
+- Recipe detail → **Clean** tab → tap **⤓ PDF** next to Share.
+- ✅ Expect: "Preparing…" briefly, then the iOS print dialog appears with a preview of the page.
+- Print dialog → pinch preview → tap share → **Save to Files**.
+- ✅ Expect: a proper A4 PDF saved. Open it: title, description, pills, ingredients list, method list, tags all present; paper pattern renders if the book has one; palette colours match the app.
+
+### 2. Export from Scrapbook view
+- Same recipe → **Scrapbook** tab → tap **⤓ Export PDF** below the page preview.
+- ✅ Same flow as test 1.
+
+### 3. Export respects Arrange Blocks overrides
+- Decorate → move the description block to an unusual position → Done.
+- Back to recipe detail → Export PDF.
+- ✅ Expect: the exported PDF shows description in the moved position, not the default.
+
+### 4. Export respects fontScale + section titles
+- Open cookbook → ⚙︎ → change Ingredients title to Ukrainian (e.g. "Що потрібно") → Save.
+- Open a recipe in that book → Decorate → select ingredients-heading → A+ a couple of times → Done.
+- Export PDF.
+- ✅ Expect: heading shows the Ukrainian label at the bumped font size.
+
+### 5. No editor session required
+- Create a brand-new recipe, do NOT open the editor.
+- Export PDF from the recipe detail screen.
+- ✅ Expect: export succeeds with default Classic layout, default palette, no stickers, no drawings.
+
+### Known scope of this commit
+- Only the Classic template renders fully; other 5 templates fall back to Classic (explicitly noted in MANUAL_TESTS). Fix as each template's render function lands.
+- Stickers and drawing strokes are **not** in the PDF yet — schema captures them but the renderer's sticker/stroke output is in a follow-up commit.
+- Images use the recipe's `cover_image_url` directly — they print whatever the URL resolves to. For Supabase Storage URLs that requires the PDF renderer (expo-print's embedded WebView here) to be online.
+
+---
+
 ## Font bump + persistence (post-Phase B, landed 2026-04-22)
 
 Covers BUG-015 (canvas state per-recipe), BUG-016 (selected block z-order), BUG-017 (pills font scale).

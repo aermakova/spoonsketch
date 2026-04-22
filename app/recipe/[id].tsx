@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, Share, useWindowDimensions,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, Share, useWindowDimensions, Alert,
 } from 'react-native';
+import { exportRecipePdf } from '../../src/lib/exportRecipePdf';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -29,7 +30,7 @@ type DetailView = 'clean' | 'scrapbook';
 const STICKER_SIZE = 64;
 
 // ─── Scrapbook View — A4 page preview ────────────────────────────
-function ScrapbookView({ recipe, palette, sectionTitles, paperType }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles; paperType: CookbookPaperType }) {
+function ScrapbookView({ recipe, palette, sectionTitles, paperType, onExport, exporting }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles; paperType: CookbookPaperType; onExport: () => void; exporting: boolean }) {
   const { width: screenWidth } = useWindowDimensions();
   const pageWidth = screenWidth - 48;
   const { elements, recipeId: canvasRecipeId, templateKey, recipeFont, blockOverrides, stepOverrides, ingOverrides } = useCanvasStore();
@@ -106,12 +107,22 @@ function ScrapbookView({ recipe, palette, sectionTitles, paperType }: { recipe: 
           </View>
         ))}
       </View>
+
+      <TouchableOpacity
+        style={[sb.exportBtn, { borderColor: palette.accent }, exporting && sb.exportBtnDisabled]}
+        onPress={onExport}
+        disabled={exporting}
+      >
+        <Text style={[sb.exportBtnText, { color: palette.accent }]}>
+          {exporting ? 'Preparing…' : '⤓ Export PDF'}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 // ─── Clean View ───────────────────────────────────────────────────
-function CleanView({ recipe, palette, sectionTitles }: { recipe: Recipe; palette: Palette; sectionTitles: CookbookSectionTitles }) {
+function CleanView({ recipe, palette, sectionTitles, onExport, exporting }: { recipe: Recipe; palette: Palette; sectionTitles: CookbookSectionTitles; onExport: () => void; exporting: boolean }) {
   const totalTime = (recipe.prep_minutes ?? 0) + (recipe.cook_minutes ?? 0);
   const ingredientsTitle = sectionTitles.ingredients.trim() || DEFAULT_SECTION_TITLES.ingredients;
   const methodTitle = sectionTitles.method.trim() || DEFAULT_SECTION_TITLES.method;
@@ -202,10 +213,21 @@ function CleanView({ recipe, palette, sectionTitles }: { recipe: Recipe; palette
           </>
         )}
 
-        {/* Share */}
-        <TouchableOpacity style={[cl.shareBtn, { borderColor: palette.accent }]} onPress={handleShare}>
-          <Text style={[cl.shareBtnText, { color: palette.accent }]}>Share recipe</Text>
-        </TouchableOpacity>
+        {/* Share + Export */}
+        <View style={cl.actionRow}>
+          <TouchableOpacity style={[cl.shareBtn, { borderColor: palette.accent, flex: 1 }]} onPress={handleShare}>
+            <Text style={[cl.shareBtnText, { color: palette.accent }]}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[cl.shareBtn, { borderColor: palette.accent, flex: 1 }, exporting && cl.shareBtnDisabled]}
+            onPress={onExport}
+            disabled={exporting}
+          >
+            <Text style={[cl.shareBtnText, { color: palette.accent }]}>
+              {exporting ? 'Preparing…' : '⤓ PDF'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -228,8 +250,9 @@ export default function RecipeDetailScreen() {
   const { id, view: viewParam } = useLocalSearchParams<{ id: string; view?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { palette } = useThemeStore();
+  const { palette, paletteName } = useThemeStore();
   const [view, setView] = useState<DetailView>(viewParam === 'scrapbook' ? 'scrapbook' : 'clean');
+  const [exporting, setExporting] = useState(false);
 
   const { data: recipe, isLoading } = useQuery({
     queryKey: ['recipe', id],
@@ -250,6 +273,29 @@ export default function RecipeDetailScreen() {
   });
   const sectionTitles = cookbook?.section_titles ?? DEFAULT_SECTION_TITLES;
   const paperType: CookbookPaperType = cookbook?.paper_type ?? 'blank';
+
+  const { width: screenWidth } = useWindowDimensions();
+  const exportCanvasW = screenWidth - 48;
+  const exportCanvasH = Math.round(exportCanvasW * 1.4142);
+
+  async function handleExport() {
+    if (!recipe || exporting) return;
+    setExporting(true);
+    try {
+      await exportRecipePdf({
+        recipe,
+        cookbook: cookbook ?? null,
+        palette,
+        paletteName,
+        canvasWidth: exportCanvasW,
+        canvasHeight: exportCanvasH,
+      });
+    } catch (e: any) {
+      Alert.alert('Export failed', e?.message ?? 'Unknown error');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (isLoading || !recipe) {
     return (
@@ -302,8 +348,8 @@ export default function RecipeDetailScreen() {
       </View>
 
       {view === 'clean'
-        ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} />
-        : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} paperType={paperType} />
+        ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} onExport={handleExport} exporting={exporting} />
+        : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} paperType={paperType} onExport={handleExport} exporting={exporting} />
       }
     </View>
     </ErrorBoundary>
@@ -453,6 +499,16 @@ const sb = StyleSheet.create({
     fontFamily: fonts.hand,
     fontSize: 9,
   },
+  exportBtn: {
+    marginTop: 20,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  exportBtnDisabled: { opacity: 0.5 },
+  exportBtnText: { fontFamily: fonts.bodyBold, fontSize: 15 },
 });
 
 const cl = StyleSheet.create({
@@ -508,5 +564,7 @@ const cl = StyleSheet.create({
     paddingVertical: 13,
     alignItems: 'center',
   },
+  shareBtnDisabled: { opacity: 0.5 },
   shareBtnText: { fontFamily: fonts.bodyBold, fontSize: 15 },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 24 },
 });
