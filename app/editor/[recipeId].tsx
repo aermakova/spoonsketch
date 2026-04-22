@@ -15,6 +15,7 @@ import { CanvasElement } from '../../src/components/canvas/CanvasElement';
 import { StickerTray } from '../../src/components/canvas/StickerTray';
 import { SkiaCanvas } from '../../src/components/canvas/SkiaCanvas';
 import { DrawingToolbar } from '../../src/components/canvas/DrawingToolbar';
+import { HelpSheet } from '../../src/components/canvas/HelpSheet';
 import { LayerPanel } from '../../src/components/canvas/LayerPanel';
 import { PageTemplate } from '../../src/components/canvas/PageTemplates';
 import { PaperPattern } from '../../src/components/canvas/PaperPattern';
@@ -41,6 +42,7 @@ export default function EditorScreen() {
 
   const [editorMode, setEditorMode] = useState<EditorMode>('stickers');
   const [layerPanelOpen, setLayerPanelOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [blockEditMode, setBlockEditMode] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
 
@@ -342,7 +344,7 @@ export default function EditorScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.helpBtn} onPress={() => { /* TODO: show help overlay */ }}>
+          <TouchableOpacity style={styles.helpBtn} onPress={() => setHelpOpen(true)}>
             <Text style={styles.helpIcon}>?</Text>
           </TouchableOpacity>
         </View>
@@ -404,6 +406,9 @@ export default function EditorScreen() {
 
       {/* Layer panel (draw mode only) */}
       <LayerPanel visible={layerPanelOpen} onClose={() => setLayerPanelOpen(false)} />
+
+      {/* Help sheet — mode-aware content */}
+      <HelpSheet visible={helpOpen} mode={editorMode} onClose={() => setHelpOpen(false)} />
     </View>
     </ErrorBoundary>
   );

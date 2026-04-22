@@ -1410,12 +1410,12 @@ Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
 
 Items intentionally skipped during Phase 5 to keep scope tight. Implement before launch.
 
-### Help overlay (`?` button in editor)
-- Button is already placed in the mode-tabs row (`app/editor/[recipeId].tsx`) with a `// TODO` comment
-- On tap: open a bottom sheet with short contextual sections per mode
-- **Stickers section:** tap to place, drag to move, pinch to resize/rotate, tap selected to delete
-- **Drawing section:** layer blending guide (Normal / Multiply / Screen / Overlay / Soft Light explained with 1-line descriptions), eraser tip, undo hint
-- **Design:** embed short looping GIF demos per feature (record these as screen recordings before implementation)
+### Help overlay (`?` button in editor) — ✅ Landed 2026-04-22
+- `src/components/canvas/HelpSheet.tsx` renders a mode-aware bottom sheet: Layout / Stickers / Draw each get their own contextual tip list.
+- Layout section walks through template picker, font picker, Arrange Blocks, move/rotate/scale, font-size bump, delete + reset.
+- Stickers section covers add, move, pinch resize/rotate, delete.
+- Draw section covers brush vs eraser, stroke size + colour, layers, blend modes (Normal / Multiply / Screen / Overlay / Soft Light explained), undo, auto-save.
+- GIF demos were deferred — text-only sheet ships first; revisit after screen-recording tooling is set up.
 
 ### Drawing colour palette
 - Current: 8 fixed colours from the app design system
