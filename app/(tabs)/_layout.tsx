@@ -12,9 +12,17 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
   const { palette } = useThemeStore();
   const active = focused ? palette.accent : colors.inkFaint;
   return (
-    <View style={styles.tabItem}>
+    <View style={[styles.tabItem, { minWidth: 70 }]}>
       <Text style={[styles.tabEmoji, { opacity: focused ? 1 : 0.55 }]}>{emoji}</Text>
-      <Text numberOfLines={1} style={[styles.tabLabel, { color: active }]}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        allowFontScaling={false}
+        style={[styles.tabLabel, { color: active }]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
