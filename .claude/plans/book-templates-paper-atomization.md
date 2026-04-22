@@ -7,7 +7,7 @@
 | **A** — Description normalization | ⏳ Not started | Deferred — start after Track 2 ships |
 | **B** — Atomize every recipe field | ⏳ Not started | Depends on A |
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
-| **D** — Cookbook-level section titles | ⏳ Not started | Next up after stability fixes |
+| **D** — Cookbook-level section titles | 🟡 **In progress** | Code landed; migration pending Supabase dashboard run |
 | **E** — Paper type at cookbook level | ⏳ Not started | After D |
 | **F** — Print alignment contract | ⏳ Not started | Large slice, separate PR |
 
@@ -41,13 +41,25 @@ All fixed, uncommitted at time of writing — see `.claude/test-plans/bug-log.md
 - ✅ **BUG-008** — Book default never flowed to recipes because `addBookPage` didn't link `recipes.cookbook_id`. Editor's hydration (`per-recipe override → cookbook default → fallback`) had nothing to resolve to. Fixed: `addBookPage` backfills `recipes.cookbook_id` on first-add; book builder `addMutation` invalidates `['recipe', id]` + `['recipes']`.
 - ✅ **BUG-009** — SecureStore "User interaction is not allowed" crash when iOS is locked / app backgrounded. Fixed via `AppState` listener that starts/stops Supabase's auto-refresh (canonical pattern).
 
+### Phase D — what's landed (uncommitted)
+
+- Migration `supabase/migrations/20260422000001_cookbook_section_titles.sql` — adds NOT NULL `section_titles jsonb` with default `{"ingredients":"Ingredients","method":"Method"}`. **Needs to be applied via Supabase dashboard SQL editor before the UI works end-to-end.**
+- `src/types/cookbook.ts` — new `CookbookSectionTitles` type + `DEFAULT_SECTION_TITLES` constant; `Cookbook` + `CookbookInsert` extended.
+- `app/book/[cookbookId].tsx` — Settings modal gains two `TextInput`s (Ingredients / Method) with keyboard-lift via `Keyboard.addListener` + animated `translateY` (reuses the pattern from `PageTypePicker`). Save batches template + font + section_titles into a single `updateCookbook` call.
+- `src/components/canvas/PageTemplates.tsx` — new `sectionTitles?: CookbookSectionTitles` prop on `TemplateProps`; 9 hardcoded strings replaced with `resolveSectionTitle()` + fallback. Journal keeps its `:` suffix at the render site.
+- `app/editor/[recipeId].tsx` — passes `cookbook?.section_titles` into `<PageTemplate />`.
+- `app/recipe/[id].tsx` — fetches cookbook when `recipe.cookbook_id` set; Clean view "Instructions" now renders cookbook `method` label (default "Method"); Share text also uses the cookbook labels.
+
+**Behavior change:** Clean view previously read "Instructions" (hardcoded); it now renders `section_titles.method`, which defaults to "Method". Intentional — keeps Clean PDF matching the scrapbook pages.
+
 ### Next up (in order)
 
-1. **Commit BUG-006…009 fixes** + re-run Phase C phone test end-to-end.
-2. **Phase D** — cookbook-level section titles.
-3. **Phase E** — paper type.
-4. **Phases A + B** — canvas atomization (one PR).
-5. **Phase F** — print contract.
+1. **Apply Phase D migration** via Supabase dashboard SQL editor.
+2. **Commit BUG-006…009 fixes + Phase D** as separate commits.
+3. **Run Phase D device tests** (manual-device-tests.md § Phase D).
+4. **Phase E** — paper type.
+5. **Phases A + B** — canvas atomization (one PR).
+6. **Phase F** — print contract.
 
 ---
 

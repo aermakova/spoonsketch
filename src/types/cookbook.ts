@@ -12,6 +12,16 @@ export type CookbookTemplateKey =
   | 'classic' | 'photo-hero' | 'minimal' | 'two-column' | 'journal' | 'recipe-card';
 export type CookbookFontKey = 'caveat' | 'marck' | 'bad-script' | 'amatic';
 
+export interface CookbookSectionTitles {
+  ingredients: string;
+  method: string;
+}
+
+export const DEFAULT_SECTION_TITLES: CookbookSectionTitles = {
+  ingredients: 'Ingredients',
+  method: 'Method',
+};
+
 export interface Cookbook {
   id: string;
   user_id: string;
@@ -21,6 +31,7 @@ export interface Cookbook {
   palette: 'terracotta' | 'sage' | 'blush' | 'cobalt';
   default_template_key: CookbookTemplateKey | null;
   default_recipe_font: CookbookFontKey | null;
+  section_titles: CookbookSectionTitles;
   is_public: boolean;
   sort_order: number;
   created_at: string;
@@ -31,6 +42,7 @@ export type CookbookInsert = Pick<Cookbook, 'title' | 'palette'> & {
   description?: string | null;
   default_template_key?: CookbookTemplateKey | null;
   default_recipe_font?: CookbookFontKey | null;
+  section_titles?: Partial<CookbookSectionTitles>;
 };
 
 export interface BookPage {

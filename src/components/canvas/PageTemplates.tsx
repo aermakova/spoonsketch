@@ -9,8 +9,20 @@ import type { TemplateKey, FontPresetKey } from '../../lib/canvasStore';
 import type { StepOverride, IngOverride } from '../../lib/canvasStore';
 import type { BlockOverride } from '../../lib/blockDefs';
 import { TEMPLATE_BLOCKS } from '../../lib/blockDefs';
+import type { CookbookSectionTitles } from '../../types/cookbook';
+import { DEFAULT_SECTION_TITLES } from '../../types/cookbook';
 import { BlockElement } from './BlockElement';
 import { BlockItemEditor } from './BlockItemEditor';
+
+// Cookbook section titles are user-editable per book. Empty / whitespace-only
+// values fall back to the English default so users can clear a field to reset.
+function resolveSectionTitle(
+  titles: CookbookSectionTitles | undefined,
+  key: keyof CookbookSectionTitles,
+): string {
+  const t = titles?.[key]?.trim();
+  return t && t.length > 0 ? t : DEFAULT_SECTION_TITLES[key];
+}
 
 // Reference width for proportional font scaling (A4-equivalent "design canvas").
 // All base font sizes are authored at this width; scaled by pw/DESIGN_WIDTH at render.
@@ -42,6 +54,7 @@ export interface TemplateProps {
   pageWidth: number;
   palette: Palette;
   recipeFont: FontPresetKey;
+  sectionTitles?: CookbookSectionTitles;
   // Block editing — all optional; omit for read-only (scrapbook preview)
   blockOverrides?: Record<string, BlockOverride>;
   blockEditMode?: boolean;
@@ -195,7 +208,9 @@ function uniformStepScale(texts: string[], textAreaW: number, baseFs: number): n
 
 // ─── Classic ──────────────────────────────────────────────────────
 function Classic(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -250,7 +265,7 @@ function Classic(props: TemplateProps) {
 
       {ingredients && (
         <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>Ingredients</Text>
+          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
@@ -267,7 +282,7 @@ function Classic(props: TemplateProps) {
 
       {steps && (
         <BlockElement key={steps.elKey} {...makeBlockProps('steps', steps, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, steps.fontScale), { color: palette.accent, fontFamily: f }]}>Method</Text>
+          <Text style={[scaleText(t.colHead, steps.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
@@ -317,7 +332,9 @@ function Classic(props: TemplateProps) {
 
 // ─── Photo Hero ───────────────────────────────────────────────────
 function PhotoHero(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -361,7 +378,7 @@ function PhotoHero(props: TemplateProps) {
 
       {ingredients && (
         <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>Ingredients</Text>
+          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
@@ -378,7 +395,7 @@ function PhotoHero(props: TemplateProps) {
 
       {method && (
         <BlockElement key={method.elKey} {...makeBlockProps('method', method, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, method.fontScale), { color: palette.accent, fontFamily: f }]}>Method</Text>
+          <Text style={[scaleText(t.colHead, method.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
@@ -420,7 +437,9 @@ function PhotoHero(props: TemplateProps) {
 
 // ─── Minimal ──────────────────────────────────────────────────────
 function Minimal(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -462,7 +481,7 @@ function Minimal(props: TemplateProps) {
 
       {ingredientsBlock && (
         <BlockElement key={ingredientsBlock.elKey} {...makeBlockProps('ingredients', ingredientsBlock, props, pageHeight)}>
-          <Text style={[scaleText(t.minimalSection, ingredientsBlock.fontScale), { color: palette.accent, fontFamily: f }]}>Ingredients</Text>
+          <Text style={[scaleText(t.minimalSection, ingredientsBlock.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
           <View style={t.minimalIngList}>
             {visibleIngs.map((ing) => (
               <TouchableOpacity
@@ -481,7 +500,7 @@ function Minimal(props: TemplateProps) {
 
       {methodBlock && recipe.instructions.length > 0 && (
         <BlockElement key={methodBlock.elKey} {...makeBlockProps('method', methodBlock, props, pageHeight)}>
-          <Text style={[scaleText(t.minimalSection, methodBlock.fontScale), { color: palette.accent, fontFamily: f }]}>Method</Text>
+          <Text style={[scaleText(t.minimalSection, methodBlock.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
@@ -521,7 +540,9 @@ function Minimal(props: TemplateProps) {
 
 // ─── Two Column ───────────────────────────────────────────────────
 function TwoColumn(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -560,7 +581,7 @@ function TwoColumn(props: TemplateProps) {
             <FoodImage width={colW} height={imgH} borderRadius={6} />
           </View>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
-          <Text style={[t.colHead, { color: palette.accent, marginTop: 8, fontFamily: f }]}>Ingredients</Text>
+          <Text style={[t.colHead, { color: palette.accent, marginTop: 8, fontFamily: f }]}>{ingredientsTitle}</Text>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
@@ -577,7 +598,7 @@ function TwoColumn(props: TemplateProps) {
 
       {rightCol && (
         <BlockElement key={rightCol.elKey} {...makeBlockProps('right-col', rightCol, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, rightCol.fontScale), { color: palette.accent, fontFamily: f }]}>Method</Text>
+          <Text style={[scaleText(t.colHead, rightCol.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
@@ -619,7 +640,8 @@ function TwoColumn(props: TemplateProps) {
 
 // ─── Journal ──────────────────────────────────────────────────────
 function Journal(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -672,7 +694,7 @@ function Journal(props: TemplateProps) {
         <BlockElement key={meta.elKey} {...makeBlockProps('meta', meta, props, pageHeight)}>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
           <View style={[t.journalDivider, { backgroundColor: palette.accent + '33' }]} />
-          <Text style={[scaleText(t.journalNote, meta.fontScale), { color: palette.accent, fontFamily: f }]}>What you'll need:</Text>
+          <Text style={[scaleText(t.journalNote, meta.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}:</Text>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
@@ -739,7 +761,9 @@ function Journal(props: TemplateProps) {
 
 // ─── Recipe Card ─────────────────────────────────────────────────
 function RecipeCard(props: TemplateProps) {
-  const { recipe, pageWidth, palette, recipeFont } = props;
+  const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
+  const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -786,7 +810,7 @@ function RecipeCard(props: TemplateProps) {
 
       {ingredients && (
         <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.cardSection, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>Ingredients</Text>
+          <Text style={[scaleText(t.cardSection, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
@@ -804,7 +828,7 @@ function RecipeCard(props: TemplateProps) {
 
       {steps && (
         <BlockElement key={steps.elKey} {...makeBlockProps('steps', steps, props, pageHeight)}>
-          <Text style={[scaleText(t.cardSection, steps.fontScale), { color: palette.accent, fontFamily: f }]}>Method</Text>
+          <Text style={[scaleText(t.cardSection, steps.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
           <View style={t.cardStepGrid}>
             {slicedSteps.map(step => (
               <TouchableOpacity

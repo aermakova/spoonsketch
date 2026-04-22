@@ -72,7 +72,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Book Builder → **Add page → Recipe → Choose Recipe** → search input autofocuses, keyboard covers the entire recipe list.
 - **Root cause:** `PageTypePicker` is a custom `Animated.View` bottom sheet at `position: absolute; bottom: 0`. `KeyboardAvoidingView` doesn't compose cleanly with absolute positioning, so we couldn't reuse BUG-002's fix.
 - **Fix:** Added a second `Animated.Value` (`kbY`) driven by `Keyboard.addListener('keyboardWillShow'/'keyboardWillHide')`, combined with the entry/exit value via `Animated.add`. The sheet now slides up by keyboard height when the input focuses.
-- **Commit:** (pending — see uncommitted changes)
+- **Commit:** `08ac9f5`
 - **Test:** `manual-device-tests.md` § Phase C test 6 (expanded to all TextInput hosts).
 
 ## BUG-007 — Book Settings modal had no Save button
@@ -81,7 +81,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Book Builder → ⚙︎ → change template → no "Save" button visible; user doesn't know if change persisted.
 - **Root cause:** Modal called `settingsMutation.mutate()` on every picker tap (optimistic update), but had no explicit Save action — only a backdrop-tap / ✕ close. The "coming soon" info box looked like a disabled button, compounding confusion.
 - **Fix:** Reworked to draft state in the modal (`template`, `font` useState initialized from cookbook). Added explicit **Cancel** + **Save** buttons. Save fires `settingsMutation.mutate(patch)` with `onSuccess: closeModal`. Spinner on Save button while in-flight; disabled when no changes. "Coming soon" box restyled as a small footer hint.
-- **Commit:** (pending)
+- **Commit:** `08ac9f5`
 - **Test:** `manual-device-tests.md` § Phase C test 1 + 3 (covers Save interaction; **TODO: add "open settings, change then Cancel → original values restored"**).
 
 ## BUG-008 — Book default never applied to recipes (missing FK link)
@@ -90,7 +90,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Create cookbook with Journal default → Home → create recipe → open editor → still Classic (default fallback), not Journal.
 - **Root cause:** Two independent paths linked recipes to cookbooks (`recipes.cookbook_id` FK + `book_pages` join table). `addBookPage` wrote only to `book_pages`, never backfilled `recipes.cookbook_id`. Editor hydration keyed off `recipe.cookbook_id` → null → cookbook query disabled → fell back to `'classic'`/`'caveat'`.
 - **Fix:** `addBookPage` now backfills `recipes.cookbook_id` on first-add (only when currently null, so being added to a second book doesn't overwrite). Book builder's `addMutation` invalidates `['recipe', vars.recipe_id]` + `['recipes']` so the editor immediately sees the link.
-- **Commit:** (pending)
+- **Commit:** `08ac9f5`
 - **Test:** `manual-device-tests.md` § Phase C test 1 (rewritten to include the "add as book page" step — which is the trigger for linkage).
 - **Related risk:** if we ever want "recipe can belong to multiple books," this FK approach breaks. For v1 the home-book-wins model is correct. Revisit during Phase B if we generalize page types.
 
@@ -100,7 +100,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Leave app idle for a while, lock the phone, return to app → red-box "Auto refresh tick failed. Calling the 'getValueWithKeyAsync' function has failed → User interaction is not allowed."
 - **Root cause:** Supabase's `autoRefreshToken: true` runs a timer that tries to read the session from SecureStore. iOS keychain rejects reads when the device is locked or the app is not active.
 - **Fix:** Added `AppState` listener in `src/api/client.ts` that calls `supabase.auth.startAutoRefresh()` on `active` and `stopAutoRefresh()` on any other state. Canonical Supabase React Native pattern.
-- **Commit:** (pending)
+- **Commit:** `08ac9f5`
 - **Test:** **TODO add to `manual-device-tests.md`**:
   1. Open app + sign in.
   2. Lock the phone for 60 seconds.

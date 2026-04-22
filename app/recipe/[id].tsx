@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRecipe } from '../../src/api/recipes';
+import { fetchCookbook } from '../../src/api/cookbooks';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
 import { FoodImage } from '../../src/components/ui/FoodImage';
 import { Sticker } from '../../src/components/stickers/Sticker';
@@ -19,13 +20,15 @@ import { PageTemplate } from '../../src/components/canvas/PageTemplates';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import type { Ingredient, Instruction, Recipe } from '../../src/types/recipe';
+import type { CookbookSectionTitles } from '../../src/types/cookbook';
+import { DEFAULT_SECTION_TITLES } from '../../src/types/cookbook';
 
 type DetailView = 'clean' | 'scrapbook';
 
 const STICKER_SIZE = 64;
 
 // ─── Scrapbook View — A4 page preview ────────────────────────────
-function ScrapbookView({ recipe, palette }: { recipe: Recipe; palette: Palette }) {
+function ScrapbookView({ recipe, palette, sectionTitles }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles }) {
   const { width: screenWidth } = useWindowDimensions();
   const pageWidth = screenWidth - 48;
   const { elements, recipeId: canvasRecipeId, templateKey, recipeFont, blockOverrides, stepOverrides, ingOverrides } = useCanvasStore();
@@ -56,6 +59,7 @@ function ScrapbookView({ recipe, palette }: { recipe: Recipe; palette: Palette }
           palette={palette}
           templateKey={canvasRecipeId === recipe.id ? templateKey : 'classic'}
           recipeFont={canvasRecipeId === recipe.id ? recipeFont : 'caveat'}
+          sectionTitles={sectionTitles}
           blockOverrides={canvasRecipeId === recipe.id ? blockOverrides : undefined}
           stepOverrides={canvasRecipeId === recipe.id ? stepOverrides : undefined}
           ingOverrides={canvasRecipeId === recipe.id ? ingOverrides : undefined}
@@ -103,18 +107,20 @@ function ScrapbookView({ recipe, palette }: { recipe: Recipe; palette: Palette }
 }
 
 // ─── Clean View ───────────────────────────────────────────────────
-function CleanView({ recipe, palette }: { recipe: Recipe; palette: Palette }) {
+function CleanView({ recipe, palette, sectionTitles }: { recipe: Recipe; palette: Palette; sectionTitles: CookbookSectionTitles }) {
   const totalTime = (recipe.prep_minutes ?? 0) + (recipe.cook_minutes ?? 0);
+  const ingredientsTitle = sectionTitles.ingredients.trim() || DEFAULT_SECTION_TITLES.ingredients;
+  const methodTitle = sectionTitles.method.trim() || DEFAULT_SECTION_TITLES.method;
 
   async function handleShare() {
     const text = [
       recipe.title,
       recipe.description ?? '',
       '',
-      'Ingredients:',
+      `${ingredientsTitle}:`,
       ...(recipe.ingredients as Ingredient[]).map(i => `• ${[i.amount, i.unit, i.name].filter(Boolean).join(' ')}`),
       '',
-      'Instructions:',
+      `${methodTitle}:`,
       ...(recipe.instructions as Instruction[]).map(s => `${s.step}. ${s.text}`),
     ].join('\n');
     await Share.share({ message: text, title: recipe.title });
@@ -165,7 +171,7 @@ function CleanView({ recipe, palette }: { recipe: Recipe; palette: Palette }) {
         {/* Ingredients */}
         {recipe.ingredients.length > 0 && (
           <>
-            <Text style={cl.sectionTitle}>Ingredients</Text>
+            <Text style={cl.sectionTitle}>{ingredientsTitle}</Text>
             {(recipe.ingredients as Ingredient[]).map((ing, i) => (
               <View key={ing.id ?? i} style={cl.ingredientRow}>
                 <View style={[cl.bullet, { backgroundColor: palette.accent }]} />
@@ -180,7 +186,7 @@ function CleanView({ recipe, palette }: { recipe: Recipe; palette: Palette }) {
         {/* Instructions */}
         {recipe.instructions.length > 0 && (
           <>
-            <Text style={cl.sectionTitle}>Instructions</Text>
+            <Text style={cl.sectionTitle}>{methodTitle}</Text>
             {(recipe.instructions as Instruction[]).map((step) => (
               <View key={step.step} style={cl.stepRow}>
                 <View style={[cl.stepNum, { backgroundColor: palette.accent }]}>
@@ -226,6 +232,16 @@ export default function RecipeDetailScreen() {
     queryFn: () => fetchRecipe(id),
     enabled: !!id,
   });
+
+  // Cookbook section titles — only fetched when the recipe is linked to a book.
+  // Standalone recipes render the English defaults.
+  const cookbookId = recipe?.cookbook_id ?? null;
+  const { data: cookbook } = useQuery({
+    queryKey: ['cookbook', cookbookId],
+    queryFn: () => fetchCookbook(cookbookId!),
+    enabled: !!cookbookId,
+  });
+  const sectionTitles = cookbook?.section_titles ?? DEFAULT_SECTION_TITLES;
 
   if (isLoading || !recipe) {
     return (
@@ -278,8 +294,8 @@ export default function RecipeDetailScreen() {
       </View>
 
       {view === 'clean'
-        ? <CleanView recipe={recipe} palette={palette} />
-        : <ScrapbookView recipe={recipe} palette={palette} />
+        ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} />
+        : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} />
       }
     </View>
     </ErrorBoundary>

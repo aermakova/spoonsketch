@@ -255,6 +255,7 @@ export default function EditorScreen() {
                 palette={palette}
                 templateKey={templateKey}
                 recipeFont={recipeFont}
+                sectionTitles={cookbook?.section_titles}
                 blockOverrides={blockOverrides}
                 blockEditMode={blockEditMode}
                 selectedBlockId={selectedBlockId}

@@ -71,13 +71,47 @@ Grab the Expo terminal log for the failing step — the stack trace tells us exa
 
 ---
 
-## Phase D — Cookbook-level section titles (not yet implemented)
+## Phase D — Cookbook-level section titles (landed 2026-04-21)
 
-_To fill in once Phase D lands. Placeholder scenarios:_
+### 1. Section titles flow to all six templates
+- Shelves → open a cookbook → ⚙︎ → under **Section titles**, set
+  - Ingredients → `Інгредієнти`
+  - Method → `Спосіб приготування`
+  - tap **Save**
+- ✅ Expect: modal closes; reopening ⚙︎ shows the new strings pre-filled.
+- Open a recipe page that's part of this book.
+- In the editor, cycle through all six templates (Layout → template picker):
+  - **Classic** → section heads read `Інгредієнти` / `Спосіб приготування`
+  - **Photo Hero** → same
+  - **Minimal** → same
+  - **Two Column** → same (left col ingredients head, right col method head)
+  - **Journal** → ingredients note reads `Інгредієнти:` (colon is Journal's decoration — kept intentionally)
+  - **Recipe Card** → same
 
-- Change section titles in book to Ukrainian ("Інгредієнти" / "Спосіб приготування") → all six templates + Clean view render them.
-- Empty string falls back to defaults.
-- Changing after recipes exist updates existing pages (section titles are read live from cookbook, not snapshotted).
+### 2. Clean view + share text use the cookbook labels
+- Back to the recipe detail → **Clean** toggle
+- ✅ Expect: `Інгредієнти` heading replaces "Ingredients"; `Спосіб приготування` heading replaces "Instructions".
+- Tap **Share recipe** → preview the share sheet text.
+- ✅ Expect: `Інгредієнти:` and `Спосіб приготування:` appear where "Ingredients:" / "Instructions:" used to.
+
+### 3. Empty string falls back to default
+- Book settings → clear both Ingredients + Method fields → **Save**
+- ✅ Expect: modal closes; templates + Clean view render the default English `Ingredients` / `Method`.
+- Reopen ⚙︎ → fields are empty (faithful to what's stored); placeholder shows the default.
+
+### 4. Live update — no remount needed
+- Open a recipe in its editor → note the current section titles.
+- Without closing the editor: go back to the book (or another device/tab) → change titles → Save.
+- Return to the editor page → ✅ next render picks up the new titles (TanStack invalidates `['cookbook', id]`).
+
+### 5. Standalone recipe (no cookbook link) shows defaults
+- Home → create a new recipe but **do not** add it as a page in any cookbook.
+- Open the editor → ✅ section headings show the default `Ingredients` / `Method`.
+
+### 6. Keyboard doesn't cover Ingredients/Method inputs
+- Book ⚙︎ → tap Method input.
+- ✅ Expect: the modal lifts ~40% of the keyboard height so the input + Save button stay visible above the keyboard.
+- Dismiss the keyboard → modal settles back.
 
 ---
 

@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, ActivityIndicator,
+  Alert, ActivityIndicator, Animated, Keyboard, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,7 +17,8 @@ import { FontPicker } from '../../src/components/canvas/FontPicker';
 import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
-import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey } from '../../src/types/cookbook';
+import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey, CookbookSectionTitles } from '../../src/types/cookbook';
+import { DEFAULT_SECTION_TITLES } from '../../src/types/cookbook';
 
 function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }) {
   const entries = pages
@@ -57,27 +58,70 @@ function SettingsModal({
 }: {
   cookbook: Cookbook;
   onClose: () => void;
-  onSave: (patch: { default_template_key: CookbookTemplateKey; default_recipe_font: CookbookFontKey }) => void;
+  onSave: (patch: {
+    default_template_key: CookbookTemplateKey;
+    default_recipe_font: CookbookFontKey;
+    section_titles: CookbookSectionTitles;
+  }) => void;
   saving: boolean;
 }) {
   // Draft state so the user can preview without committing; only
   // Save writes to the server. Prevents the "did it save?" confusion.
   const initialTemplate = (cookbook.default_template_key ?? 'classic') as CookbookTemplateKey;
   const initialFont = (cookbook.default_recipe_font ?? 'caveat') as CookbookFontKey;
+  const initialTitles = cookbook.section_titles ?? DEFAULT_SECTION_TITLES;
   const [template, setTemplate] = useState<CookbookTemplateKey>(initialTemplate);
   const [font, setFont] = useState<CookbookFontKey>(initialFont);
+  const [ingredientsLabel, setIngredientsLabel] = useState<string>(initialTitles.ingredients);
+  const [methodLabel, setMethodLabel] = useState<string>(initialTitles.method);
 
-  const dirty = template !== initialTemplate || font !== initialFont;
+  const dirty =
+    template !== initialTemplate ||
+    font !== initialFont ||
+    ingredientsLabel !== initialTitles.ingredients ||
+    methodLabel !== initialTitles.method;
+
+  // Modal is absolute-positioned, so KeyboardAvoidingView won't reliably
+  // shift it. Use the same Keyboard listener + animated offset pattern as
+  // PageTypePicker — translates the modal upward when the keyboard opens.
+  const kbY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      Animated.timing(kbY, {
+        toValue: -e.endCoordinates.height * 0.4,
+        duration: e.duration ?? 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', (e) => {
+      Animated.timing(kbY, {
+        toValue: 0,
+        duration: e.duration ?? 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [kbY]);
 
   const handleSave = () => {
     if (!dirty || saving) { onClose(); return; }
-    onSave({ default_template_key: template, default_recipe_font: font });
+    // Persist exactly what the user typed; empty strings render as the
+    // fallback at read-time so the DB stays faithful to their input.
+    onSave({
+      default_template_key: template,
+      default_recipe_font: font,
+      section_titles: {
+        ingredients: ingredientsLabel,
+        method: methodLabel,
+      },
+    });
   };
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <TouchableOpacity style={settings.backdrop} onPress={onClose} activeOpacity={1} />
-      <View style={settings.modal}>
+      <Animated.View style={[settings.modal, { transform: [{ translateY: kbY }] }]}>
         <View style={settings.headerRow}>
           <Text style={settings.heading}>Book settings</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8} disabled={saving}>
@@ -92,6 +136,35 @@ function SettingsModal({
         <Text style={[settings.section, { marginTop: 12 }]}>Default handwriting font</Text>
         <Text style={settings.hint}>Used for recipe headings and flourishes.</Text>
         <FontPicker selected={font} onSelect={setFont} />
+
+        <Text style={[settings.section, { marginTop: 12 }]}>Section titles</Text>
+        <Text style={settings.hint}>Used on every recipe page. Leave blank to use the defaults.</Text>
+        <View style={settings.labelRow}>
+          <Text style={settings.labelTag}>Ingredients</Text>
+          <TextInput
+            style={settings.labelInput}
+            value={ingredientsLabel}
+            onChangeText={setIngredientsLabel}
+            placeholder={DEFAULT_SECTION_TITLES.ingredients}
+            placeholderTextColor={colors.inkFaint}
+            editable={!saving}
+            returnKeyType="next"
+            maxLength={40}
+          />
+        </View>
+        <View style={settings.labelRow}>
+          <Text style={settings.labelTag}>Method</Text>
+          <TextInput
+            style={settings.labelInput}
+            value={methodLabel}
+            onChangeText={setMethodLabel}
+            placeholder={DEFAULT_SECTION_TITLES.method}
+            placeholderTextColor={colors.inkFaint}
+            editable={!saving}
+            returnKeyType="done"
+            maxLength={40}
+          />
+        </View>
 
         <View style={settings.actions}>
           <TouchableOpacity onPress={onClose} style={settings.cancelBtn} disabled={saving}>
@@ -110,9 +183,9 @@ function SettingsModal({
         </View>
 
         <Text style={settings.comingSoonText}>
-          Section titles and paper type are coming next.
+          Paper type is coming next.
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -120,7 +193,7 @@ function SettingsModal({
 const settings = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   modal: {
-    position: 'absolute', left: 16, right: 16, top: '12%',
+    position: 'absolute', left: 16, right: 16, top: '8%',
     backgroundColor: colors.paper, borderRadius: 16, padding: 18,
     shadowColor: colors.ink, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16,
   },
@@ -129,6 +202,21 @@ const settings = StyleSheet.create({
   closeX: { fontSize: 18, color: colors.inkFaint, paddingHorizontal: 4 },
   section: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.ink, marginTop: 4 },
   hint: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, marginBottom: 4 },
+  labelRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: 6,
+    backgroundColor: colors.bg, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 8,
+  },
+  labelTag: {
+    fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.inkSoft,
+    width: 72,
+  },
+  labelInput: {
+    flex: 1,
+    fontFamily: fonts.body, fontSize: 14, color: colors.ink,
+    paddingVertical: 0,
+  },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
   cancelBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 10,
@@ -243,7 +331,11 @@ function BookBuilderScreen() {
   // Optimistic patch — the picker feels instant even on slow networks.
   // On error we fall back to refetch so the UI doesn't lie.
   const settingsMutation = useMutation({
-    mutationFn: (patch: { default_template_key?: CookbookTemplateKey; default_recipe_font?: CookbookFontKey }) =>
+    mutationFn: (patch: {
+      default_template_key?: CookbookTemplateKey;
+      default_recipe_font?: CookbookFontKey;
+      section_titles?: CookbookSectionTitles;
+    }) =>
       updateCookbook(cookbookId, patch),
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: ['cookbook', cookbookId] });
