@@ -261,7 +261,7 @@ function Classic(props: TemplateProps) {
 
       {pills && (
         <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
-          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} fontScale={pills.fontScale} />
         </BlockElement>
       )}
 
@@ -407,7 +407,7 @@ function PhotoHero(props: TemplateProps) {
 
       {pills && (
         <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
-          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} fontScale={pills.fontScale} />
         </BlockElement>
       )}
 
@@ -528,7 +528,7 @@ function Minimal(props: TemplateProps) {
 
       {pills && (
         <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
-          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} fontScale={pills.fontScale} />
         </BlockElement>
       )}
 
@@ -657,7 +657,7 @@ function TwoColumn(props: TemplateProps) {
 
       {pills && (
         <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
-          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} fontScale={pills.fontScale} />
         </BlockElement>
       )}
 
@@ -788,7 +788,7 @@ function Journal(props: TemplateProps) {
 
       {pills && (
         <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
-          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} fontScale={pills.fontScale} />
         </BlockElement>
       )}
 
@@ -1008,7 +1008,7 @@ function RecipeCard(props: TemplateProps) {
 }
 
 // ─── Shared sub-components ────────────────────────────────────────
-function TimePills({ recipe, palette, pageWidth, light, compact, fontSection }: { recipe: Recipe; palette: Palette; pageWidth: number; light?: boolean; compact?: boolean; fontSection: string }) {
+function TimePills({ recipe, palette, pageWidth, light, compact, fontSection, fontScale = 1 }: { recipe: Recipe; palette: Palette; pageWidth: number; light?: boolean; compact?: boolean; fontSection: string; fontScale?: number }) {
   const t = makeT(pageWidth);
   const textColor = light ? 'rgba(255,255,255,0.9)' : colors.inkSoft;
   const accentColor = light ? '#fff' : palette.accent;
@@ -1018,20 +1018,20 @@ function TimePills({ recipe, palette, pageWidth, light, compact, fontSection }: 
     <View style={t.pills}>
       {recipe.prep_minutes != null && (
         <View style={[pillStyle, { backgroundColor: bgColor }]}>
-          <Text style={[t.pillLabel, { color: textColor, fontFamily: fontSection }]}>prep </Text>
-          <Text style={[t.pillVal, { color: accentColor, fontFamily: fontSection }]}>{recipe.prep_minutes}m</Text>
+          <Text style={[scaleText(t.pillLabel, fontScale), { color: textColor, fontFamily: fontSection }]}>prep </Text>
+          <Text style={[scaleText(t.pillVal, fontScale), { color: accentColor, fontFamily: fontSection }]}>{recipe.prep_minutes}m</Text>
         </View>
       )}
       {recipe.cook_minutes != null && (
         <View style={[pillStyle, { backgroundColor: bgColor }]}>
-          <Text style={[t.pillLabel, { color: textColor, fontFamily: fontSection }]}>cook </Text>
-          <Text style={[t.pillVal, { color: accentColor, fontFamily: fontSection }]}>{recipe.cook_minutes}m</Text>
+          <Text style={[scaleText(t.pillLabel, fontScale), { color: textColor, fontFamily: fontSection }]}>cook </Text>
+          <Text style={[scaleText(t.pillVal, fontScale), { color: accentColor, fontFamily: fontSection }]}>{recipe.cook_minutes}m</Text>
         </View>
       )}
       {recipe.servings != null && (
         <View style={[pillStyle, { backgroundColor: bgColor }]}>
-          <Text style={[t.pillLabel, { color: textColor, fontFamily: fontSection }]}>serves </Text>
-          <Text style={[t.pillVal, { color: accentColor, fontFamily: fontSection }]}>{recipe.servings}</Text>
+          <Text style={[scaleText(t.pillLabel, fontScale), { color: textColor, fontFamily: fontSection }]}>serves </Text>
+          <Text style={[scaleText(t.pillVal, fontScale), { color: accentColor, fontFamily: fontSection }]}>{recipe.servings}</Text>
         </View>
       )}
     </View>

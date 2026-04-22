@@ -20,6 +20,9 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-012 | Medium | ✅ Fixed | Editor / blocks | Text-heavy blocks jumped 40–80px down after template change |
 | BUG-013 | Medium | ✅ Fixed | Editor / Arrange | Delete × on short blocks covered by right side handle |
 | BUG-014 | **High** | ✅ Fixed | Drawing / persistence | Opening a different recipe destroyed the previous recipe's drawings |
+| BUG-015 | **High** | ✅ Fixed | Canvas / persistence | Opening a different recipe destroyed the previous recipe's blocks, stickers, text edits, template, and font |
+| BUG-016 | Medium | ✅ Fixed | Editor / Arrange | Selected block's text visually covered by next sibling block when font bumped |
+| BUG-017 | Medium | ✅ Fixed | Editor / Arrange | Cooking time pills font size didn't respond to A+ / A− |
 
 ---
 
@@ -98,6 +101,33 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Commit:** `08ac9f5`
 - **Test:** `MANUAL_TESTS.md` § Phase C test 1 (rewritten to include the "add as book page" step — which is the trigger for linkage).
 - **Related risk:** if we ever want "recipe can belong to multiple books," this FK approach breaks. For v1 the home-book-wins model is correct. Revisit during Phase B if we generalize page types.
+
+## BUG-017 — Cooking time pills font size didn't respond to font bump
+- **Found:** 2026-04-22 (device report, Bug 3 of 3)
+- **Severity:** Medium (font-bump feature silently broken for the pills block)
+- **Repro:** Editor → Layout → Arrange Blocks → select the **pills** block (prep / cook / serves). Tap A+ or A− in the font toolbar. ✅ Expected: text size changes. Actual: text size unchanged.
+- **Root cause:** `TimePills` component hardcoded its own text styles (`t.pillLabel`, `t.pillVal`) without receiving or applying the parent block's fontScale. `bumpBlockFontScale` updated `blockOverrides['pills'].fontScale` correctly but the rendered text ignored it.
+- **Fix:** Added an optional `fontScale` prop (defaulting to 1) to `TimePills` and wrapped every text style with `scaleText(style, fontScale)`. Updated all 5 callers where pills is its own block (Classic, Photo Hero, Minimal, Two Column, Journal) to pass `fontScale={pills.fontScale}`. Recipe Card keeps its TimePills inside the image block — image isn't text-heavy and has no font toolbar, so `fontScale` defaults to 1 there.
+- **Commit:** _(current three-bug fix commit)_
+- **Test:** `MANUAL_TESTS.md` § Font bump + persistence (post-Phase B) test 3.
+
+## BUG-016 — Selected block's text visually covered when font bumped
+- **Found:** 2026-04-22 (device report, Bug 2 of 3)
+- **Severity:** Medium (looks like text clipping)
+- **Repro:** Editor → Layout → Arrange Blocks → select a text-heavy block with a sibling below (e.g. description; pills renders below it). Tap A+ a few times. ✅ Expected: block visibly grows. Actual: block content extends downward but the sibling block below is rendered on top of the overflowed text, making the bottom lines look cut.
+- **Root cause:** All atomized blocks are absolutely positioned. Blocks later in the JSX tree render on top of earlier siblings by default in React Native. When a text-heavy block grows (via fontScale bump), its rendered content can extend past its base.h notional bottom edge into the space of whichever block follows it in the template. The follower then overlays the overflowed text.
+- **Fix:** Elevate `zIndex: 100` on the currently selected `GestureBlock` so it renders above every other block while selected. Unselected blocks stay at `zIndex: 0`. This doesn't push siblings out of the way (template layout logic would be needed for that) but stops the visual clipping — user can see their bumped text in full and decide whether to drag the next block down.
+- **Commit:** _(current three-bug fix commit)_
+- **Test:** `MANUAL_TESTS.md` § Font bump + persistence (post-Phase B) test 2.
+
+## BUG-015 — Opening a different recipe destroyed canvas customization
+- **Found:** 2026-04-22 (device report, Bug 1 of 3)
+- **Severity:** **High** — silent data loss across recipe switches. Block arrangement, sticker placement, step/ingredient text edits, template choice, and font choice for recipe A are all wiped when the user opens recipe B's editor.
+- **Repro:** Open recipe A → Layout → Arrange Blocks → move several blocks. Exit. Open recipe B → Arrange Blocks → move blocks. Exit. Return to recipe A. ✅ Expect: A's arrangement restored. Actual (before fix): A shows default arrangement; previous moves wiped.
+- **Root cause:** `canvasStore` only held one recipe's state at a time. `init(newRecipeId)` when the id changed reset `elements / blockOverrides / stepOverrides / ingOverrides` to empty and persisted that. The persistence layer had exactly one slot. Exactly the same pattern as BUG-014 for the drawing store, but with much broader data loss because it covered the entire canvas customization surface.
+- **Fix:** Reshape `canvasStore` to a per-recipe map: `recipeStates: Record<recipeId, RecipeCanvasState>` where `RecipeCanvasState = { elements, blockOverrides, stepOverrides, ingOverrides, templateKey, recipeFont }`. Keep top-level fields as a working-copy mirror for the current recipe. Every mutation updates both the working copy AND the canonical map entry via a `commitRecipeState` helper. On `init(newRecipeId)`: snapshot the outgoing recipe's working copy back into `recipeStates`, then load the incoming recipe's entry (or create a fresh default set). Persist config bumped to `version: 4`; `migrate` seeds the new map with the v3 single-recipe entry so that recipe's customization survives the upgrade.
+- **Commit:** _(current three-bug fix commit)_
+- **Test:** `MANUAL_TESTS.md` § Font bump + persistence (post-Phase B) test 1.
 
 ## BUG-014 — Drawings destroyed when opening a different recipe
 - **Found:** 2026-04-22 (code read)

@@ -301,7 +301,7 @@ function GestureBlock({
   return (
     <GestureDetector gesture={gesture}>
       {/* overflow: 'visible' so rotation/scale/side handles can extend outside bounds */}
-      <Animated.View style={[styles.block, { overflow: 'visible' }, animStyle]}>
+      <Animated.View style={[styles.block, { overflow: 'visible', zIndex: selected ? 100 : 0 }, animStyle]}>
         {/* Inner container. Text-heavy: no clip, onLayout drives measuredH. Other: fixed w/h with clip. */}
         {isTextHeavy ? (
           <View onLayout={onContentLayout}>

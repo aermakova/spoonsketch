@@ -216,6 +216,34 @@ Repeat in each of the 6 templates (Classic, Photo Hero, Minimal, Two Column, Jou
 
 ---
 
+## Font bump + persistence (post-Phase B, landed 2026-04-22)
+
+Covers BUG-015 (canvas state per-recipe), BUG-016 (selected block z-order), BUG-017 (pills font scale).
+
+### 1. Canvas customization survives recipe switch (BUG-015)
+- Open recipe **A** → Layout → Arrange Blocks → drag title and ingredients-list to new positions. Place a sticker. Bump font on description. Done.
+- Open recipe **B** → Arrange Blocks → drag different blocks. Place a different sticker. Done.
+- Return to recipe **A**.
+- ✅ Expect: A's block positions, sticker placements, font bumps are all intact. Not reset to defaults.
+- Switch back to **B** — ✅ B's customization intact.
+- Kill app → reopen → visit both recipes. ✅ Still intact.
+
+### 2. Selected block shows above siblings when font is bumped (BUG-016)
+- Arrange Blocks → select the **description** block.
+- Tap A+ 3–4 times.
+- ✅ Expect: text grows and remains visible. Previously the pills block rendered below would cover the bottom lines of description.
+- Deselect → tap a different block.
+- ✅ Expect: description is still visible; only the newly-selected block is elevated.
+- Drag description down manually if it overlaps pills too aggressively.
+
+### 3. Cooking time pills respond to font bump (BUG-017)
+- Arrange Blocks → select the **pills** block (prep / cook / serves).
+- Tap A+ 3–4 times. ✅ Expect: pill text visibly grows.
+- Tap A− back to 100%. ✅ Expect: pill text shrinks back.
+- Verify in every template that uses a pills block (Classic / Photo Hero / Minimal / Two Column / Journal). Recipe Card's pills live inside the image block and currently don't have their own font toolbar — that's a separate design question, not a regression.
+
+---
+
 ## Drawing persistence (post-Phase B, landed 2026-04-22)
 
 Covers BUG-014 — previously, opening a different recipe destroyed the previous one's drawings.
