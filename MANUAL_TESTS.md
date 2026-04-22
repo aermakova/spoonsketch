@@ -216,14 +216,51 @@ Repeat in each of the 6 templates (Classic, Photo Hero, Minimal, Two Column, Jou
 
 ---
 
-## Phase B — Full atomization (not yet implemented)
+## Phase B — Full atomization (landed 2026-04-22)
 
-_To fill in once B lands. Planned scenarios:_
+### 1. Every field is its own block
+Open the editor on a recipe with all fields populated. Layout mode → Arrange Blocks. In **each** of the 6 templates, confirm these atoms appear as independently selectable blocks:
 
-- Every populated recipe field (title, description, pills, image, ingredients-heading, ingredients-list, method-heading, method-list, tags) renders as its own selectable block in all six templates.
-- Section titles ("Ingredients", "Method") editable as text blocks.
-- Distinct "first look" preserved per template.
-- `schemaVersion: 3` gate clears A-era overrides without crashing.
+- `title`
+- `description`
+- `pills` (time + servings)
+- `image` / `photo`
+- `ingredients-heading` (the text "Ingredients")
+- `ingredients-list` (the bulleted rows)
+- `method-heading` (the text "Method")
+- `method-list` (the numbered steps)
+- `tags` (Classic / Journal / Recipe Card only)
+
+Tap the ingredients heading — ✅ block select ring shows around the label only, not the list. Same for method heading.
+
+### 2. Heading + list drag independently
+- Select `ingredients-heading` → drag it to a new position. ✅ Only the heading moves; the list stays.
+- Same for `method-heading`.
+
+### 3. Section titles from Book Settings flow into heading blocks
+- Open Book Settings → change "Ingredients" to "Що потрібно" → Save.
+- Reopen any recipe. ✅ Every template's ingredients-heading block shows the new text.
+
+### 4. First-look preserved per template
+Without any overrides:
+- Classic: photo + ingredients side-by-side row, method below, tags sticker at bottom.
+- Photo Hero: big image at top with dark overlay; title, description, pills stacked below; ingredients/method as two columns.
+- Minimal: clean vertical stack, accent line under title.
+- Two Column: title + description full-width; below, left = image + pills + ingredients; right = method.
+- Journal: photo rotated; pills + ingredients to the right of photo; method below with ruled lines; tags sticker.
+- Recipe Card: title in accent-banner background; photo + ingredients side-by-side; grid-style method below.
+
+### 5. `schemaVersion: 3` migration
+- (Once only, first reload after this commit.) Any pre-existing block override — whether from v1 (pre-A) or v2 (post-A) — gets cleared. Open any recipe. ✅ No crash; template renders at new defaults.
+
+### 6. Empty fields render no block
+- Recipe with no tags → no tags block.
+- Recipe with no description → no description block.
+- Steps list empty → no method-heading + method-list blocks.
+
+### 7. Delete / Reset still work
+- Arrange Blocks → delete each of the 9 atoms one at a time. ✅ Each disappears.
+- Tap **Reset**. ✅ All 9 atoms reappear at defaults.
 
 ---
 

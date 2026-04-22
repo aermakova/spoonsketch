@@ -5,7 +5,7 @@
 | Phase | Status | Notes |
 |---|---|---|
 | **A** — Description normalization | ✅ **Shipped** | Every template now has a movable `description` block; `schemaVersion: 2` gate clears stale overrides |
-| **B** — Atomize every recipe field | ⏳ Not started | Depends on A |
+| **B** — Atomize every recipe field | ✅ **Shipped** | Every template now uses the 9-atom set; `schemaVersion: 3` migration clears v1/v2 overrides |
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
 | **D** — Cookbook-level section titles | ✅ **Shipped** | Migration applied; landed in commit `20330e7` |
 | **E** — Paper type at cookbook level | ✅ **Shipped** | Initial landing `6eb9810`; pattern geometry polish + BUG-010 logged in follow-up commit |
@@ -83,10 +83,26 @@ Surfaced during Phase E device testing; unrelated to the paper feature but fixed
 - `PageTemplates.tsx` — each of the 5 changed templates stops rendering description text inside its former mega-block and adds a dedicated `<BlockElement>` for description. Classic and Minimal also add a dedicated `pills` `<BlockElement>` wrapping the TimePills row. Every description block is gated on `recipe.description` being non-empty.
 - `canvasStore.ts` — zustand persist config bumped to `version: 2` with a `migrate` function that clears `blockOverrides` when hydrating from v1. Safe one-time reset because no production users yet.
 
+### Phase B — what's landed
+
+Every template is now built from the 9-atom set. Atoms per template:
+
+| Template | Atoms |
+|---|---|
+| Classic | title / description / pills / image / ingredients-heading / ingredients-list / method-heading / method-list / tags |
+| Photo Hero | image (with decorative dark overlay) / title / description / pills / ingredients-heading / ingredients-list / method-heading / method-list |
+| Minimal | title / description / pills / ingredients-heading / ingredients-list / method-heading / method-list |
+| Two Column | title / description / image / pills / ingredients-heading / ingredients-list / method-heading / method-list |
+| Journal | title / description / photo / pills / ingredients-heading / ingredients-list / method-heading / method-list / tags |
+| Recipe Card | title (with accent-banner background) / description / image / ingredients-heading / ingredients-list / method-heading / method-list / tags |
+
+- `canvasStore` persist bumped to `version: 3`; migrate clears `blockOverrides` when hydrating from v1 or v2.
+- `blockDefs.ts` rewrote all 6 template block arrays; removed mega-block IDs (`header`, `hero`, `banner`, `meta`, `left-col`, `right-col`, `ingredients`, `steps`, `method`).
+- `PageTemplates.tsx` every template's render split into per-atom `<BlockElement>` wrappers. Photo Hero keeps its dark image overlay as a child of the `image` block so the overlay travels with the image when user drags. Recipe Card keeps the accent banner as a child of the `title` block.
+
 ### Next up (in order)
 
-1. **Phase B** — full atomization into the 9-atom set (adds `ingredients-heading`, `method-heading`, `method-list`, splits Two Column's left-col into `image` + `ingredients`, splits Journal's `meta` into `pills` + `ingredients`). Bump `schemaVersion` to 3.
-2. **Phase F** — print contract. Unblocks BUG-010 and Phase 9 PDF export quality.
+1. **Phase F** — print contract. Unblocks BUG-010 and Phase 9 PDF export quality. Biggest remaining refactor.
 
 ---
 

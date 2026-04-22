@@ -269,13 +269,16 @@ export const useCanvasStore = create<CanvasState>()(
       name: 'spoonsketch-canvas',
       storage: createJSONStorage(() => storage),
       // Bump whenever a blockDefs schema change invalidates stored overrides.
-      // v2 (Phase A): `header` / `hero` / `banner` mega-blocks split — existing
-      // overrides keyed by those ids or by repositioned siblings no longer map
-      // to the new defaults. One-time reset is safe (no production users).
-      version: 2,
+      // v2 (Phase A): `header` / `hero` / `banner` mega-blocks split.
+      // v3 (Phase B): full atomization — `ingredients` / `steps` / `meta` /
+      // `left-col` / `right-col` / `banner` split into atomic blocks
+      // (`ingredients-heading`, `ingredients-list`, `method-heading`,
+      // `method-list`, `pills`, `image`, `title`). Any override keyed by a
+      // removed id or positioned against the old layout no longer maps.
+      version: 3,
       migrate: (persisted: any, from: number) => {
         if (!persisted) return persisted;
-        if (from < 2) {
+        if (from < 3) {
           return { ...persisted, blockOverrides: {} };
         }
         return persisted;

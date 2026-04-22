@@ -47,17 +47,19 @@ function usable(pw: number) {
 }
 
 // ─── Classic ─────────────────────────────────────────────────────────────────
-// Layout: [title] / [description] / [pills] / [photo | ingredients] / [method] / [tags]
-//
-// Phase A: `header` mega-block (desc + pills) split into separate `description`
-// and `pills` blocks. Downstream row heights rebalanced to make room.
-const classicTitleH   = (pw: number) => Math.round(usable(pw) * 0.08);
-const classicDescH    = (pw: number) => Math.round(usable(pw) * 0.08);
-const classicPillsH   = (pw: number) => Math.round(usable(pw) * 0.05);
-const classicRowH     = (pw: number) => Math.round(usable(pw) * 0.28);
-const classicStepsH   = (pw: number) => Math.round(usable(pw) * 0.37);
-const classicRowTop   = (pw: number) =>
+// Phase B atomization. Layout:
+//   [title] / [description] / [pills] / [photo | ing-heading + ing-list] /
+//   [method-heading] / [method-list] / [tags]
+const classicTitleH     = (pw: number) => Math.round(usable(pw) * 0.08);
+const classicDescH      = (pw: number) => Math.round(usable(pw) * 0.08);
+const classicPillsH     = (pw: number) => Math.round(usable(pw) * 0.05);
+const classicRowH       = (pw: number) => Math.round(usable(pw) * 0.28);
+const classicMethHdrH   = (pw: number) => Math.round(usable(pw) * 0.05);
+const classicMethListH  = (pw: number) => Math.round(usable(pw) * 0.32);
+const classicIngHdrH    = (pw: number) => Math.round(usable(pw) * 0.05);
+const classicRowTop     = (pw: number) =>
   PAD + classicTitleH(pw) + GAP + classicDescH(pw) + GAP + classicPillsH(pw) + GAP;
+const classicMethTop    = (pw: number) => classicRowTop(pw) + classicRowH(pw) + GAP;
 
 const classicBlocks: BlockDef[] = [
   {
@@ -106,25 +108,53 @@ const classicBlocks: BlockDef[] = [
     isTextHeavy: false,
   },
   {
-    blockId: 'ingredients',
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
+    getDefault: (pw) => {
+      const imgBlockW = Math.round(pw * 0.34) + 10;
+      const xStart = PAD + imgBlockW + GAP;
+      const w = pw - PAD - xStart;
+      const cx = xStart + w / 2;
+      const h = classicIngHdrH(pw);
+      const cy = classicRowTop(pw) + h / 2;
+      return { cx, cy, w, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'ingredients-list',
     label: 'Ingredients',
     getDefault: (pw) => {
       const imgBlockW = Math.round(pw * 0.34) + 10;
       const xStart = PAD + imgBlockW + GAP;
       const w = pw - PAD - xStart;
       const cx = xStart + w / 2;
-      const cy = classicRowTop(pw) + classicRowH(pw) / 2;
-      return { cx, cy, w, h: classicRowH(pw), rotation: 0, scale: 1 };
+      const hdrH = classicIngHdrH(pw);
+      const h = classicRowH(pw) - hdrH - GAP;
+      const top = classicRowTop(pw) + hdrH + GAP;
+      return { cx, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'steps',
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const h = classicMethHdrH(pw);
+      const top = classicMethTop(pw);
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
     label: 'Method',
     getDefault: (pw) => {
-      const h = classicStepsH(pw);
-      const top = classicRowTop(pw) + classicRowH(pw) + GAP;
+      const h = classicMethListH(pw);
+      const top = classicMethTop(pw) + classicMethHdrH(pw) + GAP;
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -135,7 +165,7 @@ const classicBlocks: BlockDef[] = [
     label: 'Tags',
     getDefault: (pw) => {
       const h = 28;
-      const top = classicRowTop(pw) + classicRowH(pw) + GAP + classicStepsH(pw) + GAP;
+      const top = classicMethTop(pw) + classicMethHdrH(pw) + GAP + classicMethListH(pw) + GAP;
       const w = Math.round(pw * 0.42);
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
@@ -145,60 +175,107 @@ const classicBlocks: BlockDef[] = [
 ];
 
 // ─── Photo Hero ───────────────────────────────────────────────────────────────
-// Layout: [hero — full width (image+title+pills overlay)] / [description] / [ingredients | method]
-//
-// Phase A: description extracted from the hero mega-block into its own block,
-// positioned between hero and the ingredient/method columns. Hero keeps image,
-// title overlay and pill overlay.
-const photoHeroHeroH = (pw: number) => Math.round(usable(pw) * 0.44);
-const photoHeroDescH = (pw: number) => Math.round(usable(pw) * 0.06);
+// Phase B: `hero` split into `image` (keeps dark-overlay decoration), `title`
+// overlay near bottom of image, plus description + pills atoms below. Ingredient
+// and method columns split into heading + list pairs.
+const phHeroH       = (pw: number) => Math.round(usable(pw) * 0.42);
+const phTitleH      = (pw: number) => Math.round(usable(pw) * 0.08);
+const phDescH       = (pw: number) => Math.round(usable(pw) * 0.06);
+const phPillsH      = (pw: number) => Math.round(usable(pw) * 0.05);
+const phColHdrH     = (pw: number) => Math.round(usable(pw) * 0.05);
+const phColsTop     = (pw: number) =>
+  PAD + phHeroH(pw) + GAP + phTitleH(pw) + GAP + phDescH(pw) + GAP + phPillsH(pw) + GAP;
 
 const photoHeroBlocks: BlockDef[] = [
   {
-    blockId: 'hero',
-    label: 'Hero (image + title)',
+    blockId: 'image',
+    label: 'Photo',
     getDefault: (pw) => {
-      const h = photoHeroHeroH(pw);
+      const h = phHeroH(pw);
       return { cx: pw / 2, cy: PAD + h / 2, w: pw, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 2,
     isTextHeavy: false,
   },
   {
-    blockId: 'description',
-    label: 'Description',
+    blockId: 'title',
+    label: 'Title',
     getDefault: (pw) => {
-      const heroH = photoHeroHeroH(pw);
-      const h = photoHeroDescH(pw);
-      const top = PAD + heroH + GAP;
+      const h = phTitleH(pw);
+      const top = PAD + phHeroH(pw) + GAP;
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'ingredients',
-    label: 'Ingredients',
+    blockId: 'description',
+    label: 'Description',
     getDefault: (pw) => {
-      const heroH = photoHeroHeroH(pw);
-      const descH = photoHeroDescH(pw);
-      const top = PAD + heroH + GAP + descH + GAP;
+      const h = phDescH(pw);
+      const top = PAD + phHeroH(pw) + GAP + phTitleH(pw) + GAP;
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'pills',
+    label: 'Time & servings',
+    getDefault: (pw) => {
+      const h = phPillsH(pw);
+      const top = PAD + phHeroH(pw) + GAP + phTitleH(pw) + GAP + phDescH(pw) + GAP;
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
+    getDefault: (pw) => {
       const colW = Math.round((pw - PAD * 2 - GAP) / 2);
-      const h = usable(pw) - heroH - GAP - descH - GAP;
+      const h = phColHdrH(pw);
+      const top = phColsTop(pw);
       return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'method',
+    blockId: 'ingredients-list',
+    label: 'Ingredients',
+    getDefault: (pw) => {
+      const colW = Math.round((pw - PAD * 2 - GAP) / 2);
+      const hdrH = phColHdrH(pw);
+      const top = phColsTop(pw) + hdrH + GAP;
+      const h = usable(pw) - (phColsTop(pw) - PAD) - hdrH - GAP;
+      return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const colW = Math.round((pw - PAD * 2 - GAP) / 2);
+      const h = phColHdrH(pw);
+      const top = phColsTop(pw);
+      const cx = PAD + colW + GAP + colW / 2;
+      return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
     label: 'Method',
     getDefault: (pw) => {
-      const heroH = photoHeroHeroH(pw);
-      const descH = photoHeroDescH(pw);
-      const top = PAD + heroH + GAP + descH + GAP;
       const colW = Math.round((pw - PAD * 2 - GAP) / 2);
-      const h = usable(pw) - heroH - GAP - descH - GAP;
+      const hdrH = phColHdrH(pw);
+      const top = phColsTop(pw) + hdrH + GAP;
+      const h = usable(pw) - (phColsTop(pw) - PAD) - hdrH - GAP;
       const cx = PAD + colW + GAP + colW / 2;
       return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
@@ -208,14 +285,17 @@ const photoHeroBlocks: BlockDef[] = [
 ];
 
 // ─── Minimal ──────────────────────────────────────────────────────────────────
-// Layout: [title] / [description] / [pills] / [ingredients] / [method]
-//
-// Phase A: header mega-block split into `description` + `pills`. Ingredients /
-// method take the remaining vertical space.
-const minimalTitleH = (pw: number) => Math.round(usable(pw) * 0.10);
-const minimalDescH  = (pw: number) => Math.round(usable(pw) * 0.08);
-const minimalPillsH = (pw: number) => Math.round(usable(pw) * 0.06);
-const minimalIngH   = (pw: number) => Math.round(usable(pw) * 0.18);
+// Phase B: ingredients and method split into heading + list pairs.
+const minimalTitleH     = (pw: number) => Math.round(usable(pw) * 0.10);
+const minimalDescH      = (pw: number) => Math.round(usable(pw) * 0.08);
+const minimalPillsH     = (pw: number) => Math.round(usable(pw) * 0.06);
+const minimalIngHdrH    = (pw: number) => Math.round(usable(pw) * 0.05);
+const minimalIngListH   = (pw: number) => Math.round(usable(pw) * 0.14);
+const minimalMethHdrH   = (pw: number) => Math.round(usable(pw) * 0.05);
+const minimalIngTop     = (pw: number) =>
+  PAD + minimalTitleH(pw) + GAP + minimalDescH(pw) + GAP + minimalPillsH(pw) + GAP;
+const minimalMethTop    = (pw: number) =>
+  minimalIngTop(pw) + minimalIngHdrH(pw) + GAP + minimalIngListH(pw) + GAP;
 
 const minimalBlocks: BlockDef[] = [
   {
@@ -251,26 +331,44 @@ const minimalBlocks: BlockDef[] = [
     isTextHeavy: true,
   },
   {
-    blockId: 'ingredients',
-    label: 'Ingredients',
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
     getDefault: (pw) => {
-      const h = minimalIngH(pw);
-      const top = PAD + minimalTitleH(pw) + GAP + minimalDescH(pw) + GAP + minimalPillsH(pw) + GAP;
+      const h = minimalIngHdrH(pw);
+      const top = minimalIngTop(pw);
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'method',
+    blockId: 'ingredients-list',
+    label: 'Ingredients',
+    getDefault: (pw) => {
+      const h = minimalIngListH(pw);
+      const top = minimalIngTop(pw) + minimalIngHdrH(pw) + GAP;
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const h = minimalMethHdrH(pw);
+      const top = minimalMethTop(pw);
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
     label: 'Method',
     getDefault: (pw) => {
-      const titleH = minimalTitleH(pw);
-      const descH  = minimalDescH(pw);
-      const pillsH = minimalPillsH(pw);
-      const ingH   = minimalIngH(pw);
-      const h = usable(pw) - titleH - descH - pillsH - ingH - GAP * 4;
-      const top = PAD + titleH + GAP + descH + GAP + pillsH + GAP + ingH + GAP;
+      const top = minimalMethTop(pw) + minimalMethHdrH(pw) + GAP;
+      const h = usable(pw) - (top - PAD);
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -279,13 +377,19 @@ const minimalBlocks: BlockDef[] = [
 ];
 
 // ─── Two Column ───────────────────────────────────────────────────────────────
-// Layout: [title — full width] / [description — full width] /
-//         [left (photo+ingredients) | right (steps)]
-//
-// Phase A: adds a `description` block between the title and the two columns.
-// Columns shrink vertically to make room.
-const twoColTitleH = (pw: number) => Math.round(usable(pw) * 0.08);
-const twoColDescH  = (pw: number) => Math.round(usable(pw) * 0.06);
+// Phase B: `left-col` / `right-col` atomized.
+// Layout:
+//   [title — full width] / [description — full width] /
+//   [left: image + pills + ingredients-heading + ingredients-list] |
+//   [right: method-heading + method-list]
+const twoColTitleH    = (pw: number) => Math.round(usable(pw) * 0.08);
+const twoColDescH     = (pw: number) => Math.round(usable(pw) * 0.06);
+const twoColTop       = (pw: number) => PAD + twoColTitleH(pw) + GAP + twoColDescH(pw) + GAP;
+const twoColW         = (pw: number) => Math.round((pw - PAD * 2 - GAP) / 2);
+const twoColImgH      = (pw: number) => Math.round(twoColW(pw) * 0.72);
+const twoColPillsH    = (pw: number) => Math.round(usable(pw) * 0.05);
+const twoColIngHdrH   = (pw: number) => Math.round(usable(pw) * 0.05);
+const twoColMethHdrH  = (pw: number) => Math.round(usable(pw) * 0.05);
 
 const twoColumnBlocks: BlockDef[] = [
   {
@@ -310,28 +414,73 @@ const twoColumnBlocks: BlockDef[] = [
     isTextHeavy: true,
   },
   {
-    blockId: 'left-col',
-    label: 'Left (photo + ingredients)',
+    blockId: 'image',
+    label: 'Photo',
     getDefault: (pw) => {
-      const titleH = twoColTitleH(pw);
-      const descH  = twoColDescH(pw);
-      const top = PAD + titleH + GAP + descH + GAP;
-      const colW = Math.round((pw - PAD * 2 - GAP) / 2);
-      const h = usable(pw) - titleH - GAP - descH - GAP;
+      const colW = twoColW(pw);
+      const h = twoColImgH(pw);
+      const top = twoColTop(pw);
       return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: false,
   },
   {
-    blockId: 'right-col',
-    label: 'Right (method)',
+    blockId: 'pills',
+    label: 'Time & servings',
     getDefault: (pw) => {
-      const titleH = twoColTitleH(pw);
-      const descH  = twoColDescH(pw);
-      const top = PAD + titleH + GAP + descH + GAP;
-      const colW = Math.round((pw - PAD * 2 - GAP) / 2);
-      const h = usable(pw) - titleH - GAP - descH - GAP;
+      const colW = twoColW(pw);
+      const h = twoColPillsH(pw);
+      const top = twoColTop(pw) + twoColImgH(pw) + GAP;
+      return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
+    getDefault: (pw) => {
+      const colW = twoColW(pw);
+      const h = twoColIngHdrH(pw);
+      const top = twoColTop(pw) + twoColImgH(pw) + GAP + twoColPillsH(pw) + GAP;
+      return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'ingredients-list',
+    label: 'Ingredients',
+    getDefault: (pw) => {
+      const colW = twoColW(pw);
+      const top = twoColTop(pw) + twoColImgH(pw) + GAP + twoColPillsH(pw) + GAP + twoColIngHdrH(pw) + GAP;
+      const h = usable(pw) - (top - PAD);
+      return { cx: PAD + colW / 2, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const colW = twoColW(pw);
+      const h = twoColMethHdrH(pw);
+      const top = twoColTop(pw);
+      const cx = PAD + colW + GAP + colW / 2;
+      return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
+    label: 'Method',
+    getDefault: (pw) => {
+      const colW = twoColW(pw);
+      const top = twoColTop(pw) + twoColMethHdrH(pw) + GAP;
+      const h = usable(pw) - (top - PAD);
       const cx = PAD + colW + GAP + colW / 2;
       return { cx, cy: top + h / 2, w: colW, h, rotation: 0, scale: 1 };
     },
@@ -341,13 +490,26 @@ const twoColumnBlocks: BlockDef[] = [
 ];
 
 // ─── Journal ──────────────────────────────────────────────────────────────────
-// Layout: [title] / [description] / [photo | meta] / [steps] / [tags]
+// Phase B: `meta` mega-block split into `pills` + `ingredients-heading` +
+// `ingredients-list`; `steps` split into `method-heading` + `method-list`.
+// Photo keeps its subtle rotation for the signature journal-page look.
+const jTitleH     = (pw: number) => Math.round(usable(pw) * 0.08);
+const jDescH      = (pw: number) => Math.round(usable(pw) * 0.08);
+const jRowH       = (pw: number) => Math.round(usable(pw) * 0.28);
+const jImgW       = (pw: number) => Math.round(pw * 0.42);
+const jPillsH     = (pw: number) => Math.round(usable(pw) * 0.05);
+const jIngHdrH    = (pw: number) => Math.round(usable(pw) * 0.05);
+const jMethHdrH   = (pw: number) => Math.round(usable(pw) * 0.05);
+const jMethListH  = (pw: number) => Math.round(usable(pw) * 0.32);
+const jRowTop     = (pw: number) => PAD + jTitleH(pw) + GAP + jDescH(pw) + GAP;
+const jMethTop    = (pw: number) => jRowTop(pw) + jRowH(pw) + GAP;
+
 const journalBlocks: BlockDef[] = [
   {
     blockId: 'title',
     label: 'Title',
     getDefault: (pw) => {
-      const h = Math.round(usable(pw) * 0.08);
+      const h = jTitleH(pw);
       return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -357,9 +519,8 @@ const journalBlocks: BlockDef[] = [
     blockId: 'description',
     label: 'Description',
     getDefault: (pw) => {
-      const titleH = Math.round(usable(pw) * 0.08);
-      const h = Math.round(usable(pw) * 0.08);
-      return { cx: pw / 2, cy: PAD + titleH + GAP + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+      const h = jDescH(pw);
+      return { cx: pw / 2, cy: PAD + jTitleH(pw) + GAP + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
@@ -368,42 +529,72 @@ const journalBlocks: BlockDef[] = [
     blockId: 'photo',
     label: 'Photo',
     getDefault: (pw) => {
-      const titleH = Math.round(usable(pw) * 0.08);
-      const descH = Math.round(usable(pw) * 0.08);
-      const rowH = Math.round(usable(pw) * 0.28);
-      const imgW = Math.round(pw * 0.42);
-      const top = PAD + titleH + GAP + descH + GAP;
-      return { cx: PAD + imgW / 2, cy: top + rowH / 2, w: imgW, h: rowH, rotation: 0.017, scale: 1 };
+      const imgW = jImgW(pw);
+      const top = jRowTop(pw);
+      return { cx: PAD + imgW / 2, cy: top + jRowH(pw) / 2, w: imgW, h: jRowH(pw), rotation: 0.017, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: false,
   },
   {
-    blockId: 'meta',
-    label: 'Meta (time + ingredients)',
+    blockId: 'pills',
+    label: 'Time & servings',
     getDefault: (pw) => {
-      const titleH = Math.round(usable(pw) * 0.08);
-      const descH = Math.round(usable(pw) * 0.08);
-      const rowH = Math.round(usable(pw) * 0.28);
-      const imgW = Math.round(pw * 0.42);
+      const imgW = jImgW(pw);
       const xStart = PAD + imgW + GAP;
       const w = pw - PAD - xStart;
-      const top = PAD + titleH + GAP + descH + GAP;
-      return { cx: xStart + w / 2, cy: top + rowH / 2, w, h: rowH, rotation: 0, scale: 1 };
+      const h = jPillsH(pw);
+      const top = jRowTop(pw);
+      return { cx: xStart + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'steps',
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
+    getDefault: (pw) => {
+      const imgW = jImgW(pw);
+      const xStart = PAD + imgW + GAP;
+      const w = pw - PAD - xStart;
+      const h = jIngHdrH(pw);
+      const top = jRowTop(pw) + jPillsH(pw) + GAP;
+      return { cx: xStart + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'ingredients-list',
+    label: 'Ingredients',
+    getDefault: (pw) => {
+      const imgW = jImgW(pw);
+      const xStart = PAD + imgW + GAP;
+      const w = pw - PAD - xStart;
+      const top = jRowTop(pw) + jPillsH(pw) + GAP + jIngHdrH(pw) + GAP;
+      const h = jRowH(pw) - jPillsH(pw) - GAP - jIngHdrH(pw) - GAP;
+      return { cx: xStart + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const h = jMethHdrH(pw);
+      const top = jMethTop(pw);
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
     label: 'Method',
     getDefault: (pw) => {
-      const u = usable(pw);
-      const titleH = Math.round(u * 0.08);
-      const descH = Math.round(u * 0.08);
-      const rowH = Math.round(u * 0.28);
-      const h = Math.round(u * 0.38);
-      const top = PAD + titleH + GAP + descH + GAP + rowH + GAP;
+      const h = jMethListH(pw);
+      const top = jMethTop(pw) + jMethHdrH(pw) + GAP;
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -413,13 +604,8 @@ const journalBlocks: BlockDef[] = [
     blockId: 'tags',
     label: 'Tags',
     getDefault: (pw) => {
-      const u = usable(pw);
-      const titleH = Math.round(u * 0.08);
-      const descH = Math.round(u * 0.08);
-      const rowH = Math.round(u * 0.28);
-      const stepsH = Math.round(u * 0.38);
       const h = 28;
-      const top = PAD + titleH + GAP + descH + GAP + rowH + GAP + stepsH + GAP;
+      const top = jMethTop(pw) + jMethHdrH(pw) + GAP + jMethListH(pw) + GAP;
       const w = Math.round(pw * 0.42);
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
@@ -429,34 +615,35 @@ const journalBlocks: BlockDef[] = [
 ];
 
 // ─── Recipe Card ──────────────────────────────────────────────────────────────
-// Layout: [banner — edge-to-edge] / [description] / [photo | ingredients] /
-//         [method] / [tags]
-//
-// Phase A: description extracted from the banner mega-block into its own block
-// between banner and the photo/ingredients row. Banner keeps title + accent
-// background; row heights rebalanced to make room.
-const cardBannerH = (pw: number) => Math.round(usable(pw) * 0.12);
-const cardDescH   = (pw: number) => Math.round(usable(pw) * 0.07);
-const cardRowH    = (pw: number) => Math.round(usable(pw) * 0.27);
-const cardStepsH  = (pw: number) => Math.round(usable(pw) * 0.37);
+// Phase B: `banner` retained as a non-block decorative accent painted behind
+// the title block (in PageTemplates.tsx). `ingredients` split into heading +
+// list; `steps` split into method-heading + method-list.
+const cardTitleH     = (pw: number) => Math.round(usable(pw) * 0.10);
+const cardDescH      = (pw: number) => Math.round(usable(pw) * 0.07);
+const cardRowH       = (pw: number) => Math.round(usable(pw) * 0.24);
+const cardIngHdrH    = (pw: number) => Math.round(usable(pw) * 0.05);
+const cardMethHdrH   = (pw: number) => Math.round(usable(pw) * 0.05);
+const cardMethListH  = (pw: number) => Math.round(usable(pw) * 0.32);
+const cardRowTop     = (pw: number) => PAD + cardTitleH(pw) + GAP + cardDescH(pw) + GAP;
+const cardMethTop    = (pw: number) => cardRowTop(pw) + cardRowH(pw) + GAP;
 
 const recipeCardBlocks: BlockDef[] = [
   {
-    blockId: 'banner',
-    label: 'Banner',
+    blockId: 'title',
+    label: 'Title',
     getDefault: (pw) => {
-      const h = cardBannerH(pw);
-      return { cx: pw / 2, cy: h / 2, w: pw, h, rotation: 0, scale: 1 };
+      const h = cardTitleH(pw);
+      return { cx: pw / 2, cy: PAD + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
-    isTextHeavy: false,
+    isTextHeavy: true,
   },
   {
     blockId: 'description',
     label: 'Description',
     getDefault: (pw) => {
       const h = cardDescH(pw);
-      const top = cardBannerH(pw) + GAP;
+      const top = PAD + cardTitleH(pw) + GAP;
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -467,31 +654,58 @@ const recipeCardBlocks: BlockDef[] = [
     label: 'Photo',
     getDefault: (pw) => {
       const imgW = Math.round(pw * 0.42);
-      const top = cardBannerH(pw) + GAP + cardDescH(pw) + GAP;
+      const top = cardRowTop(pw);
       return { cx: PAD + imgW / 2, cy: top + cardRowH(pw) / 2, w: imgW, h: cardRowH(pw), rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: false,
   },
   {
-    blockId: 'ingredients',
-    label: 'Ingredients',
+    blockId: 'ingredients-heading',
+    label: 'Ingredients heading',
     getDefault: (pw) => {
       const imgW = Math.round(pw * 0.42);
       const xStart = PAD + imgW + GAP;
       const w = pw - PAD - xStart;
-      const top = cardBannerH(pw) + GAP + cardDescH(pw) + GAP;
-      return { cx: xStart + w / 2, cy: top + cardRowH(pw) / 2, w, h: cardRowH(pw), rotation: 0, scale: 1 };
+      const h = cardIngHdrH(pw);
+      const top = cardRowTop(pw);
+      return { cx: xStart + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
     isTextHeavy: true,
   },
   {
-    blockId: 'steps',
+    blockId: 'ingredients-list',
+    label: 'Ingredients',
+    getDefault: (pw) => {
+      const imgW = Math.round(pw * 0.42);
+      const xStart = PAD + imgW + GAP;
+      const w = pw - PAD - xStart;
+      const hdrH = cardIngHdrH(pw);
+      const h = cardRowH(pw) - hdrH - GAP;
+      const top = cardRowTop(pw) + hdrH + GAP;
+      return { cx: xStart + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-heading',
+    label: 'Method heading',
+    getDefault: (pw) => {
+      const h = cardMethHdrH(pw);
+      const top = cardMethTop(pw);
+      return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
+    },
+    minScale: 0.4, maxScale: 3,
+    isTextHeavy: true,
+  },
+  {
+    blockId: 'method-list',
     label: 'Method',
     getDefault: (pw) => {
-      const h = cardStepsH(pw);
-      const top = cardBannerH(pw) + GAP + cardDescH(pw) + GAP + cardRowH(pw) + GAP;
+      const h = cardMethListH(pw);
+      const top = cardMethTop(pw) + cardMethHdrH(pw) + GAP;
       return { cx: pw / 2, cy: top + h / 2, w: pw - PAD * 2, h, rotation: 0, scale: 1 };
     },
     minScale: 0.4, maxScale: 3,
@@ -502,7 +716,7 @@ const recipeCardBlocks: BlockDef[] = [
     label: 'Tags',
     getDefault: (pw) => {
       const h = 28;
-      const top = cardBannerH(pw) + GAP + cardDescH(pw) + GAP + cardRowH(pw) + GAP + cardStepsH(pw) + GAP;
+      const top = cardMethTop(pw) + cardMethHdrH(pw) + GAP + cardMethListH(pw) + GAP;
       const w = Math.round(pw * 0.42);
       return { cx: PAD + w / 2, cy: top + h / 2, w, h, rotation: 0, scale: 1 };
     },

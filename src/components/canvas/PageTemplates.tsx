@@ -228,8 +228,10 @@ function Classic(props: TemplateProps) {
   const description = getBlock('description');
   const pills = getBlock('pills');
   const image = getBlock('image');
-  const ingredients = getBlock('ingredients');
-  const steps = getBlock('steps');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
   const tags = getBlock('tags');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
@@ -239,11 +241,8 @@ function Classic(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  // Text-heavy blocks are content-driven: render all steps/ings and let the block
-  // grow vertically via onLayout. Slicing by maxCount(block.h,...) would feedback-loop
-  // with the debounced measured-height commit and progressively drop items.
-  const slicedSteps = steps ? visibleSteps : [];
-  const stepTextW = steps ? steps.w - Math.max(9, Math.round(15 * fs)) - Math.max(2, Math.round(7 * fs)) : 0;
+  const slicedSteps = methodList ? visibleSteps : [];
+  const stepTextW = methodList ? methodList.w - Math.max(9, Math.round(15 * fs)) - Math.max(2, Math.round(7 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), stepTextW, t.stepText.fontSize);
 
   return (
@@ -274,37 +273,47 @@ function Classic(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {ingredients && (
-        <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
-              disabled={!inEdit('ingredients')}
+              disabled={!inEdit('ingredients-list')}
               onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
-              style={[t.ingRow, inEdit('ingredients') && t.editableRow]}
+              style={[t.ingRow, inEdit('ingredients-list') && t.editableRow]}
             >
               <View style={[t.dot, { backgroundColor: palette.accent }]} />
-              <Text style={[scaleText(t.ingText, ingredients.fontScale), { fontFamily: f }]} numberOfLines={ingredients.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingredients.hasTextOverride} minimumFontScale={0.7}>{ingText(ing)}</Text>
+              <Text style={[scaleText(t.ingText, ingList.fontScale), { fontFamily: f }]} numberOfLines={ingList.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingList.hasTextOverride} minimumFontScale={0.7}>{ingText(ing)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
       )}
 
-      {steps && (
-        <BlockElement key={steps.elKey} {...makeBlockProps('steps', steps, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, steps.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+        </BlockElement>
+      )}
+
+      {methodList && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
-              disabled={!inEdit('steps')}
+              disabled={!inEdit('method-list')}
               onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-              style={[t.stepRow, inEdit('steps') && t.editableRow]}
+              style={[t.stepRow, inEdit('method-list') && t.editableRow]}
             >
               <View style={[t.stepBadge, { backgroundColor: palette.accent }]}>
                 <Text style={[t.stepNum, { fontFamily: f }]}>{step.step}</Text>
               </View>
-              <Text style={[scaleText(t.stepText, stepScale * steps.fontScale), { fontFamily: f }]} numberOfLines={steps.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
+              <Text style={[scaleText(t.stepText, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
@@ -350,14 +359,17 @@ function PhotoHero(props: TemplateProps) {
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
   const fs = pageWidth / DESIGN_WIDTH;
-  const heroH = Math.round(pageWidth * 0.60);
   const { getBlock, pageHeight } = useBlockResolver('photo-hero', pageWidth, props.blockOverrides, props.layoutResetVersion);
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
-  const hero = getBlock('hero');
+  const image = getBlock('image');
+  const title = getBlock('title');
   const description = getBlock('description');
-  const ingredients = getBlock('ingredients');
-  const method = getBlock('method');
+  const pills = getBlock('pills');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
 
@@ -366,24 +378,24 @@ function PhotoHero(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  const slicedSteps = method ? visibleSteps : [];
-  const stepTextW = method ? method.w - Math.max(9, Math.round(15 * fs)) - Math.max(2, Math.round(7 * fs)) : 0;
+  const slicedSteps = methodList ? visibleSteps : [];
+  const stepTextW = methodList ? methodList.w - Math.max(9, Math.round(15 * fs)) - Math.max(2, Math.round(7 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), stepTextW, t.stepText.fontSize);
 
   return (
     <>
-      {hero && (
-        <BlockElement key={hero.elKey} {...makeBlockProps('hero', hero, props, pageHeight)}>
-          <View style={{ width: hero.w, height: heroH, overflow: 'hidden' }}>
-            <FoodImage width={hero.w} height={heroH} borderRadius={0} />
+      {image && (
+        <BlockElement key={image.elKey} {...makeBlockProps('image', image, props, pageHeight)}>
+          <View style={{ width: image.w, height: image.h, overflow: 'hidden' }}>
+            <FoodImage width={image.w} height={image.h} borderRadius={0} />
             <View style={[t.heroOverlay, { backgroundColor: palette.accent + '99' }]} />
-            <View style={t.heroText}>
-              <Text style={[t.heroTitle, { fontFamily: preset.title }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5}>{recipe.title}</Text>
-            </View>
-            <View style={t.heroPills}>
-              <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} light fontSection={f} />
-            </View>
           </View>
+        </BlockElement>
+      )}
+
+      {title && (
+        <BlockElement key={title.elKey} {...makeBlockProps('title', title, props, pageHeight)}>
+          <Text style={[scaleText(t.title, title.fontScale), { fontFamily: preset.title }]} numberOfLines={title.hasTextOverride ? undefined : 2} adjustsFontSizeToFit={!title.hasTextOverride} minimumFontScale={0.5}>{recipe.title}</Text>
         </BlockElement>
       )}
 
@@ -393,37 +405,53 @@ function PhotoHero(props: TemplateProps) {
         </BlockElement>
       ) : null}
 
-      {ingredients && (
-        <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+      {pills && (
+        <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
+          <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
+        </BlockElement>
+      )}
+
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
-              disabled={!inEdit('ingredients')}
+              disabled={!inEdit('ingredients-list')}
               onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
-              style={[t.ingRow, inEdit('ingredients') && t.editableRow]}
+              style={[t.ingRow, inEdit('ingredients-list') && t.editableRow]}
             >
               <View style={[t.dot, { backgroundColor: palette.accent }]} />
-              <Text style={[scaleText(t.ingText, ingredients.fontScale), { fontFamily: f }]} numberOfLines={ingredients.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingredients.hasTextOverride} minimumFontScale={0.7}>{ingText(ing)}</Text>
+              <Text style={[scaleText(t.ingText, ingList.fontScale), { fontFamily: f }]} numberOfLines={ingList.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingList.hasTextOverride} minimumFontScale={0.7}>{ingText(ing)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
       )}
 
-      {method && (
-        <BlockElement key={method.elKey} {...makeBlockProps('method', method, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, method.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+        </BlockElement>
+      )}
+
+      {methodList && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
-              disabled={!inEdit('method')}
+              disabled={!inEdit('method-list')}
               onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-              style={[t.stepRow, inEdit('method') && t.editableRow]}
+              style={[t.stepRow, inEdit('method-list') && t.editableRow]}
             >
               <View style={[t.stepBadge, { backgroundColor: palette.accent }]}>
                 <Text style={[t.stepNum, { fontFamily: f }]}>{step.step}</Text>
               </View>
-              <Text style={[scaleText(t.stepText, stepScale * method.fontScale), { fontFamily: f }]} numberOfLines={method.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
+              <Text style={[scaleText(t.stepText, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
@@ -467,8 +495,10 @@ function Minimal(props: TemplateProps) {
   const title = getBlock('title');
   const description = getBlock('description');
   const pills = getBlock('pills');
-  const ingredientsBlock = getBlock('ingredients');
-  const methodBlock = getBlock('method');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
 
@@ -477,8 +507,8 @@ function Minimal(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  const slicedSteps = methodBlock ? visibleSteps : [];
-  const stepTextW = methodBlock ? methodBlock.w - Math.max(9, Math.round(14 * fs)) - Math.max(2, Math.round(6 * fs)) : 0;
+  const slicedSteps = methodList ? visibleSteps : [];
+  const stepTextW = methodList ? methodList.w - Math.max(9, Math.round(14 * fs)) - Math.max(2, Math.round(6 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), stepTextW, t.minimalStepText.fontSize);
 
   return (
@@ -502,17 +532,22 @@ function Minimal(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {ingredientsBlock && (
-        <BlockElement key={ingredientsBlock.elKey} {...makeBlockProps('ingredients', ingredientsBlock, props, pageHeight)}>
-          <Text style={[scaleText(t.minimalSection, ingredientsBlock.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.minimalSection, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           <View style={t.minimalIngList}>
             {visibleIngs.map((ing) => (
               <TouchableOpacity
                 key={ing.id}
-                disabled={!inEdit('ingredients')}
+                disabled={!inEdit('ingredients-list')}
                 onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
               >
-                <Text style={[scaleText(t.minimalIngItem, ingredientsBlock.fontScale), { fontFamily: f }, inEdit('ingredients') && t.editableRow]}>
+                <Text style={[scaleText(t.minimalIngItem, ingList.fontScale), { fontFamily: f }, inEdit('ingredients-list') && t.editableRow]}>
                   {ingText(ing)}
                 </Text>
               </TouchableOpacity>
@@ -521,18 +556,23 @@ function Minimal(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {methodBlock && recipe.instructions.length > 0 && (
-        <BlockElement key={methodBlock.elKey} {...makeBlockProps('method', methodBlock, props, pageHeight)}>
-          <Text style={[scaleText(t.minimalSection, methodBlock.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.minimalSection, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+        </BlockElement>
+      )}
+
+      {methodList && recipe.instructions.length > 0 && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
-              disabled={!inEdit('method')}
+              disabled={!inEdit('method-list')}
               onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-              style={[t.minimalStep, inEdit('method') && t.editableRow]}
+              style={[t.minimalStep, inEdit('method-list') && t.editableRow]}
             >
-              <Text style={[scaleText(t.minimalStepNum, methodBlock.fontScale), { color: palette.accent, fontFamily: f }]}>{step.step}.</Text>
-              <Text style={[scaleText(t.minimalStepText, stepScale * methodBlock.fontScale), { fontFamily: f }]} numberOfLines={methodBlock.hasTextOverride ? undefined : 3}>{stepText(step)}</Text>
+              <Text style={[scaleText(t.minimalStepNum, methodList.fontScale), { color: palette.accent, fontFamily: f }]}>{step.step}.</Text>
+              <Text style={[scaleText(t.minimalStepText, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 3}>{stepText(step)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
@@ -570,15 +610,17 @@ function TwoColumn(props: TemplateProps) {
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
   const fs = pageWidth / DESIGN_WIDTH;
-  const colW = Math.round((pageWidth - 40) / 2);
-  const imgH = Math.round(colW * 0.75);
   const { getBlock, pageHeight } = useBlockResolver('two-column', pageWidth, props.blockOverrides, props.layoutResetVersion);
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const title = getBlock('title');
   const description = getBlock('description');
-  const leftCol = getBlock('left-col');
-  const rightCol = getBlock('right-col');
+  const image = getBlock('image');
+  const pills = getBlock('pills');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
 
@@ -587,8 +629,8 @@ function TwoColumn(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  const slicedSteps = rightCol ? visibleSteps : [];
-  const stepTextW = rightCol ? rightCol.w - Math.max(9, Math.round(12 * fs)) - Math.max(2, Math.round(5 * fs)) : 0;
+  const slicedSteps = methodList ? visibleSteps : [];
+  const stepTextW = methodList ? methodList.w - Math.max(9, Math.round(12 * fs)) - Math.max(2, Math.round(5 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), stepTextW, t.stepTextSm.fontSize);
 
   return (
@@ -605,19 +647,34 @@ function TwoColumn(props: TemplateProps) {
         </BlockElement>
       ) : null}
 
-      {leftCol && (
-        <BlockElement key={leftCol.elKey} {...makeBlockProps('left-col', leftCol, props, pageHeight)}>
-          <View style={[t.twoColImg, { height: imgH }]}>
-            <FoodImage width={colW} height={imgH} borderRadius={6} />
+      {image && (
+        <BlockElement key={image.elKey} {...makeBlockProps('image', image, props, pageHeight)}>
+          <View style={[t.twoColImg, { height: image.h }]}>
+            <FoodImage width={image.w} height={image.h} borderRadius={6} />
           </View>
+        </BlockElement>
+      )}
+
+      {pills && (
+        <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
-          <Text style={[t.colHead, { color: palette.accent, marginTop: 8, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
-              disabled={!inEdit('left-col')}
+              disabled={!inEdit('ingredients-list')}
               onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
-              style={[t.ingRow, inEdit('left-col') && t.editableRow]}
+              style={[t.ingRow, inEdit('ingredients-list') && t.editableRow]}
             >
               <View style={[t.dot, { backgroundColor: palette.accent }]} />
               <Text style={[t.ingTextSm, { fontFamily: f }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{ingText(ing)}</Text>
@@ -626,20 +683,25 @@ function TwoColumn(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {rightCol && (
-        <BlockElement key={rightCol.elKey} {...makeBlockProps('right-col', rightCol, props, pageHeight)}>
-          <Text style={[scaleText(t.colHead, rightCol.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.colHead, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+        </BlockElement>
+      )}
+
+      {methodList && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           {slicedSteps.map(step => (
             <TouchableOpacity
               key={step.step}
-              disabled={!inEdit('right-col')}
+              disabled={!inEdit('method-list')}
               onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-              style={[t.stepRowSm, inEdit('right-col') && t.editableRow]}
+              style={[t.stepRowSm, inEdit('method-list') && t.editableRow]}
             >
               <View style={[t.stepBadgeSm, { backgroundColor: palette.accent }]}>
                 <Text style={[t.stepNumSm, { fontFamily: f }]}>{step.step}</Text>
               </View>
-              <Text style={[scaleText(t.stepTextSm, stepScale * rightCol.fontScale), { fontFamily: f }]} numberOfLines={rightCol.hasTextOverride ? undefined : 3}>{stepText(step)}</Text>
+              <Text style={[scaleText(t.stepTextSm, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 3}>{stepText(step)}</Text>
             </TouchableOpacity>
           ))}
         </BlockElement>
@@ -672,6 +734,7 @@ function TwoColumn(props: TemplateProps) {
 function Journal(props: TemplateProps) {
   const { recipe, pageWidth, palette, recipeFont, sectionTitles } = props;
   const ingredientsTitle = resolveSectionTitle(sectionTitles, 'ingredients');
+  const methodTitle = resolveSectionTitle(sectionTitles, 'method');
   const t = makeT(pageWidth);
   const preset = resolvePreset(recipeFont);
   const f = preset.section;
@@ -683,8 +746,11 @@ function Journal(props: TemplateProps) {
   const title = getBlock('title');
   const description = getBlock('description');
   const photo = getBlock('photo');
-  const meta = getBlock('meta');
-  const steps = getBlock('steps');
+  const pills = getBlock('pills');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
   const tags = getBlock('tags');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
@@ -694,8 +760,8 @@ function Journal(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  const slicedSteps = steps ? visibleSteps : [];
-  const stepTextW = steps ? steps.w - Math.max(9, Math.round(18 * fs)) - Math.max(2, Math.round(8 * fs)) : 0;
+  const slicedSteps = methodList ? visibleSteps : [];
+  const stepTextW = methodList ? methodList.w - Math.max(9, Math.round(18 * fs)) - Math.max(2, Math.round(8 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), stepTextW, t.journalStepText.fontSize);
 
   return (
@@ -720,19 +786,28 @@ function Journal(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {meta && (
-        <BlockElement key={meta.elKey} {...makeBlockProps('meta', meta, props, pageHeight)}>
+      {pills && (
+        <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} compact fontSection={f} />
-          <View style={[t.journalDivider, { backgroundColor: palette.accent + '33' }]} />
-          <Text style={[scaleText(t.journalNote, meta.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}:</Text>
+        </BlockElement>
+      )}
+
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.journalNote, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}:</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
-              disabled={!inEdit('meta')}
+              disabled={!inEdit('ingredients-list')}
               onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
-              style={inEdit('meta') ? t.editableRow : undefined}
+              style={inEdit('ingredients-list') ? t.editableRow : undefined}
             >
-              <Text style={[scaleText(t.journalIng, meta.fontScale), { fontFamily: f }]} numberOfLines={meta.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!meta.hasTextOverride} minimumFontScale={0.7}>
+              <Text style={[scaleText(t.journalIng, ingList.fontScale), { fontFamily: f }]} numberOfLines={ingList.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingList.hasTextOverride} minimumFontScale={0.7}>
                 — {ingText(ing)}
               </Text>
             </TouchableOpacity>
@@ -740,18 +815,24 @@ function Journal(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {steps && (
-        <BlockElement key={steps.elKey} {...makeBlockProps('steps', steps, props, pageHeight)}>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.journalNote, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}:</Text>
+        </BlockElement>
+      )}
+
+      {methodList && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           <View style={[t.journalRuled, { borderTopColor: palette.accent + '22' }]}>
             {slicedSteps.map(step => (
               <TouchableOpacity
                 key={step.step}
-                disabled={!inEdit('steps')}
+                disabled={!inEdit('method-list')}
                 onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-                style={[t.journalStepRow, { borderBottomColor: palette.accent + '18' }, inEdit('steps') && t.editableRow]}
+                style={[t.journalStepRow, { borderBottomColor: palette.accent + '18' }, inEdit('method-list') && t.editableRow]}
               >
-                <Text style={[scaleText(t.journalStepNum, steps.fontScale), { color: palette.accent, fontFamily: f }]}>{step.step}</Text>
-                <Text style={[scaleText(t.journalStepText, stepScale * steps.fontScale), { fontFamily: f }]} numberOfLines={steps.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
+                <Text style={[scaleText(t.journalStepNum, methodList.fontScale), { color: palette.accent, fontFamily: f }]}>{step.step}</Text>
+                <Text style={[scaleText(t.journalStepText, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -802,11 +883,13 @@ function RecipeCard(props: TemplateProps) {
   const { getBlock, pageHeight } = useBlockResolver('recipe-card', pageWidth, props.blockOverrides, props.layoutResetVersion);
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
-  const banner = getBlock('banner');
+  const title = getBlock('title');
   const description = getBlock('description');
   const image = getBlock('image');
-  const ingredients = getBlock('ingredients');
-  const steps = getBlock('steps');
+  const ingHeading = getBlock('ingredients-heading');
+  const ingList = getBlock('ingredients-list');
+  const methodHeading = getBlock('method-heading');
+  const methodList = getBlock('method-list');
   const tags = getBlock('tags');
 
   const inEdit = (bid: string) => !!props.blockEditMode && props.selectedBlockId === bid;
@@ -816,16 +899,16 @@ function RecipeCard(props: TemplateProps) {
   const stepText = (s: Instruction) => props.stepOverrides?.[s.step]?.text ?? s.text;
   const ingText  = (i: Ingredient)  => props.ingOverrides?.[i.id]?.text  ?? [i.amount, i.unit, i.name].filter(Boolean).join(' ');
 
-  const slicedSteps = steps ? visibleSteps : [];
+  const slicedSteps = methodList ? visibleSteps : [];
   // Each card step item is ~48% of block width; text area minus badge
-  const cardItemW = steps ? steps.w * 0.48 - Math.max(9, Math.round(12 * fs)) - Math.max(2, Math.round(4 * fs)) : 0;
+  const cardItemW = methodList ? methodList.w * 0.48 - Math.max(9, Math.round(12 * fs)) - Math.max(2, Math.round(4 * fs)) : 0;
   const stepScale = uniformStepScale(slicedSteps.map(s => stepText(s)), cardItemW, t.cardStepText.fontSize);
 
   return (
     <>
-      {banner && (
-        <BlockElement key={banner.elKey} {...makeBlockProps('banner', banner, props, pageHeight)}>
-          <View style={[t.cardBanner, { backgroundColor: palette.accent, width: banner.w, height: banner.h }]}>
+      {title && (
+        <BlockElement key={title.elKey} {...makeBlockProps('title', title, props, pageHeight)}>
+          <View style={[t.cardBanner, { backgroundColor: palette.accent, width: title.w, height: title.h }]}>
             <Text style={[t.cardBannerTitle, { fontFamily: preset.title }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{recipe.title}</Text>
           </View>
         </BlockElement>
@@ -844,17 +927,22 @@ function RecipeCard(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {ingredients && (
-        <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
-          <Text style={[scaleText(t.cardSection, ingredients.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+      {ingHeading && (
+        <BlockElement key={ingHeading.elKey} {...makeBlockProps('ingredients-heading', ingHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.cardSection, ingHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{ingredientsTitle}</Text>
+        </BlockElement>
+      )}
+
+      {ingList && (
+        <BlockElement key={ingList.elKey} {...makeBlockProps('ingredients-list', ingList, props, pageHeight)}>
           {visibleIngs.map((ing) => (
             <TouchableOpacity
               key={ing.id}
-              disabled={!inEdit('ingredients')}
+              disabled={!inEdit('ingredients-list')}
               onPress={() => setEditing({ kind: 'ing', id: ing.id, text: ingText(ing) })}
-              style={inEdit('ingredients') ? t.editableRow : undefined}
+              style={inEdit('ingredients-list') ? t.editableRow : undefined}
             >
-              <Text style={[scaleText(t.cardIng, ingredients.fontScale), { fontFamily: f }]} numberOfLines={ingredients.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingredients.hasTextOverride} minimumFontScale={0.7}>
+              <Text style={[scaleText(t.cardIng, ingList.fontScale), { fontFamily: f }]} numberOfLines={ingList.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!ingList.hasTextOverride} minimumFontScale={0.7}>
                 · {ingText(ing)}
               </Text>
             </TouchableOpacity>
@@ -862,21 +950,26 @@ function RecipeCard(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {steps && (
-        <BlockElement key={steps.elKey} {...makeBlockProps('steps', steps, props, pageHeight)}>
-          <Text style={[scaleText(t.cardSection, steps.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+      {methodHeading && (
+        <BlockElement key={methodHeading.elKey} {...makeBlockProps('method-heading', methodHeading, props, pageHeight)}>
+          <Text style={[scaleText(t.cardSection, methodHeading.fontScale), { color: palette.accent, fontFamily: f }]}>{methodTitle}</Text>
+        </BlockElement>
+      )}
+
+      {methodList && (
+        <BlockElement key={methodList.elKey} {...makeBlockProps('method-list', methodList, props, pageHeight)}>
           <View style={t.cardStepGrid}>
             {slicedSteps.map(step => (
               <TouchableOpacity
                 key={step.step}
-                disabled={!inEdit('steps')}
+                disabled={!inEdit('method-list')}
                 onPress={() => setEditing({ kind: 'step', num: step.step, text: stepText(step) })}
-                style={[t.cardStepItem, inEdit('steps') && t.editableRow]}
+                style={[t.cardStepItem, inEdit('method-list') && t.editableRow]}
               >
                 <View style={[t.stepBadgeSm, { backgroundColor: palette.accent }]}>
                   <Text style={[t.stepNumSm, { fontFamily: f }]}>{step.step}</Text>
                 </View>
-                <Text style={[scaleText(t.cardStepText, stepScale * steps.fontScale), { fontFamily: f }]} numberOfLines={steps.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
+                <Text style={[scaleText(t.cardStepText, stepScale * methodList.fontScale), { fontFamily: f }]} numberOfLines={methodList.hasTextOverride ? undefined : 2}>{stepText(step)}</Text>
               </TouchableOpacity>
             ))}
           </View>
