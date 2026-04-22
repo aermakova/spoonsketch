@@ -104,8 +104,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontFamily: fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 0.2,
+    fontSize: 10,
   },
   fabWrapper: {
     flex: 1,
