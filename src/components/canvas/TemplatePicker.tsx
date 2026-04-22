@@ -63,7 +63,7 @@ export function TemplatePicker({ selected, onSelect }: Props) {
             activeOpacity={0.75}
           >
             <TemplateDiagram diagram={tmpl.diagram} active={active} />
-            <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>{tmpl.label}</Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{tmpl.label}</Text>
           </TouchableOpacity>
         );
       })}

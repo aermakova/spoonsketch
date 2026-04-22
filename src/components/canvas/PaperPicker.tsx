@@ -42,7 +42,7 @@ export function PaperPicker({ selected, onSelect }: Props) {
             <View style={[styles.preview, active && styles.previewActive]}>
               <PaperPattern type={opt.key} width={TILE_W} height={TILE_H} />
             </View>
-            <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>{opt.label}</Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{opt.label}</Text>
           </TouchableOpacity>
         );
       })}
