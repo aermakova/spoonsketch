@@ -244,6 +244,9 @@ export default function RecipeDetailScreen() {
     queryKey: ['cookbook', cookbookId],
     queryFn: () => fetchCookbook(cookbookId!),
     enabled: !!cookbookId,
+    // Book-level settings (section titles, paper type) are edited elsewhere;
+    // always refetch on mount so the detail view never shows stale labels.
+    refetchOnMount: 'always',
   });
   const sectionTitles = cookbook?.section_titles ?? DEFAULT_SECTION_TITLES;
   const paperType: CookbookPaperType = cookbook?.paper_type ?? 'blank';

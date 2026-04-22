@@ -69,6 +69,9 @@ export default function EditorScreen() {
     queryKey: ['cookbook', cookbookId],
     queryFn: () => fetchCookbook(cookbookId!),
     enabled: !!cookbookId,
+    // Book-level settings (section titles, paper type, defaults) are edited
+    // elsewhere; pick up the latest values every time the editor opens.
+    refetchOnMount: 'always',
   });
 
   const upsertCanvasMutation = useMutation({
