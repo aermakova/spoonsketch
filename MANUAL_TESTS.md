@@ -12,6 +12,157 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Phase 7.1 — AI recipe import from URL (landed pending)
+
+Prereqs:
+- `ANTHROPIC_API_KEY` set in Supabase secrets.
+- `extract-recipe` Edge Function deployed (`supabase functions deploy extract-recipe`).
+- Signed-in user on the Free tier.
+
+### 1. Tab modal opens from the FAB
+- Home → tap centre `+` FAB
+- ✅ Expect: "Import a Recipe" modal slides up; 4 tabs visible; Paste Link tab active by default
+- ✅ Expect: Photo + File tabs greyed out with "Soon" pill; tapping them does nothing
+
+### 2. Happy path — recognised recipe site
+- Paste Link tab → paste `https://www.bbcgoodfood.com/recipes/tomato-soup` → tap **Import Recipe**
+- ✅ Expect: button shows spinner for ~2–5 seconds
+- ✅ Expect: auto-switches to Type tab; Title filled ("Tomato soup" or similar); ≥ 3 ingredients; ≥ 2 instruction lines; sage-left-border banner reads "Imported from bbcgoodfood.com"
+- Tap Save → ✅ modal dismisses, Recipe detail opens with the new recipe
+
+### 3. Non-recipe URL — partial fallback
+- Paste Link → paste a news article URL (e.g. any nytimes.com/world/... link you have handy)
+- Tap Import Recipe
+- ✅ Expect: auto-switches to Type with title filled (or "Untitled Recipe"), ingredients/steps empty, partial banner visible
+
+### 4. Invalid URL — inline error
+- Paste Link → type `localhost:8000` → tap Import Recipe
+- ✅ Expect: no network call; inline red text "That doesn't look like a recipe URL."
+- Same for `notaurl`, `ftp://foo`, `https://10.0.0.1/`
+
+### 5. Rate limit — 10-second window
+- Immediately after a successful Import, change the URL and tap Import again within 10 seconds
+- ✅ Expect: inline "You're going a bit fast — try again in a moment."
+
+### 6. Monthly cap — paywall replaces the Import button
+- Seed 20 successful `url_extract` rows into `ai_jobs` for the test user for the current month (use Supabase Studio or `psql`)
+- Paste Link → paste any URL → tap Import Recipe
+- ✅ Expect: Import button is replaced by a card "You've used 20 / 20 imports this month" + "Upgrade to Premium" ClayButton
+- Tap Upgrade → ✅ Upgrade modal opens (placeholder copy); tap "Got it, thanks" → returns to Import modal
+
+### 7. Manual path still works (Type tab)
+- Paste Link → switch to Type tab without importing
+- Enter Title only → Save → ✅ recipe saves, modal dismisses, Recipe detail opens
+
+### 8. Tab state preservation
+- Paste Link → paste a URL but don't submit → switch to Type → type a title
+- Switch back to Paste Link → ✅ URL still present
+- Switch back to Type → ✅ title still present
+
+### 9. Legacy route redirect
+- In Safari, navigate to `spoonsketch://recipe/create` (if deep links are set up) or any in-app link to `/recipe/create`
+- ✅ Expect: lands on Type tab of the Import modal
+
+### 10. Close + reopen
+- Open modal → × close → reopen from FAB
+- ✅ Expect: fresh state (empty URL input, empty Type form, no banner)
+
+### 11. Keyboard handling
+- Paste Link → focus URL input on a short device → keyboard must not cover the Import button
+- Type tab → focus Ingredients (at the bottom) → ✅ field scrolls above the keyboard
+
+### 12. Offline behaviour
+- Airplane mode on → Paste Link → paste URL → Import
+- ✅ Expect: TanStack Query surfaces a network failure; inline error reads a friendly fallback (not a stack trace). Note: `networkMode: 'always'` is set app-wide so the mutation will actually attempt and fail rather than be pre-empted.
+
+### 13. `ai_jobs` observability
+- After each successful and failed import attempt, check `ai_jobs` in Supabase Studio:
+- ✅ One row per attempt
+- ✅ `job_type = 'url_extract'`, `status` done or failed, `tokens_used` > 0 on success, `model = 'claude-haiku-4-5-20251001'`
+
+### If something fails
+Add a BUG-NNN row to BUGS.md (see BUG-017 for a template), wire it to the specific scenario above, and fix before flipping Phase 7.1 to ✅ Done.
+
+---
+
+## Phase 7.2 — Make me Sketch (auto-sticker) (landed pending)
+
+Prereqs:
+- `ANTHROPIC_API_KEY` set in Supabase secrets.
+- `auto-sticker` Edge Function deployed (`supabase functions deploy auto-sticker`).
+- Signed-in user on the Free tier with at least one recipe that has a title + ingredients.
+
+### 1. Button visible in Stickers mode
+- Open any recipe with a title → tap **Decorate** → editor opens
+- Tap **✱ Stickers** mode
+- ✅ Expect: **Make me Sketch** terracotta button at the top of the sticker panel, with star icon + label
+- ✅ Expect: horizontal sticker tray still visible below the button
+
+### 2. Disabled when recipe has no title
+- Create a new recipe via FAB → Type tab → save with title field *empty but it won't let you — so* create a recipe with a minimum title → open editor
+- Open the editor and immediately clear the title via Arrange Blocks block edit (if feasible) OR use a recipe you deliberately seeded with empty title in the DB for this test
+- ✅ Expect: Make me Sketch button appears disabled (greyed out, tap does nothing)
+
+### 3. Happy path — ≥3 stickers appear
+- Open a recipe with title "Tomato Basil Soup" (or similar — pick one with strong keyword overlap)
+- Stickers mode → tap **Make me Sketch**
+- ✅ Expect: spinner in the button for ~1–3 seconds
+- ✅ Expect: 3–5 stickers appear along the edges of the canvas (top / bottom / left / right bands — not over the recipe text in the middle)
+- ✅ Expect: stickers are semantically relevant — for a tomato/basil soup you should see at least one of `tomato`, `basil`, or `spoon`
+- ✅ Expect: toast below the button reads "Sketched N stickers! Tap undo if you want to try again."
+- ✅ Expect: toast auto-dismisses after ~3.5 seconds
+
+### 4. Undo pops all stickers in one frame
+- Immediately after a successful sketch → switch to Draw mode → tap the Undo ↩ button once
+- ✅ Expect: all sketch-placed stickers disappear together (not one at a time)
+- Tap Undo again → ✅ any pre-existing canvas state is restored
+
+### 5. Variety over multiple calls
+- On the same recipe, tap Make me Sketch three times in a row (wait 10 s between each to avoid rate limit, or use a different recipe each time)
+- ✅ Expect: selections change between runs — Haiku doesn't return identical picks every time
+- ✅ Expect: each run's stickers don't overlap each other within a single call (server enforces min separation)
+
+### 6. Rate limit — 10-second window
+- Tap Make me Sketch → wait for success → immediately tap again
+- ✅ Expect: snackbar "A little fast — wait a moment and try again."
+
+### 7. Monthly cap — paywall replaces the button
+- Seed 5 successful `auto_sticker` rows into `ai_jobs` for the test user for the current month (Supabase Studio or `psql`)
+- Stickers mode → ✅ button renders normally; tap Make me Sketch
+- ✅ Expect: button replaced by a paywall card "5 / 5 sketches used this month" + **Upgrade to Premium** inner button
+- Tap Upgrade → ✅ Upgrade modal opens
+
+### 8. Manual sticker tap still works after sketch
+- After a successful sketch, tap any single sticker in the tray
+- ✅ Expect: that sticker drops in the centre of the canvas as usual (non-sketch path untouched)
+- ✅ Expect: the manual add is one separate undo frame from the sketch batch — undo removes only the manual one first, then a second undo removes the sketch batch
+
+### 9. Stickers stay on edges, not over text
+- On 3 different recipes, tap Make me Sketch
+- ✅ Expect: for all runs, no sticker's centre lands inside the middle band (roughly x ∈ [0.2, 0.8] AND y ∈ [0.2, 0.8] of the canvas)
+
+### 10. Offline behaviour
+- Airplane mode on → Make me Sketch
+- ✅ Expect: snackbar with a friendly error; no stickers appear; no half-state
+
+### 11. `ai_jobs` observability
+- After each sketch attempt (success or failure), check `ai_jobs` in Supabase Studio:
+- ✅ One row per attempt, `job_type = 'auto_sticker'`, `status` done or failed, `tokens_used > 0` on success, `output_data` contains the `elements` array, `input_data` contains the `recipe_id`
+
+### 12. Recipe-empty guard (server-side)
+- Seed a recipe with a title but strip the title via DB before the test (`update recipes set title='' where id=...`)
+- Open the editor → Stickers → Make me Sketch
+- ✅ Expect: button is disabled (client-side guard); if you bypass and hit the function directly, it returns 422 `recipe_empty`
+
+### 13. Persistence across recipes
+- Sketch on Recipe A → open Recipe B (no sketch there yet) → open Recipe A again
+- ✅ Expect: Recipe A still has its sketch stickers (per-recipe canvas state, BUG-015 regression check)
+
+### If something fails
+Add a BUG-NNN row to BUGS.md, wire it to the specific scenario above, and fix before flipping Phase 7 to ✅ Done in PLAN.md.
+
+---
+
 ## Phase C — Book-level template + font defaults (landed 2026-04-21)
 
 ### 1. Book default applies to recipes linked to that book

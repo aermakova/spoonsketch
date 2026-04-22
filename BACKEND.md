@@ -502,6 +502,19 @@ All PostgREST calls respect RLS automatically. Client passes JWT in `Authorizati
 
 ### Edge Functions (custom logic)
 
+All Edge Functions share a set of helpers under `supabase/functions/_shared/`:
+- `cors.ts` — preflight + shared headers
+- `errors.ts` — `jsonError` / `jsonResponse` wrappers with the consistent `{ error, message, ... }` shape
+- `auth.ts` — `requireUser(req)` returns `{ userId, jwt, supabaseAdmin }` from the `Authorization: Bearer` header or a ready-to-return 401
+- `ai.ts` — shared Anthropic client (`HAIKU_MODEL = 'claude-haiku-4-5-20251001'`) + `logAiJob(...)` writer
+- `tier.ts` — `getQuota` / `checkQuotaAllowed` / `checkRateLimit` and the `FREE_MONTHLY_LIMITS` table (20 url_extract, 20 image_extract, 5 auto_sticker)
+
+Secrets to set on the Supabase project:
+- `ANTHROPIC_API_KEY` — set manually via `supabase secrets set`
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — auto-injected by the platform at runtime
+
+Local dev: `supabase functions serve extract-recipe --env-file supabase/.env.local`. See `docs/edge-functions.md` for the full flow.
+
 #### `POST /functions/v1/extract-recipe`
 
 Extracts a recipe from a URL or image using Claude Haiku.

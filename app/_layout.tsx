@@ -80,7 +80,13 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <StatusBar style="dark" />
         <AuthGate />
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen
+            name="recipe/import"
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen name="upgrade" options={{ presentation: 'modal' }} />
+        </Stack>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

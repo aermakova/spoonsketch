@@ -41,3 +41,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# supabase local dev
+supabase/.branches/
+supabase/.temp/
+supabase/.env.local

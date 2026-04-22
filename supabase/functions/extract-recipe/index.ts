@@ -1,0 +1,405 @@
+import { handlePreflight } from '../_shared/cors.ts';
+import { jsonError, jsonResponse } from '../_shared/errors.ts';
+import { requireUser } from '../_shared/auth.ts';
+import {
+  checkQuotaAllowed,
+  checkRateLimit,
+  getQuota,
+} from '../_shared/tier.ts';
+import { anthropic, HAIKU_MODEL, logAiJob } from '../_shared/ai.ts';
+
+const MAX_SCRAPE_BYTES = 200_000;
+const MAX_SCRAPE_CHARS = 20_000;
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_REDIRECTS = 3;
+const USER_AGENT =
+  'Mozilla/5.0 (compatible; SpoonAndSketchBot/1.0; +https://spoonsketch.app)';
+
+const EXTRACTION_SYSTEM_PROMPT = `You are a recipe extraction assistant. Given scraped text from a recipe webpage, extract exactly this JSON shape and nothing else:
+
+{
+  "title": string,
+  "description": string | null,
+  "servings": number | null,
+  "prep_minutes": number | null,
+  "cook_minutes": number | null,
+  "ingredients": [{ "name": string, "amount": string | null, "unit": string | null, "group": string | null }],
+  "instructions": [{ "step": number, "text": string }],
+  "tags": string[],
+  "confidence": number
+}
+
+Rules:
+- "tags" is at most 5 short lower-case tokens (e.g. "italian", "vegetarian", "quick").
+- "confidence" is between 0 and 1. Lower it when content is ambiguous or incomplete.
+- Preserve the original language of the recipe content in title / ingredients / instructions.
+- If you cannot find a recipe in the content, return this instead and nothing else: { "partial": true, "reason": "<short reason>" }.
+- Output valid JSON only. No prose. No markdown fences.`;
+
+Deno.serve(async (req) => {
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+
+  if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
+
+  const ctx = await requireUser(req);
+  if (ctx instanceof Response) return ctx;
+
+  // Parse body
+  let body: { url?: unknown; locale?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonError(400, 'bad_request', 'Invalid JSON body');
+  }
+  const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
+  const locale = typeof body.locale === 'string' ? body.locale : 'en';
+  if (!rawUrl) return jsonError(400, 'invalid_url', 'URL is required');
+
+  const validated = validateUrl(rawUrl);
+  if (!validated.ok) return jsonError(400, 'invalid_url', validated.reason);
+
+  // Rate limit: single user hammering the endpoint
+  const rate = await checkRateLimit(ctx.supabaseAdmin, ctx.userId, 'url_extract');
+  if (!rate.ok) {
+    return jsonError(429, 'rate_limited', 'Too many requests', {
+      retry_after_seconds: rate.retryAfterSeconds,
+    });
+  }
+
+  // Monthly quota
+  const quota = await getQuota(ctx.supabaseAdmin, ctx.userId, 'url_extract');
+  const capped = checkQuotaAllowed(quota);
+  if (capped) return jsonError(429, capped.error, undefined, capped);
+
+  // Scrape
+  let scraped: string;
+  try {
+    scraped = await scrapeUrl(validated.url);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await logAiJob({
+      supabaseAdmin: ctx.supabaseAdmin,
+      userId: ctx.userId,
+      jobType: 'url_extract',
+      status: 'failed',
+      input: { url: rawUrl },
+      errorMessage: `scrape_failed: ${message}`,
+    });
+    return jsonResponse(
+      {
+        partial: true,
+        reason: 'scrape_failed',
+        title: 'Untitled Recipe',
+        ingredients: [],
+        instructions: [],
+      },
+      206,
+    );
+  }
+
+  if (scraped.length < 50) {
+    // Empty-ish response (paywalled, JS-only, 404 masquerading as 200, etc.)
+    await logAiJob({
+      supabaseAdmin: ctx.supabaseAdmin,
+      userId: ctx.userId,
+      jobType: 'url_extract',
+      status: 'failed',
+      input: { url: rawUrl },
+      errorMessage: 'empty_scrape',
+    });
+    return jsonResponse(
+      {
+        partial: true,
+        reason: 'empty_page',
+        title: 'Untitled Recipe',
+        ingredients: [],
+        instructions: [],
+      },
+      206,
+    );
+  }
+
+  // Haiku extraction
+  let haikuResponse;
+  try {
+    haikuResponse = await anthropic.messages.create({
+      model: HAIKU_MODEL,
+      max_tokens: 1024,
+      temperature: 0,
+      system: [
+        {
+          type: 'text',
+          text: EXTRACTION_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Locale: ${locale}\nSource URL: ${validated.url}\n\nScraped content:\n${scraped}`,
+        },
+      ],
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await logAiJob({
+      supabaseAdmin: ctx.supabaseAdmin,
+      userId: ctx.userId,
+      jobType: 'url_extract',
+      status: 'failed',
+      input: { url: rawUrl },
+      errorMessage: `haiku_call_failed: ${message}`,
+    });
+    return jsonError(502, 'ai_unavailable', 'AI service unavailable');
+  }
+
+  const textBlock = haikuResponse.content.find((b) => b.type === 'text');
+  const rawText = textBlock && 'text' in textBlock ? textBlock.text : '';
+  const tokensUsed =
+    (haikuResponse.usage?.input_tokens ?? 0) +
+    (haikuResponse.usage?.output_tokens ?? 0);
+
+  const parsed = safeJsonParse(rawText);
+  if (!parsed) {
+    await logAiJob({
+      supabaseAdmin: ctx.supabaseAdmin,
+      userId: ctx.userId,
+      jobType: 'url_extract',
+      status: 'failed',
+      input: { url: rawUrl },
+      output: { raw: rawText.slice(0, 500) },
+      tokensUsed,
+      errorMessage: 'json_parse_failed',
+    });
+    return jsonResponse(
+      {
+        partial: true,
+        reason: 'extraction_failed',
+        title: 'Untitled Recipe',
+        ingredients: [],
+        instructions: [],
+      },
+      206,
+    );
+  }
+
+  // Haiku returned an explicit partial
+  if (parsed && typeof parsed === 'object' && (parsed as { partial?: boolean }).partial) {
+    await logAiJob({
+      supabaseAdmin: ctx.supabaseAdmin,
+      userId: ctx.userId,
+      jobType: 'url_extract',
+      status: 'done',
+      input: { url: rawUrl },
+      output: parsed,
+      tokensUsed,
+    });
+    return jsonResponse(
+      {
+        partial: true,
+        reason:
+          (parsed as { reason?: string }).reason ?? 'no_recipe_found',
+        title: 'Untitled Recipe',
+        ingredients: [],
+        instructions: [],
+        source_url: validated.url,
+      },
+      206,
+    );
+  }
+
+  const recipe = {
+    ...(parsed as Record<string, unknown>),
+    source_url: validated.url,
+  };
+
+  await logAiJob({
+    supabaseAdmin: ctx.supabaseAdmin,
+    userId: ctx.userId,
+    jobType: 'url_extract',
+    status: 'done',
+    input: { url: rawUrl },
+    output: recipe,
+    tokensUsed,
+  });
+
+  return jsonResponse(recipe);
+});
+
+/* ---------------------------- helpers ---------------------------- */
+
+interface UrlOk {
+  ok: true;
+  url: string;
+}
+interface UrlBad {
+  ok: false;
+  reason: string;
+}
+
+function validateUrl(raw: string): UrlOk | UrlBad {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, reason: 'URL is malformed' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, reason: 'Only http(s) URLs are supported' };
+  }
+  if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+    return { ok: false, reason: 'Non-standard ports are not allowed' };
+  }
+  if (isPrivateHost(parsed.hostname)) {
+    return { ok: false, reason: 'Private or local hosts are not allowed' };
+  }
+
+  return { ok: true, url: parsed.toString() };
+}
+
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h.endsWith('.local')) return true;
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (!ipv4) return false;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 0) return true;
+  return false;
+}
+
+async function scrapeUrl(url: string): Promise<string> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(current, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': USER_AGENT,
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) throw new Error(`redirect with no location (${res.status})`);
+      const next = new URL(loc, current).toString();
+      const v = validateUrl(next);
+      if (!v.ok) throw new Error(`redirect to invalid host: ${v.reason}`);
+      current = v.url;
+      continue;
+    }
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    // Read up to MAX_SCRAPE_BYTES
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('no body');
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (total < MAX_SCRAPE_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+    try {
+      await reader.cancel();
+    } catch { /* noop */ }
+
+    const merged = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      merged.set(c.subarray(0, Math.min(c.length, MAX_SCRAPE_BYTES - off)), off);
+      off += c.length;
+      if (off >= MAX_SCRAPE_BYTES) break;
+    }
+    const html = new TextDecoder('utf-8', { fatal: false }).decode(merged);
+    return htmlToText(html);
+  }
+  throw new Error('too many redirects');
+}
+
+function htmlToText(html: string): string {
+  // Rough, good-enough pass for Haiku consumption. Not a real HTML parser.
+  let s = html;
+  // Prefer <article> or <main> content when present; otherwise strip body.
+  const article = matchBlock(s, 'article') ?? matchBlock(s, 'main');
+  if (article) s = article;
+
+  // Drop non-content regions
+  s = s
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, ' ')
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, ' ');
+
+  // Strip remaining tags
+  s = s.replace(/<[^>]+>/g, ' ');
+
+  // Decode a handful of common entities. Leave the rest to Haiku.
+  s = s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  s = s.replace(/\s+/g, ' ').trim();
+  if (s.length > MAX_SCRAPE_CHARS) s = s.slice(0, MAX_SCRAPE_CHARS);
+  return s;
+}
+
+function matchBlock(html: string, tag: string): string | null {
+  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const m = re.exec(html);
+  return m ? m[1] : null;
+}
+
+function safeJsonParse(raw: string): unknown | null {
+  if (!raw) return null;
+  let trimmed = raw.trim();
+  // Tolerate accidental markdown fences even though we asked for none.
+  if (trimmed.startsWith('```')) {
+    trimmed = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Haiku sometimes returns a leading/trailing sentence around JSON.
+    const first = trimmed.indexOf('{');
+    const last = trimmed.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+      try {
+        return JSON.parse(trimmed.slice(first, last + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}

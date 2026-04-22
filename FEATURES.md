@@ -304,7 +304,7 @@ Each cookbook renders as a shelf-like row with its palette accent.
 ## 5. Add tab
 
 - **Route:** `/(tabs)/add`
-- **Behaviour:** not a standalone screen. The tab bar renders a floating "+" button in this slot; tapping it routes directly to Recipe create. The underlying route itself is a redirect to Recipe create, so a deep link to `/add` also lands in Recipe create.
+- **Behaviour:** not a standalone screen. The tab bar renders a floating "+" button in this slot; tapping it opens the **Import a Recipe** modal (see section 8). The underlying `/add` route redirects to `/recipe/import` so deep links land in the same place.
 - **Realtime:** —
 - **Permissions:** signed-in users only
 - **Limits:** —
@@ -344,16 +344,37 @@ Each cookbook renders as a shelf-like row with its palette accent.
 
 ---
 
-## 8. Recipe create
+## 8. Import a Recipe
 
 ### 8.1 Full page
 
-- **Route:** `/recipe/create`
-- **Presentation:** full-screen form. Header has a back control; "Save" lives at the bottom of the form.
-- **Source:** every recipe created here is stored as `manual` source. The UI does not yet surface URL-import, screenshot-import, or Telegram-import entry points.
-- **Cookbook linkage:** recipes created here start unlinked. A recipe becomes linked to a cookbook the first time it is added as a page in Book Builder.
+- **Route:** `/recipe/import` (presented modally; optional `?tab=paste|type|photo|file` param to deep-link a tab).
+- **Header:** `×` close on the left, centred "Import a Recipe" title. Closing always returns to the previous screen (or Home if the stack is empty).
+- **Tab bar** under the header, 4 tabs with Feather icons:
+  1. **Paste Link** (`paperclip`) — active by default, functional since Phase 7.1
+  2. **Type** (`edit-2`) — manual entry; functional (the former "Recipe create" screen lives here)
+  3. **Photo** (`camera`) — shown but disabled with a "Soon" pill; wires up in Phase 8
+  4. **File** (`file-text`) — shown but disabled with a "Soon" pill; later
+- **Legacy route:** `/recipe/create` redirects to `/recipe/import?tab=type` for any lingering links or deep-links that predate Phase 7.
 
-### 8.2 Form — New recipe
+### 8.2 Tab — Paste Link
+
+- Heading "Paste the link to any recipe".
+- Subcopy "We'll grab the ingredients, instructions, and photos for you."
+- URL input with an `×` clear button; `keyboardType="url"`, autocorrect/autocaps off.
+- Primary **Import Recipe** ClayButton with two small sparkle accents. Disabled while the input is empty or the mutation is in flight.
+- "Here are some we support:" — 6 styled wordmarks in a 3×2 grid: Allrecipes, Food, Delish, Epicurious, NYT Cooking, Tasty. *(Styled text in our palette, not the sites' actual logos — avoids trademark misuse.)*
+- Tip card with the built-in `whisk` sticker, handwritten-font copy "Tip: You can always edit and make it your own.", and a heart icon.
+- **On success:** auto-switches to the Type tab, pre-fills every field from the extracted recipe, and shows a sage-left-border banner "Imported from *domain.com* — review and save." with an × to dismiss the banner (user can also clear it via the Type tab × control).
+- **On `invalid_url`:** inline red "That doesn't look like a recipe URL." under the input.
+- **On `ai_unavailable`:** inline amber "Couldn't read that page right now. Try again in a minute."
+- **On `rate_limited`:** inline "You're going a bit fast — try again in a moment."
+- **On `monthly_limit_reached`:** replaces the Import button with a card: "You've used X / 20 imports this month" + "Upgrade to Premium" ClayButton (navigates to `/upgrade`).
+- **On `partial` (206):** server returns a partial recipe — auto-switches to Type, pre-fills whatever came back, shows a banner indicating partial extraction.
+
+### 8.3 Tab — Type (manual entry)
+
+Same form as the previous "Recipe create" screen. Save button at the bottom of the form (no longer in the header).
 
 | Field | Type | Required | Default | Options / Constraints | Custom allowed | Notes |
 |---|---|---|---|---|---|---|
@@ -366,18 +387,32 @@ Each cookbook renders as a shelf-like row with its palette accent.
 | Ingredients | multiline text (~6 rows) | No | — | One per line | Yes | Each line becomes one ingredient |
 | Instructions | multiline text (~8 rows) | No | — | One per line | Yes | Each line becomes one step |
 
-### 8.3 Actions
+When the user arrives here via a Paste Link import, all fields are pre-populated and the top of the form shows the "Imported from *domain.com*" banner. `source_type` is `url_import` when the form was populated via Paste Link (otherwise `manual`).
+
+### 8.4 Tab — Photo (Coming soon)
+
+- Empty state with camera icon and copy: "Snap a photo of a cookbook page or screenshot — we'll read the recipe for you."
+- Tab is disabled (no tap action). Will light up in Phase 8 alongside the Telegram bot.
+
+### 8.5 Tab — File (Coming soon)
+
+- Empty state with document icon and copy: "Drop in a PDF or text file and we'll pull out the recipe."
+- Tab is disabled. No committed timeline.
+
+### 8.6 Actions
 
 | Action | Confirmation | Effect |
 |---|---|---|
-| Back (header) | — | Discards the form, returns to Home |
-| Save | — | Creates the recipe; routes to the new Recipe detail. Guarded against double-submit. Save failures surface a "Save failed" alert. |
+| Close (× in header) | — | Dismisses the modal, returns to the previous screen |
+| Import Recipe (Paste Link) | — | Calls `extract-recipe` Edge Function; on success pre-fills Type tab |
+| Save (Type tab) | — | Creates the recipe; dismisses modal; routes to new Recipe detail. Guarded against double-submit. |
+| Upgrade (paywall card) | — | Opens `/upgrade` modal (currently a placeholder screen) |
 
-### 8.4 Realtime / Permissions / Limits
+### 8.7 Realtime / Permissions / Limits
 
 - **Realtime:** —
 - **Permissions:** signed-in users only
-- **Limits:** —
+- **Limits:** URL imports are capped at 20/month on the Free tier (unlimited on Premium). Enforced server-side via `ai_jobs` row counts in the current UTC calendar month. See Appendix A.
 
 ---
 
@@ -476,7 +511,20 @@ Three modes across the bottom of the editor plus a **?** help button. Exactly on
 
 #### Stickers mode
 
-Horizontal tray of 16 sticker tiles. Tapping a tile drops a copy onto the centre of the canvas with a small random rotation. The new sticker is auto-selected so the user can drag it into place immediately.
+Top of the sticker panel: a **Make me Sketch** ClayButton (terracotta, star icon, "Make me Sketch" label).
+Below it: a horizontal tray of 16 sticker tiles. Tapping a tile drops a copy onto the centre of the canvas with a small random rotation. The new sticker is auto-selected so the user can drag it into place immediately.
+
+**Make me Sketch** (AI auto-sticker):
+- Tapping calls the `auto-sticker` Edge Function. Claude Haiku picks 3–5 stickers that match the recipe's title / description / ingredients / tags; the server rolls their placement in safe zones along the top / bottom / left / right bands of the canvas (avoiding the middle text area) and returns normalised coordinates.
+- Stickers appear on the canvas in a **single undo frame** — one tap of the Draw-mode Undo arrow (or the in-app undo action) removes all of them together.
+- After a successful sketch a small toast appears below the button: *"Sketched N stickers! Tap undo if you want to try again."* Auto-dismisses after ~3.5 s.
+- **Disabled state:** button is greyed out when the recipe has no title yet (nothing for the AI to match on).
+- **Error states:**
+  - `ai_failed` → "AI didn't find good stickers — try again."
+  - `rate_limited` → "A little fast — wait a moment and try again."
+  - `ai_unavailable` → "AI is taking a breather. Try again in a minute."
+  - `recipe_empty` → "Add a title or ingredients first."
+- **Paywall state (`monthly_limit_reached`):** the button is replaced by a card "X / 5 sketches used this month" + "Upgrade to Premium" inner ClayButton (→ `/upgrade`).
 
 **Sticker catalog (16 — all free today):**
 Tomato · Lemon · Garlic · Basil · Whisk · Spoon · Pan · Wheat · Strawberry · Flower · Leaf · Heart · Star · Mushroom · Bread · Cherry
@@ -738,6 +786,10 @@ These appear in the project's planning docs but are **not present in the app tod
 | Book page types | 8 (Recipe, Cover, Dedication, Table of Contents, About / Intro, Chapter Divider, Blank, Closing) |
 | Built-in stickers | 16 (Essentials pack, all free) |
 | Drawing blend modes | 5 (Normal, Multiply, Overlay, Screen, Soft light) |
+| URL recipe imports | Free: 20 / month; Premium: unlimited (server-enforced in `extract-recipe`) |
+| Auto-sticker ("Make me Sketch") calls | Free: 5 / month; Premium: unlimited (server-enforced in `auto-sticker`) |
+| AI rate limit (any user, any AI function) | 1 call / 10 seconds (server-enforced) |
+| Scraped page cap (URL import) | 200 KB downloaded, 20 000 characters fed to Haiku, 10s fetch timeout, ≤ 3 redirects |
 
 ---
 

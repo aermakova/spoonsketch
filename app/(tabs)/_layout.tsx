@@ -34,7 +34,7 @@ function FABButton() {
   return (
     <TouchableOpacity
       style={[styles.fabWrapper, { paddingBottom: insets.bottom > 0 ? 4 : 8 }]}
-      onPress={() => router.push('/recipe/create')}
+      onPress={() => router.push('/recipe/import')}
       activeOpacity={0.85}
     >
       <View style={[styles.fab, { backgroundColor: palette.accent }]}>

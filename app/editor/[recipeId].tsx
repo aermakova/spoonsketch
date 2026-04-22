@@ -13,6 +13,7 @@ import { fetchCookbook } from '../../src/api/cookbooks';
 import { fetchRecipeCanvas, upsertRecipeCanvas } from '../../src/api/recipeCanvases';
 import { CanvasElement } from '../../src/components/canvas/CanvasElement';
 import { StickerTray } from '../../src/components/canvas/StickerTray';
+import { MakeMeSketchButton } from '../../src/components/canvas/MakeMeSketchButton';
 import { SkiaCanvas } from '../../src/components/canvas/SkiaCanvas';
 import { DrawingToolbar } from '../../src/components/canvas/DrawingToolbar';
 import { HelpSheet } from '../../src/components/canvas/HelpSheet';
@@ -397,7 +398,16 @@ export default function EditorScreen() {
           </>
         )}
         {editorMode === 'stickers' && (
-          <StickerTray onAdd={handleAddSticker} />
+          <>
+            <MakeMeSketchButton
+              recipeId={recipeId}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+              onUpgradePress={() => router.push('/upgrade')}
+              disabled={!recipe?.title?.trim()}
+            />
+            <StickerTray onAdd={handleAddSticker} />
+          </>
         )}
         {editorMode === 'draw' && (
           <DrawingToolbar onOpenLayers={() => setLayerPanelOpen(true)} />

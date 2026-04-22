@@ -73,6 +73,11 @@ interface CanvasState {
   // Does not push history, does not alert — purely a client-state sync.
   hydrateTemplateAndFont: (patch: { templateKey?: TemplateKey; recipeFont?: FontPresetKey }) => void;
   addSticker: (key: string, x: number, y: number) => void;
+  // Batch insert used by "Make me Sketch". A single history snapshot so
+  // Cmd-Z / the undo action pops all at once.
+  addStickersBatch: (
+    inputs: Array<{ stickerKey: string; x: number; y: number; rotation: number; scale: number }>,
+  ) => void;
   updateEl: (id: string, patch: Partial<CanvasEl>) => void;
   removeEl: (id: string) => void;
   select: (id: string | null) => void;
@@ -218,6 +223,30 @@ export const useCanvasStore = create<CanvasState>()(
               elements,
               selectedId: el.id,
               recipeStates: commitRecipeState(s.recipeStates, s.recipeId, { elements }),
+            };
+          });
+        },
+
+        addStickersBatch(inputs) {
+          if (!inputs.length) return;
+          pushSnap();
+          const { elements } = get();
+          const maxZ = elements.length ? Math.max(...elements.map(e => e.zIndex)) : 0;
+          const newEls: CanvasEl[] = inputs.map((it, i) => ({
+            id: Math.random().toString(36).slice(2, 9),
+            stickerKey: it.stickerKey,
+            x: it.x,
+            y: it.y,
+            rotation: it.rotation,
+            scale: it.scale,
+            zIndex: maxZ + 1 + i,
+          }));
+          set(s => {
+            const merged = [...s.elements, ...newEls];
+            return {
+              elements: merged,
+              selectedId: null,
+              recipeStates: commitRecipeState(s.recipeStates, s.recipeId, { elements: merged }),
             };
           });
         },
