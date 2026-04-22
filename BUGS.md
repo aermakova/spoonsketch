@@ -105,7 +105,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Open recipe A → Draw mode → scribble → Done. Open recipe B → Draw mode → draw briefly → Done. Return to recipe A → Draw mode. ✅ Expect: previous strokes still there. Actual (before fix): recipe A shows the empty default 3 layers, previous strokes gone from memory and from persisted storage.
 - **Root cause:** `drawingStore` only kept one recipe's drawings at a time. Its shape was `{ recipeId, layers, activeLayerId }`. `init(newRecipeId)` when the id changed simply reset to `DEFAULT_LAYERS()` and persisted the new (empty) state, overwriting the previous recipe's layers in MMKV. There was no per-recipe map; the persistence layer had exactly one slot.
 - **Fix:** Reshape the store to a per-recipe map: `drawings: Record<recipeId, { layers, activeLayerId }>`. Top-level `layers` / `activeLayerId` become a "working copy" mirror for the current recipe. Every mutation (commitStroke, addLayer, removeLayer, setActiveLayer, reorder, toggleVisible, setLayerOpacity, setLayerBlendMode, undo) updates both the working copy AND the canonical `drawings[recipeId]` entry. On `init(newRecipeId)`: snapshot the outgoing recipe's working copy back into `drawings`, then load the incoming recipe's layers (or create defaults). Persist config bumped to `version: 2`; the migrate function seeds the new `drawings` map with the v1 single-recipe entry so that recipe's drawings survive the upgrade.
-- **Commit:** _(current drawing persistence commit)_
+- **Commit:** `8795b7d`
 - **Test:** `MANUAL_TESTS.md` § Drawing persistence (post-Phase B) test 1.
 
 ## BUG-013 — Delete × on short blocks covered by right side handle
