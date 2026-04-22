@@ -1423,7 +1423,7 @@ Items intentionally skipped during Phase 5 to keep scope tight. Implement before
 - Colour picker library candidates: `react-native-wheel-color-picker`, or a custom Skia-drawn wheel
 
 ### Other polish items
-- Per-recipe drawing persistence: current store holds only one recipe's drawing at a time; migrate to MMKV keyed by `recipeId` so switching between recipes doesn't lose work
+- ✅ Per-recipe drawing persistence (landed 2026-04-22, see `BUGS.md` BUG-014): `drawingStore` now persists a `drawings` map keyed by `recipeId`; every mutation snapshots into it and `init` loads from it on recipe switch.
 - Apple Pencil pressure: wire `e.pressure` from the gesture event into `StrokePoint.pressure` for natural thinning (currently simulated at 0.5)
 
 ---

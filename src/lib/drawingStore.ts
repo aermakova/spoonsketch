@@ -3,14 +3,27 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import storage from './canvasStorage';
 import type { BlendMode, DrawingLayer, DrawingStroke, StrokePoint } from '../types/drawing';
 
+// Per-recipe drawing state. Each recipe has its own layers + active layer.
+// The top-level `layers` / `activeLayerId` are the working copy for the
+// *current* recipe; every mutation also snapshots into the `drawings` map so
+// opening another recipe and coming back restores strokes.
+interface RecipeDrawing {
+  layers: DrawingLayer[];
+  activeLayerId: string | null;
+}
+
 interface DrawingState {
   recipeId: string | null;
+  // Canonical per-recipe drawings, persisted. Keyed by recipeId.
+  drawings: Record<string, RecipeDrawing>;
+  // Working copy for the current recipe — mirrors drawings[recipeId].
   layers: DrawingLayer[];
   activeLayerId: string | null;
   activeTool: 'brush' | 'eraser';
   strokeWidth: number;
   color: string;
   opacity: number;
+  // Undo history is transient (not persisted) and scoped to the session.
   history: DrawingLayer[][];
 
   init: (recipeId: string) => void;
@@ -41,16 +54,27 @@ function makeLayer(name: string, zIndex: number): DrawingLayer {
   };
 }
 
-const DEFAULT_LAYERS = () => [
+const DEFAULT_LAYERS = (): DrawingLayer[] => [
   makeLayer('Layer 1', 1),
   makeLayer('Layer 2', 2),
   makeLayer('Layer 3', 3),
 ];
 
+function snapshot(
+  prev: Record<string, RecipeDrawing>,
+  recipeId: string | null,
+  layers: DrawingLayer[],
+  activeLayerId: string | null,
+): Record<string, RecipeDrawing> {
+  if (!recipeId) return prev;
+  return { ...prev, [recipeId]: { layers, activeLayerId } };
+}
+
 export const useDrawingStore = create<DrawingState>()(
   persist(
     (set, get) => ({
       recipeId: null,
+      drawings: {},
       layers: DEFAULT_LAYERS(),
       activeLayerId: null,
       activeTool: 'brush',
@@ -60,39 +84,72 @@ export const useDrawingStore = create<DrawingState>()(
       history: [],
 
       init(recipeId) {
-        const state = get();
-        if (state.recipeId === recipeId) {
-          // Same recipe — just make sure activeLayerId points at a real layer
-          // (it isn't persisted, so a reload resets it to null and drawing silently fails).
-          if (!state.activeLayerId && state.layers.length > 0) {
-            set({ activeLayerId: state.layers[0].id });
+        const s = get();
+        if (s.recipeId === recipeId) {
+          // Same recipe — just ensure activeLayerId points at a real layer
+          // (working copy can be out of sync after a reload).
+          if (!s.activeLayerId && s.layers.length > 0) {
+            set({ activeLayerId: s.layers[0].id });
           }
           return;
         }
-        const layers = DEFAULT_LAYERS();
-        set({ recipeId, layers, activeLayerId: layers[0].id, history: [] });
+
+        // Save the outgoing recipe's current working copy back into the map.
+        const drawingsWithOutgoing = snapshot(s.drawings, s.recipeId, s.layers, s.activeLayerId);
+
+        // Load incoming recipe's drawings (or create defaults).
+        const existing = drawingsWithOutgoing[recipeId];
+        const loadedLayers = existing?.layers ?? DEFAULT_LAYERS();
+        const loadedActive = existing?.activeLayerId ?? loadedLayers[0]?.id ?? null;
+
+        // Make sure the new recipe has an entry so it's persisted even before
+        // any strokes land.
+        const drawingsWithIncoming = existing
+          ? drawingsWithOutgoing
+          : { ...drawingsWithOutgoing, [recipeId]: { layers: loadedLayers, activeLayerId: loadedActive } };
+
+        set({
+          recipeId,
+          drawings: drawingsWithIncoming,
+          layers: loadedLayers,
+          activeLayerId: loadedActive,
+          history: [],
+        });
       },
 
       addLayer() {
-        const { layers } = get();
+        const { layers, recipeId, drawings } = get();
         if (layers.length >= 5) return;
         const maxZ = Math.max(...layers.map(l => l.zIndex));
         const layer = makeLayer(`Layer ${layers.length + 1}`, maxZ + 1);
-        set({ layers: [...layers, layer], activeLayerId: layer.id });
+        const nextLayers = [...layers, layer];
+        set({
+          layers: nextLayers,
+          activeLayerId: layer.id,
+          drawings: snapshot(drawings, recipeId, nextLayers, layer.id),
+        });
       },
 
       removeLayer(id) {
-        const { layers, activeLayerId, history } = get();
+        const { layers, activeLayerId, history, recipeId, drawings } = get();
         if (layers.length <= 1) return;
         const next = layers.filter(l => l.id !== id);
         const nextActive = activeLayerId === id ? (next[next.length - 1]?.id ?? null) : activeLayerId;
-        set({ layers: next, activeLayerId: nextActive, history: [...history, layers] });
+        set({
+          layers: next,
+          activeLayerId: nextActive,
+          history: [...history, layers],
+          drawings: snapshot(drawings, recipeId, next, nextActive),
+        });
       },
 
-      setActiveLayer(id) { set({ activeLayerId: id }); },
+      setActiveLayer(id) {
+        const { recipeId, drawings, layers } = get();
+        set({ activeLayerId: id, drawings: snapshot(drawings, recipeId, layers, id) });
+      },
 
       reorderLayer(id, dir) {
-        const { layers } = get();
+        const { layers, recipeId, drawings, activeLayerId } = get();
         const idx = layers.findIndex(l => l.id === id);
         if (idx < 0) return;
         const swapIdx = dir === 'up' ? idx + 1 : idx - 1;
@@ -101,23 +158,33 @@ export const useDrawingStore = create<DrawingState>()(
         const tmpZ = next[idx].zIndex;
         next[idx] = { ...next[idx], zIndex: next[swapIdx].zIndex };
         next[swapIdx] = { ...next[swapIdx], zIndex: tmpZ };
-        set({ layers: next.sort((a, b) => a.zIndex - b.zIndex) });
+        const sorted = next.sort((a, b) => a.zIndex - b.zIndex);
+        set({ layers: sorted, drawings: snapshot(drawings, recipeId, sorted, activeLayerId) });
       },
 
       toggleVisible(id) {
-        set(s => ({ layers: s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) }));
+        set(s => {
+          const next = s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l);
+          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+        });
       },
 
       setLayerOpacity(id, opacity) {
-        set(s => ({ layers: s.layers.map(l => l.id === id ? { ...l, opacity } : l) }));
+        set(s => {
+          const next = s.layers.map(l => l.id === id ? { ...l, opacity } : l);
+          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+        });
       },
 
       setLayerBlendMode(id, mode) {
-        set(s => ({ layers: s.layers.map(l => l.id === id ? { ...l, blendMode: mode } : l) }));
+        set(s => {
+          const next = s.layers.map(l => l.id === id ? { ...l, blendMode: mode } : l);
+          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+        });
       },
 
       commitStroke(points) {
-        const { layers, activeLayerId, history, strokeWidth, color, opacity, activeTool } = get();
+        const { layers, activeLayerId, history, strokeWidth, color, opacity, activeTool, recipeId, drawings } = get();
         if (!activeLayerId || points.length < 2) return;
         const stroke: DrawingStroke = {
           id: Math.random().toString(36).slice(2, 9),
@@ -127,19 +194,26 @@ export const useDrawingStore = create<DrawingState>()(
           opacity,
           isEraser: activeTool === 'eraser',
         };
+        const nextLayers = layers.map(l => l.id === activeLayerId
+          ? { ...l, strokes: [...l.strokes, stroke] }
+          : l,
+        );
         set({
-          layers: layers.map(l => l.id === activeLayerId
-            ? { ...l, strokes: [...l.strokes, stroke] }
-            : l
-          ),
+          layers: nextLayers,
           history: [...history, layers],
+          drawings: snapshot(drawings, recipeId, nextLayers, activeLayerId),
         });
       },
 
       undo() {
-        const { history } = get();
+        const { history, recipeId, drawings, activeLayerId } = get();
         if (!history.length) return;
-        set({ layers: history[history.length - 1], history: history.slice(0, -1) });
+        const prevLayers = history[history.length - 1];
+        set({
+          layers: prevLayers,
+          history: history.slice(0, -1),
+          drawings: snapshot(drawings, recipeId, prevLayers, activeLayerId),
+        });
       },
 
       setTool(tool) { set({ activeTool: tool }); },
@@ -150,7 +224,34 @@ export const useDrawingStore = create<DrawingState>()(
     {
       name: 'spoonsketch-drawing',
       storage: createJSONStorage(() => storage),
-      partialize: (s) => ({ recipeId: s.recipeId, layers: s.layers, activeLayerId: s.activeLayerId }),
-    }
-  )
+      // Persist the canonical `drawings` map (keyed by recipeId) and tool
+      // preferences. Working copy (layers/activeLayerId) is restored from
+      // `drawings[recipeId]` on init.
+      version: 2,
+      migrate: (persisted: any, from: number) => {
+        if (!persisted) return persisted;
+        if (from < 2) {
+          // v1 persisted a single { recipeId, layers, activeLayerId }. Seed the
+          // drawings map with that entry so the user's one recipe's drawings
+          // aren't lost.
+          const drawings: Record<string, RecipeDrawing> = {};
+          if (persisted.recipeId && Array.isArray(persisted.layers)) {
+            drawings[persisted.recipeId] = {
+              layers: persisted.layers,
+              activeLayerId: persisted.activeLayerId ?? persisted.layers[0]?.id ?? null,
+            };
+          }
+          return { drawings, activeTool: persisted.activeTool ?? 'brush', strokeWidth: persisted.strokeWidth ?? 6, color: persisted.color ?? '#3b2a1f', opacity: persisted.opacity ?? 1 };
+        }
+        return persisted;
+      },
+      partialize: (s) => ({
+        drawings: s.drawings,
+        activeTool: s.activeTool,
+        strokeWidth: s.strokeWidth,
+        color: s.color,
+        opacity: s.opacity,
+      }),
+    },
+  ),
 );

@@ -216,6 +216,33 @@ Repeat in each of the 6 templates (Classic, Photo Hero, Minimal, Two Column, Jou
 
 ---
 
+## Drawing persistence (post-Phase B, landed 2026-04-22)
+
+Covers BUG-014 — previously, opening a different recipe destroyed the previous one's drawings.
+
+### 1. Drawings survive recipe switches
+- Open recipe **A** → Draw mode → scribble a clear pattern (e.g. "A") → Done.
+- Open recipe **B** → Draw mode → scribble a different pattern ("B") → Done.
+- Return to recipe **A** → Draw mode.
+- ✅ Expect: the "A" strokes are still there, not reset to empty layers.
+- Go back to **B** — ✅ "B" strokes still there.
+
+### 2. Drawings survive an app kill
+- Draw something on a recipe → Done.
+- Kill the app (swipe up from app switcher) → reopen → navigate back to that recipe.
+- ✅ Expect: strokes restored.
+
+### 3. Multiple recipes persist independently
+- Draw different patterns on **3+ recipes**. Close the app between each.
+- Reopen and visit each recipe's editor.
+- ✅ Expect: each recipe keeps its own strokes. Switching between them does not mix or clear.
+
+### 4. v2 migration (one-time, first reload after this commit)
+- If you had drawn on any recipe before this fix, those strokes should still be present after reloading the app for the first time — migration seeds the new per-recipe map with the single v1 entry.
+- ✅ Expect: no red-box on launch; the one pre-migration recipe's drawings are intact.
+
+---
+
 ## Phase B — Full atomization (landed 2026-04-22)
 
 ### 1. Every field is its own block
