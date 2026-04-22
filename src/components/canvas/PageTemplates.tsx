@@ -225,7 +225,8 @@ function Classic(props: TemplateProps) {
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const title = getBlock('title');
-  const header = getBlock('header');
+  const description = getBlock('description');
+  const pills = getBlock('pills');
   const image = getBlock('image');
   const ingredients = getBlock('ingredients');
   const steps = getBlock('steps');
@@ -253,9 +254,14 @@ function Classic(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {header && (
-        <BlockElement key={header.elKey} {...makeBlockProps('header', header, props, pageHeight)}>
-          {recipe.description ? <Text style={[scaleText(t.desc, header.fontScale), { fontFamily: f }]} numberOfLines={header.hasTextOverride ? undefined : 2}>{recipe.description}</Text> : null}
+      {description && recipe.description ? (
+        <BlockElement key={description.elKey} {...makeBlockProps('description', description, props, pageHeight)}>
+          <Text style={[scaleText(t.desc, description.fontScale), { fontFamily: f }]} numberOfLines={description.hasTextOverride ? undefined : 2}>{recipe.description}</Text>
+        </BlockElement>
+      ) : null}
+
+      {pills && (
+        <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
         </BlockElement>
       )}
@@ -349,6 +355,7 @@ function PhotoHero(props: TemplateProps) {
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const hero = getBlock('hero');
+  const description = getBlock('description');
   const ingredients = getBlock('ingredients');
   const method = getBlock('method');
 
@@ -372,7 +379,6 @@ function PhotoHero(props: TemplateProps) {
             <View style={[t.heroOverlay, { backgroundColor: palette.accent + '99' }]} />
             <View style={t.heroText}>
               <Text style={[t.heroTitle, { fontFamily: preset.title }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5}>{recipe.title}</Text>
-              {recipe.description ? <Text style={[t.heroDesc, { fontFamily: f }]} numberOfLines={1}>{recipe.description}</Text> : null}
             </View>
             <View style={t.heroPills}>
               <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} light fontSection={f} />
@@ -380,6 +386,12 @@ function PhotoHero(props: TemplateProps) {
           </View>
         </BlockElement>
       )}
+
+      {description && recipe.description ? (
+        <BlockElement key={description.elKey} {...makeBlockProps('description', description, props, pageHeight)}>
+          <Text style={[scaleText(t.desc, description.fontScale), { fontFamily: f }]} numberOfLines={description.hasTextOverride ? undefined : 2}>{recipe.description}</Text>
+        </BlockElement>
+      ) : null}
 
       {ingredients && (
         <BlockElement key={ingredients.elKey} {...makeBlockProps('ingredients', ingredients, props, pageHeight)}>
@@ -453,7 +465,8 @@ function Minimal(props: TemplateProps) {
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const title = getBlock('title');
-  const header = getBlock('header');
+  const description = getBlock('description');
+  const pills = getBlock('pills');
   const ingredientsBlock = getBlock('ingredients');
   const methodBlock = getBlock('method');
 
@@ -477,9 +490,14 @@ function Minimal(props: TemplateProps) {
         </BlockElement>
       )}
 
-      {header && (
-        <BlockElement key={header.elKey} {...makeBlockProps('header', header, props, pageHeight)}>
-          {recipe.description ? <Text style={[scaleText(t.minimalDesc, header.fontScale), { fontFamily: f }]} numberOfLines={header.hasTextOverride ? undefined : 2}>{recipe.description}</Text> : null}
+      {description && recipe.description ? (
+        <BlockElement key={description.elKey} {...makeBlockProps('description', description, props, pageHeight)}>
+          <Text style={[scaleText(t.minimalDesc, description.fontScale), { fontFamily: f }]} numberOfLines={description.hasTextOverride ? undefined : 2}>{recipe.description}</Text>
+        </BlockElement>
+      ) : null}
+
+      {pills && (
+        <BlockElement key={pills.elKey} {...makeBlockProps('pills', pills, props, pageHeight)}>
           <TimePills recipe={recipe} palette={palette} pageWidth={pageWidth} fontSection={f} />
         </BlockElement>
       )}
@@ -558,6 +576,7 @@ function TwoColumn(props: TemplateProps) {
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const title = getBlock('title');
+  const description = getBlock('description');
   const leftCol = getBlock('left-col');
   const rightCol = getBlock('right-col');
 
@@ -579,6 +598,12 @@ function TwoColumn(props: TemplateProps) {
           <Text style={[scaleText(t.twoColTitle, title.fontScale), { borderBottomColor: palette.accent + '44', fontFamily: preset.title }]} numberOfLines={title.hasTextOverride ? undefined : 1} adjustsFontSizeToFit={!title.hasTextOverride} minimumFontScale={0.5}>{recipe.title}</Text>
         </BlockElement>
       )}
+
+      {description && recipe.description ? (
+        <BlockElement key={description.elKey} {...makeBlockProps('description', description, props, pageHeight)}>
+          <Text style={[scaleText(t.desc, description.fontScale), { fontFamily: f }]} numberOfLines={description.hasTextOverride ? undefined : 2}>{recipe.description}</Text>
+        </BlockElement>
+      ) : null}
 
       {leftCol && (
         <BlockElement key={leftCol.elKey} {...makeBlockProps('left-col', leftCol, props, pageHeight)}>
@@ -778,6 +803,7 @@ function RecipeCard(props: TemplateProps) {
   const [editing, setEditing] = useState<{ kind: 'step'; num: number; text: string } | { kind: 'ing'; id: string; text: string } | null>(null);
 
   const banner = getBlock('banner');
+  const description = getBlock('description');
   const image = getBlock('image');
   const ingredients = getBlock('ingredients');
   const steps = getBlock('steps');
@@ -801,10 +827,15 @@ function RecipeCard(props: TemplateProps) {
         <BlockElement key={banner.elKey} {...makeBlockProps('banner', banner, props, pageHeight)}>
           <View style={[t.cardBanner, { backgroundColor: palette.accent, width: banner.w, height: banner.h }]}>
             <Text style={[t.cardBannerTitle, { fontFamily: preset.title }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{recipe.title}</Text>
-            {recipe.description ? <Text style={[t.cardBannerDesc, { fontFamily: f }]} numberOfLines={1}>{recipe.description}</Text> : null}
           </View>
         </BlockElement>
       )}
+
+      {description && recipe.description ? (
+        <BlockElement key={description.elKey} {...makeBlockProps('description', description, props, pageHeight)}>
+          <Text style={[scaleText(t.desc, description.fontScale), { fontFamily: f }]} numberOfLines={description.hasTextOverride ? undefined : 2}>{recipe.description}</Text>
+        </BlockElement>
+      ) : null}
 
       {image && (
         <BlockElement key={image.elKey} {...makeBlockProps('image', image, props, pageHeight)}>

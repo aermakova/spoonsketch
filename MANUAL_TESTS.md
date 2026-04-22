@@ -177,15 +177,53 @@ Covers BUG-011 (drawing), BUG-012 (block jump), BUG-013 (delete ×). Run after a
 
 ---
 
-## Phases A + B — Canvas atomization (not yet implemented)
+## Phase A — Description normalization (landed 2026-04-22)
 
-_To fill in once A+B lands. Placeholder scenarios:_
+### 1. Description renders as a movable block in every template
+Repeat in each of the 6 templates (Classic, Photo Hero, Minimal, Two Column, Journal, Recipe Card):
+- Open a recipe that has a non-empty description.
+- Layout mode → change to this template.
+- ✅ Expect: a standalone description block appears between the title/hero/banner and the content rows.
+- Arrange Blocks → tap the description block → drag it. ✅ Moves independently of title / pills / hero.
+- Font-bump + / – buttons scale the description text, not the other blocks.
+- Tap × → description hides; **Reset** restores it.
+
+### 2. Photo Hero hero loses its description line
+- Template: **Photo Hero**.
+- ✅ Expect: the hero image overlay shows title + time pills only (no description text inside the dark overlay).
+- ✅ Expect: a separate description block renders below the hero band.
+
+### 3. Recipe Card banner loses its description line
+- Template: **Recipe Card**.
+- ✅ Expect: accent banner shows title only (no small description line).
+- ✅ Expect: a separate description block between banner and the photo row.
+
+### 4. Classic / Minimal split header into description + pills
+- Template: **Classic** (or **Minimal**).
+- ✅ Expect: description and time/servings pills are now two separate blocks.
+- Arrange Blocks → drag pills block without moving description. ✅ Works independently.
+
+### 5. Two Column gains a description block
+- Template: **Two Column**.
+- ✅ Expect: a full-width description block between the title and the left/right columns. Previously Two Column hid description entirely.
+
+### 6. Recipes with empty description don't render the block
+- Open a recipe where `description` is empty / null.
+- Any template. ✅ Expect: no description block appears. Layout compresses to fill the space.
+
+### 7. `schemaVersion: 2` migration clears stale overrides
+- (Once only, on first reload after upgrade.) Any pre-existing `header` / `hero` / `banner` position overrides created before this change should be cleared. Opening any recipe → no crash, no misplaced blocks from old coordinates. ✅ Expect: everything renders at the new template defaults.
+
+---
+
+## Phase B — Full atomization (not yet implemented)
+
+_To fill in once B lands. Planned scenarios:_
 
 - Every populated recipe field (title, description, pills, image, ingredients-heading, ingredients-list, method-heading, method-list, tags) renders as its own selectable block in all six templates.
-- Tap selects, edge-drag resizes width, font-bump works, delete hides.
-- Distinct "first look" preserved per template (Photo Hero big top image, Recipe Card accent banner, Journal photo rotation).
-- Empty recipe fields don't render a block.
-- `schemaVersion: 2` gate clears stale `blockOverrides` without crashing.
+- Section titles ("Ingredients", "Method") editable as text blocks.
+- Distinct "first look" preserved per template.
+- `schemaVersion: 3` gate clears A-era overrides without crashing.
 
 ---
 

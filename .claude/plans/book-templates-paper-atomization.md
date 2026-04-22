@@ -4,7 +4,7 @@
 
 | Phase | Status | Notes |
 |---|---|---|
-| **A** — Description normalization | ⏳ Not started | Deferred — start after Track 2 ships |
+| **A** — Description normalization | ✅ **Shipped** | Every template now has a movable `description` block; `schemaVersion: 2` gate clears stale overrides |
 | **B** — Atomize every recipe field | ⏳ Not started | Depends on A |
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
 | **D** — Cookbook-level section titles | ✅ **Shipped** | Migration applied; landed in commit `20330e7` |
@@ -77,9 +77,15 @@ Surfaced during Phase E device testing; unrelated to the paper feature but fixed
 - ✅ **BUG-012** — Text-heavy blocks jumped 40–80px down ~200ms after template change. Root cause: `onContentLayout`-measured height was committed to `blockOverrides[id].h` and fed back into `translateY = cy - h/2`. Fix: `useBlockResolver` now ignores `ov.h` for text-heavy blocks (always uses template default); `GestureBlock` still tracks real content height via its own `measuredH` shared value.
 - ✅ **BUG-013** — Delete `×` unreachable on short blocks in Arrange mode. Root cause: side handle rendered after delete in the JSX tree and its hitSlop completely covered the 22×22 button. Fix: delete now rendered **last**, `zIndex: 3`, pushed out to `top/right: -14`.
 
+### Phase A — what's landed
+
+- `blockDefs.ts` — `classic` and `minimal` lose the `header` mega-block; gain separate `description` + `pills` blocks. `photo-hero` keeps `hero` (image + title + pills overlay) but loses its description line — description becomes a new block between hero and the ingredient/method columns. `recipe-card` keeps `banner` (title + accent background) but loses description — description becomes a new block between banner and the photo/ingredients row. `two-column` gains a new `description` block between the full-width title and the two columns. `journal` was already atomized here; no change.
+- `PageTemplates.tsx` — each of the 5 changed templates stops rendering description text inside its former mega-block and adds a dedicated `<BlockElement>` for description. Classic and Minimal also add a dedicated `pills` `<BlockElement>` wrapping the TimePills row. Every description block is gated on `recipe.description` being non-empty.
+- `canvasStore.ts` — zustand persist config bumped to `version: 2` with a `migrate` function that clears `blockOverrides` when hydrating from v1. Safe one-time reset because no production users yet.
+
 ### Next up (in order)
 
-1. **Phases A + B** — canvas atomization. See § "Phase A" and § "Phase B" below. One PR, biggest refactor in this plan.
+1. **Phase B** — full atomization into the 9-atom set (adds `ingredients-heading`, `method-heading`, `method-list`, splits Two Column's left-col into `image` + `ingredients`, splits Journal's `meta` into `pills` + `ingredients`). Bump `schemaVersion` to 3.
 2. **Phase F** — print contract. Unblocks BUG-010 and Phase 9 PDF export quality.
 
 ---
