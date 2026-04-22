@@ -13,8 +13,9 @@
 // Scope of this commit: Classic template with full block layout + paper
 // pattern. Other templates, stickers, and drawing strokes come in follow-ups.
 
-import type { RecipePage } from './recipePage';
+import type { RecipePage, RecipePageStroke } from './recipePage';
 import { TEMPLATE_BLOCKS } from './blockDefs';
+import { getStroke } from 'perfect-freehand';
 
 export interface RenderOptions {
   // Physical page width in pixels. Defaults to A4 at 96 DPI (screen preview
@@ -23,6 +24,10 @@ export interface RenderOptions {
   // Show a subtle drop shadow around the page in a grey background —
   // matches how browsers preview print pages. Disable for actual printing.
   previewChrome?: boolean;
+  // Resolve a sticker kind to an image URL the WebView can load. On device
+  // this is typically a file:// URI from expo-asset; for a server renderer
+  // it'd be an https:// URL. Returning null/undefined skips the sticker.
+  stickerSrc?: (kind: string) => string | null | undefined;
 }
 
 const DEFAULT_WIDTH_PX = 794; // A4 @ 96 DPI
@@ -45,6 +50,8 @@ export function renderRecipePage(page: RecipePage, opts: RenderOptions = {}): st
   <div class="page t-${page.style.template}">
     ${renderPaperPattern(page, pageWidth, pageHeight)}
     ${renderTemplate(page, pageWidth, pageHeight)}
+    ${renderDrawingLayers(page, pageWidth, pageHeight)}
+    ${renderStickers(page, pageWidth, pageHeight, opts.stickerSrc)}
   </div>
 </body>
 </html>`;
@@ -869,6 +876,111 @@ function renderRecipeCard(page: RecipePage, pageWidth: number, pageHeight: numbe
   }
 
   parts.push(`<div class="page-number">1</div>`);
+  return parts.join('\n    ');
+}
+
+// ─── Drawing strokes ─────────────────────────────────────────────────────────
+
+// Reuses perfect-freehand (already in deps) to turn the stroke's fractional
+// points into a polygon, then serializes to an SVG path `d` attribute with
+// the same quadratic-Bezier smoothing used by the RN/Skia renderer in
+// `src/components/canvas/DrawingStroke.tsx`.
+function renderDrawingLayers(page: RecipePage, pageWidth: number, pageHeight: number): string {
+  if (page.drawingLayers.length === 0) return '';
+
+  const layerGroups = page.drawingLayers
+    .filter(layer => layer.visible)
+    .map(layer => {
+      const paths = layer.strokes
+        // V1 print: eraser strokes are skipped — correct output would require
+        // SVG masks, deferred to a follow-up. Non-eraser strokes render fine.
+        .filter(s => !s.isEraser)
+        .map(s => renderStrokePath(s, pageWidth, pageHeight))
+        .join('');
+      if (!paths) return '';
+      const blend = cssBlendMode(layer.blendMode);
+      return `<g style="mix-blend-mode:${blend};opacity:${layer.opacity}">${paths}</g>`;
+    })
+    .filter(g => g.length > 0)
+    .join('');
+
+  if (!layerGroups) return '';
+
+  return `<svg class="drawing" xmlns="http://www.w3.org/2000/svg" width="${pageWidth}" height="${pageHeight}" style="position:absolute;inset:0;pointer-events:none">${layerGroups}</svg>`;
+}
+
+function renderStrokePath(stroke: RecipePageStroke, pageWidth: number, pageHeight: number): string {
+  const pts = stroke.points.map(p => [p.x * pageWidth, p.y * pageHeight, p.pressure] as [number, number, number]);
+  if (pts.length < 2) return '';
+  const polygon = getStroke(pts, {
+    size: stroke.widthFrac * pageWidth,
+    thinning: 0.7,
+    smoothing: 0.5,
+    streamline: 0.4,
+    simulatePressure: false,
+  });
+  const d = polygonToPathD(polygon);
+  if (!d) return '';
+  return `<path d="${d}" fill="${stroke.color}" opacity="${stroke.opacity}"/>`;
+}
+
+function polygonToPathD(polygon: number[][]): string {
+  if (polygon.length < 3) return '';
+  const avg = (a: number, b: number) => (a + b) / 2;
+  const first = polygon[0];
+  const second = polygon[1];
+  const parts: string[] = [];
+  parts.push(`M${avg(first[0], second[0])},${avg(first[1], second[1])}`);
+  for (let i = 1; i < polygon.length - 1; i++) {
+    const a = polygon[i];
+    const b = polygon[i + 1];
+    parts.push(`Q${a[0]},${a[1]} ${avg(a[0], b[0])},${avg(a[1], b[1])}`);
+  }
+  parts.push('Z');
+  return parts.join(' ');
+}
+
+function cssBlendMode(mode: string): string {
+  switch (mode) {
+    case 'multiply':   return 'multiply';
+    case 'screen':     return 'screen';
+    case 'overlay':    return 'overlay';
+    case 'soft-light': return 'soft-light';
+    case 'normal':
+    default:           return 'normal';
+  }
+}
+
+// ─── Stickers ────────────────────────────────────────────────────────────────
+
+function renderStickers(
+  page: RecipePage,
+  pageWidth: number,
+  pageHeight: number,
+  stickerSrc: RenderOptions['stickerSrc'],
+): string {
+  if (page.stickers.length === 0) return '';
+  const STICKER_DISPLAY_PX = 64; // matches the RN canvas's STICKER_SIZE
+
+  const parts = page.stickers
+    .slice()
+    .sort((a, b) => a.zIndex - b.zIndex)
+    .map(s => {
+      const src = stickerSrc?.(s.kind);
+      if (!src) return '';
+      const x = s.cx * pageWidth;
+      const y = s.cy * pageHeight;
+      const size = STICKER_DISPLAY_PX;
+      const rotDeg = (s.rotation * 180) / Math.PI;
+      return `<img
+        class="sticker"
+        src="${escapeAttr(src)}"
+        style="position:absolute;left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;transform:rotate(${rotDeg}deg) scale(${s.scale});transform-origin:center;pointer-events:none;z-index:${20 + s.zIndex};"
+        alt=""
+      >`;
+    })
+    .filter(Boolean);
+
   return parts.join('\n    ');
 }
 

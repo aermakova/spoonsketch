@@ -251,9 +251,20 @@ Classic template only in this commit. Other 5 templates fall back to Classic lay
 - Repeat test 1 (Clean → Export PDF) on a recipe set to each template in turn: Classic, Photo Hero, Minimal, Two Column, Journal, Recipe Card.
 - ✅ Expect: each PDF shows the template's distinct style — Photo Hero with dark-overlay hero image; Minimal with the accent line under title; Two Column with side-by-side layout; Journal with rotated photo and dashed method lines; Recipe Card with accent-banner title.
 
+### 7. Stickers in the exported PDF (added 2026-04-22)
+- Open a recipe → Decorate → Stickers tab → drop several stickers (e.g. tomato, leaf, heart) on the page → drag to different spots → rotate one → Done.
+- Back to recipe detail → Export PDF.
+- ✅ Expect: every sticker appears in the PDF at the same position it had on the canvas, with the same rotation and (roughly) scale. Stacking order matches the canvas.
+
+### 8. Drawing strokes in the exported PDF (added 2026-04-22)
+- Same recipe → Decorate → Draw mode → scribble something on Layer 1 in terracotta. Switch to Layer 2 → scribble in a different colour. Change Layer 2 blend mode to Multiply → Done.
+- Export PDF.
+- ✅ Expect: both scribbles present; blend mode on Layer 2 visibly tints underlying strokes/text via Multiply. Eraser strokes, if any, don't render — that's the documented v1 limitation.
+
 ### Known scope of this commit
-- Stickers and drawing strokes are **not** in the PDF yet — schema captures them but the renderer's sticker/stroke output is in a follow-up commit.
+- Eraser strokes are skipped in the PDF output for now. Non-eraser layers render correctly. Proper eraser handling needs SVG masks (follow-up).
 - Images use the recipe's `cover_image_url` directly — they print whatever the URL resolves to. For Supabase Storage URLs that requires the PDF renderer (expo-print's embedded WebView here) to be online.
+- Stickers render as `<img>` tags pointing at local file URIs (via expo-asset). That works fine on device (iOS WebView loads file://) but a server-side Puppeteer renderer would need publicly-hosted URLs instead — a small patch when we get there.
 
 ---
 
