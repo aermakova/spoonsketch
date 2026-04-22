@@ -318,7 +318,7 @@ export default function EditorScreen() {
             style={[styles.modeTab, editorMode === 'layout' && styles.modeTabActive]}
             onPress={() => switchMode('layout')}
           >
-            <Text style={[styles.modeTabText, editorMode === 'layout' && styles.modeTabTextActive]}>
+            <Text numberOfLines={1} style={[styles.modeTabText, editorMode === 'layout' && styles.modeTabTextActive]}>
               ⊞ Layout
             </Text>
           </TouchableOpacity>
@@ -326,7 +326,7 @@ export default function EditorScreen() {
             style={[styles.modeTab, editorMode === 'stickers' && styles.modeTabActive]}
             onPress={() => switchMode('stickers')}
           >
-            <Text style={[styles.modeTabText, editorMode === 'stickers' && styles.modeTabTextActive]}>
+            <Text numberOfLines={1} style={[styles.modeTabText, editorMode === 'stickers' && styles.modeTabTextActive]}>
               ✱ Stickers
             </Text>
           </TouchableOpacity>
@@ -334,7 +334,7 @@ export default function EditorScreen() {
             style={[styles.modeTab, editorMode === 'draw' && styles.modeTabActive]}
             onPress={() => switchMode('draw')}
           >
-            <Text style={[styles.modeTabText, editorMode === 'draw' && styles.modeTabTextActive]}>
+            <Text numberOfLines={1} style={[styles.modeTabText, editorMode === 'draw' && styles.modeTabTextActive]}>
               ✏ Draw
             </Text>
           </TouchableOpacity>
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modeTab: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.06)',

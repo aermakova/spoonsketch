@@ -104,7 +104,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Editor → Layout → Arrange Blocks → select a 1-line tags block. Tap the × in the top-right corner → nothing happens. The right edge width-drag handle sits under the ×.
 - **Root cause:** `BlockElement.tsx` rendered the delete `TouchableOpacity` **before** the side edge handles in JSX, so later siblings (the right handle `GestureDetector`) ended up on top in the stacking order. The side handle's `SIDE_HANDLE_HIT_SLOP = 18` extends the touch zone 18px in every direction, completely covering the 22×22 delete button on short blocks.
 - **Fix:** Moved the delete `TouchableOpacity` to render **last** in the JSX tree (after both side handles) so it wins the stacking order. Bumped `del.zIndex` from 2 → 3 as belt-and-braces. Pushed the button further out (`top/right: -10 → -14`) so its visible bounds sit clear of the side handle bar.
-- **Commit:** _(current editor stability fix commit)_
+- **Commit:** `14ef7bc`
 - **Test:** `MANUAL_TESTS.md` § Editor stability (post-Phase E) test 3.
 
 ## BUG-012 — Text-heavy blocks jumped down 40–80px after template change
@@ -113,7 +113,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Editor → Layout → change template (e.g. Classic → Journal). Blocks render at one position, then ~200ms later all text-heavy blocks (title / description / ingredients / method / tags) shift vertically — usually downward.
 - **Root cause:** `BlockElement.onContentLayout` measures the actual rendered content height and (after a 200ms debounce) commits it to `blockOverrides[id].h` via `setBlockHeightSilent`. `useBlockResolver` then returned that measured value as the block's `h`. `StaticBlock`'s transform is `translateY: cy - h / 2`, so when `h` changed from the template's default to the measured value, the block re-translated. Templates' `getDefault(pw)` functions allocate generous default heights (e.g. `method` = `usable(pw) * 0.39`); the actual rendered step-list height is almost always smaller → new `translateY` = larger (less negative offset) → block's top edge moves DOWN.
 - **Fix:** `useBlockResolver` now returns `base.h` (the template default) for text-heavy blocks regardless of any stored override. The persisted `ov.h` is ignored for positioning. `GestureBlock` still tracks the real content height via its own `measuredH` Reanimated shared value (local UI state, not persisted) so the selection ring and hit box are still accurate. Measurement is still committed but is now dead data for text-heavy blocks — could remove the write entirely in a follow-up perf pass; left in place to keep the surgical scope tight.
-- **Commit:** _(current editor stability fix commit)_
+- **Commit:** `14ef7bc`
 - **Test:** `MANUAL_TESTS.md` § Editor stability (post-Phase E) test 2.
 
 ## BUG-011 — Drawing strokes silently discarded after reload
@@ -125,7 +125,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
   1. `init(recipeId)` — when recipeId matches the stored value, still check if `activeLayerId` is null and restore it to the first layer's id if so. Makes `init` idempotent for a valid store shape.
   2. `partialize` — added `activeLayerId` so it survives reloads directly without relying on init's fallback.
 - **Collateral defensive fix:** In `app/editor/[recipeId].tsx`, the outer `canvasTapGesture` (Gesture.Tap for empty-space deselect) now sets `.enabled(editorMode !== 'draw')`. Not the root cause, but removes a potential nested-gesture race with `SkiaCanvas`'s Pan gesture — there's nothing to deselect while drawing, so the outer tap serves no purpose in that mode.
-- **Commit:** _(current editor stability fix commit)_
+- **Commit:** `14ef7bc`
 - **Test:** `MANUAL_TESTS.md` § Editor stability (post-Phase E) test 1.
 
 ## BUG-010 — Paper pattern missing from exported PDF
