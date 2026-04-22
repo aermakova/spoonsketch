@@ -17,6 +17,7 @@ import { SkiaCanvas } from '../../src/components/canvas/SkiaCanvas';
 import { DrawingToolbar } from '../../src/components/canvas/DrawingToolbar';
 import { LayerPanel } from '../../src/components/canvas/LayerPanel';
 import { PageTemplate } from '../../src/components/canvas/PageTemplates';
+import { PaperPattern } from '../../src/components/canvas/PaperPattern';
 import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
 import { FontPicker } from '../../src/components/canvas/FontPicker';
 import { useCanvasStore } from '../../src/lib/canvasStore';
@@ -247,6 +248,13 @@ export default function EditorScreen() {
       >
         <GestureDetector gesture={canvasTapGesture}>
           <View style={[styles.canvas, { width: canvasWidth, height: canvasHeight, backgroundColor: colors.paper }]}>
+            {/* Paper pattern — sits under all content */}
+            <PaperPattern
+              type={cookbook?.paper_type ?? 'blank'}
+              width={canvasWidth}
+              height={canvasHeight}
+            />
+
             {/* Recipe content — rendered with selected template */}
             {recipe && (
               <PageTemplate

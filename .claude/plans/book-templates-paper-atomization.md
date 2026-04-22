@@ -7,8 +7,8 @@
 | **A** — Description normalization | ⏳ Not started | Deferred — start after Track 2 ships |
 | **B** — Atomize every recipe field | ⏳ Not started | Depends on A |
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
-| **D** — Cookbook-level section titles | 🟡 **In progress** | Code landed; migration pending Supabase dashboard run |
-| **E** — Paper type at cookbook level | ⏳ Not started | After D |
+| **D** — Cookbook-level section titles | ✅ **Shipped** | Migration applied; landed in commit `20330e7` |
+| **E** — Paper type at cookbook level | 🟡 **In progress** | Code landed; migration applied; device test pending |
 | **F** — Print alignment contract | ⏳ Not started | Large slice, separate PR |
 
 ### Phase C — what's landed
@@ -52,14 +52,22 @@ All fixed, uncommitted at time of writing — see `.claude/test-plans/bug-log.md
 
 **Behavior change:** Clean view previously read "Instructions" (hardcoded); it now renders `section_titles.method`, which defaults to "Method". Intentional — keeps Clean PDF matching the scrapbook pages.
 
+### Phase E — what's landed (uncommitted)
+
+- Migration `supabase/migrations/20260422000002_cookbook_paper_type.sql` — adds NOT NULL `paper_type text` with `'blank'` default and a `CHECK` constraint allowing only `blank | lined | dotted | grid`. **Applied via Supabase dashboard.**
+- `src/types/cookbook.ts` — new `CookbookPaperType` type; `Cookbook` + `CookbookInsert` extended.
+- `src/components/canvas/PaperPattern.tsx` *(new)* — `react-native-svg` component rendering the four patterns as absolute-positioned, `pointerEvents="none"` overlays. `blank` returns `null`. `lined` draws horizontal lines every 28px starting at y=56; `dotted` uses an SVG `<Pattern>` of 1.2r circles on a 16×16 grid; `grid` uses crossed lines on a 24×24 grid. All patterns use `colors.inkFaint` at 0.3–0.45 stroke opacity.
+- `src/components/canvas/PaperPicker.tsx` *(new)* — horizontal strip of four tiles, each a 54×72 preview rendered by the `PaperPattern` component itself (single source of truth for geometry). Matches `TemplatePicker` / `FontPicker` visual language.
+- `app/book/[cookbookId].tsx` — Settings modal gains a "Paper" row between Default handwriting font and Section titles. Save batches `paper_type` with the existing three fields in one `updateCookbook` call. "Paper type is coming next" footer removed.
+- `app/editor/[recipeId].tsx` — `<PaperPattern>` rendered inside the canvas `<View>` before `<PageTemplate>`, reading `cookbook?.paper_type ?? 'blank'`.
+- `app/recipe/[id].tsx` — Scrapbook view gains a `paperType` prop; pattern renders beneath washi + template + stickers. Clean view left alone (pattern is scrapbook/page chrome, not cooking chrome).
+
 ### Next up (in order)
 
-1. **Apply Phase D migration** via Supabase dashboard SQL editor.
-2. **Commit BUG-006…009 fixes + Phase D** as separate commits.
-3. **Run Phase D device tests** (manual-device-tests.md § Phase D).
-4. **Phase E** — paper type.
-5. **Phases A + B** — canvas atomization (one PR).
-6. **Phase F** — print contract.
+1. **Run Phase E device tests** (manual-device-tests.md § Phase E).
+2. **Commit Phase E** (single commit).
+3. **Phases A + B** — canvas atomization (one PR).
+4. **Phase F** — print contract.
 
 ---
 

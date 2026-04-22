@@ -115,13 +115,41 @@ Grab the Expo terminal log for the failing step — the stack trace tells us exa
 
 ---
 
-## Phase E — Paper type at cookbook level (not yet implemented)
+## Phase E — Paper type at cookbook level (landed 2026-04-22)
 
-_To fill in once Phase E lands. Placeholder scenarios:_
+### 1. Picker renders and persists
+- Shelves → open a cookbook → ⚙︎ → scroll to **Paper** row.
+- ✅ Expect: four tiles — **Blank** (selected, no pattern), **Lined** (horizontal lines), **Dotted** (dot grid), **Grid** (crosshatch). Terracotta border marks the active one.
+- Tap **Lined** → border jumps → tap **Save**.
+- ✅ Expect: modal closes; reopening ⚙︎ shows Lined pre-selected.
 
-- Pick "lined" paper on book creation → all recipe pages show lined background on screen.
-- Native iPhone + web (CanvasKit) both render the pattern.
-- `users.paper_texture` intensity (low/medium/high) affects opacity (0.15 / 0.25 / 0.4).
+### 2. Pattern visible in editor
+- Open a recipe that belongs to this book → editor canvas.
+- ✅ Expect: pale horizontal lines fill the page below the top title area.
+- ⚙︎ → switch to **Dotted** → Save → reopen the recipe's editor.
+- ✅ Expect: dot grid instead of lines.
+- Repeat with **Grid** → crosshatch of fine ink lines.
+- Repeat with **Blank** → no pattern.
+
+### 3. Pattern visible in Scrapbook preview
+- Recipe detail → **Scrapbook** toggle.
+- ✅ Expect: same pattern renders on the A4 preview (washi + corner sticker still on top).
+- **Clean** toggle → ✅ no pattern (Clean view is intentionally chrome-free).
+
+### 4. Drawing strokes still land above the pattern
+- Editor → Draw mode → scribble over a lined page.
+- ✅ Expect: strokes render above the lines, not hidden underneath.
+
+### 5. Recipe with no cookbook link falls back to blank
+- Home → create a fresh recipe, don't add it to any book.
+- Open its editor.
+- ✅ Expect: no pattern visible, regardless of what any cookbook's paper type is set to.
+
+### 6. Modal still keyboard-safe with the extra row
+- Book ⚙︎ → tap Method field.
+- ✅ Expect: modal lifts so the Method input + Save button stay visible above the keyboard. Paper picker may scroll out of view — that's fine, it's a tap-target above the inputs.
+
+> **Print note (Phase F):** the paper pattern renders as SVG on the screen but does **not** appear in a `makeImageSnapshot` PNG export today. That parity is Phase F's job (shared JSON schema + HTML/CSS rendering in Puppeteer). Exporting a PDF during Phase E will produce a blank-paper PDF even if the user picked "lined" — log as a bug only if you expected otherwise.
 
 ---
 

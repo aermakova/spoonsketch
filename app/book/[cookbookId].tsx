@@ -14,10 +14,11 @@ import { BookPageRow } from '../../src/components/book/BookPageRow';
 import { PageTypePicker } from '../../src/components/book/PageTypePicker';
 import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
 import { FontPicker } from '../../src/components/canvas/FontPicker';
+import { PaperPicker } from '../../src/components/canvas/PaperPicker';
 import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
-import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey, CookbookSectionTitles } from '../../src/types/cookbook';
+import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey, CookbookSectionTitles, CookbookPaperType } from '../../src/types/cookbook';
 import { DEFAULT_SECTION_TITLES } from '../../src/types/cookbook';
 
 function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }) {
@@ -62,6 +63,7 @@ function SettingsModal({
     default_template_key: CookbookTemplateKey;
     default_recipe_font: CookbookFontKey;
     section_titles: CookbookSectionTitles;
+    paper_type: CookbookPaperType;
   }) => void;
   saving: boolean;
 }) {
@@ -70,16 +72,19 @@ function SettingsModal({
   const initialTemplate = (cookbook.default_template_key ?? 'classic') as CookbookTemplateKey;
   const initialFont = (cookbook.default_recipe_font ?? 'caveat') as CookbookFontKey;
   const initialTitles = cookbook.section_titles ?? DEFAULT_SECTION_TITLES;
+  const initialPaper = (cookbook.paper_type ?? 'blank') as CookbookPaperType;
   const [template, setTemplate] = useState<CookbookTemplateKey>(initialTemplate);
   const [font, setFont] = useState<CookbookFontKey>(initialFont);
   const [ingredientsLabel, setIngredientsLabel] = useState<string>(initialTitles.ingredients);
   const [methodLabel, setMethodLabel] = useState<string>(initialTitles.method);
+  const [paper, setPaper] = useState<CookbookPaperType>(initialPaper);
 
   const dirty =
     template !== initialTemplate ||
     font !== initialFont ||
     ingredientsLabel !== initialTitles.ingredients ||
-    methodLabel !== initialTitles.method;
+    methodLabel !== initialTitles.method ||
+    paper !== initialPaper;
 
   // Modal is absolute-positioned, so KeyboardAvoidingView won't reliably
   // shift it. Use the same Keyboard listener + animated offset pattern as
@@ -115,6 +120,7 @@ function SettingsModal({
         ingredients: ingredientsLabel,
         method: methodLabel,
       },
+      paper_type: paper,
     });
   };
 
@@ -136,6 +142,10 @@ function SettingsModal({
         <Text style={[settings.section, { marginTop: 12 }]}>Default handwriting font</Text>
         <Text style={settings.hint}>Used for recipe headings and flourishes.</Text>
         <FontPicker selected={font} onSelect={setFont} />
+
+        <Text style={[settings.section, { marginTop: 12 }]}>Paper</Text>
+        <Text style={settings.hint}>Background for every recipe page in this book.</Text>
+        <PaperPicker selected={paper} onSelect={setPaper} />
 
         <Text style={[settings.section, { marginTop: 12 }]}>Section titles</Text>
         <Text style={settings.hint}>Used on every recipe page. Leave blank to use the defaults.</Text>
@@ -181,10 +191,6 @@ function SettingsModal({
             }
           </TouchableOpacity>
         </View>
-
-        <Text style={settings.comingSoonText}>
-          Paper type is coming next.
-        </Text>
       </Animated.View>
     </View>
   );
@@ -229,7 +235,6 @@ const settings = StyleSheet.create({
   },
   saveBtnIdle: { opacity: 0.55 },
   saveText: { fontFamily: fonts.bodyBold, fontSize: 15, color: '#fff' },
-  comingSoonText: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, textAlign: 'center', marginTop: 10 },
 });
 
 const toc = StyleSheet.create({
@@ -335,6 +340,7 @@ function BookBuilderScreen() {
       default_template_key?: CookbookTemplateKey;
       default_recipe_font?: CookbookFontKey;
       section_titles?: CookbookSectionTitles;
+      paper_type?: CookbookPaperType;
     }) =>
       updateCookbook(cookbookId, patch),
     onMutate: async (patch) => {

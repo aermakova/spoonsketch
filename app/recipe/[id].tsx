@@ -17,10 +17,11 @@ import { useCanvasStore } from '../../src/lib/canvasStore';
 import { useDrawingStore } from '../../src/lib/drawingStore';
 import { SkiaCanvas } from '../../src/components/canvas/SkiaCanvas';
 import { PageTemplate } from '../../src/components/canvas/PageTemplates';
+import { PaperPattern } from '../../src/components/canvas/PaperPattern';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import type { Ingredient, Instruction, Recipe } from '../../src/types/recipe';
-import type { CookbookSectionTitles } from '../../src/types/cookbook';
+import type { CookbookSectionTitles, CookbookPaperType } from '../../src/types/cookbook';
 import { DEFAULT_SECTION_TITLES } from '../../src/types/cookbook';
 
 type DetailView = 'clean' | 'scrapbook';
@@ -28,7 +29,7 @@ type DetailView = 'clean' | 'scrapbook';
 const STICKER_SIZE = 64;
 
 // ─── Scrapbook View — A4 page preview ────────────────────────────
-function ScrapbookView({ recipe, palette, sectionTitles }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles }) {
+function ScrapbookView({ recipe, palette, sectionTitles, paperType }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles; paperType: CookbookPaperType }) {
   const { width: screenWidth } = useWindowDimensions();
   const pageWidth = screenWidth - 48;
   const { elements, recipeId: canvasRecipeId, templateKey, recipeFont, blockOverrides, stepOverrides, ingOverrides } = useCanvasStore();
@@ -47,6 +48,9 @@ function ScrapbookView({ recipe, palette, sectionTitles }: { recipe: Recipe; pal
 
       {/* A4 page — fixed proportions */}
       <View style={[sb.page, { width: pageWidth, height: pageHeight, backgroundColor: colors.paper }]}>
+
+        {/* Paper pattern — sits under all content */}
+        <PaperPattern type={paperType} width={pageWidth} height={pageHeight} />
 
         {/* Washi tape decorations */}
         <View style={[sb.washi, sb.washiTop, { backgroundColor: palette.accentLight + 'cc' }]} />
@@ -242,6 +246,7 @@ export default function RecipeDetailScreen() {
     enabled: !!cookbookId,
   });
   const sectionTitles = cookbook?.section_titles ?? DEFAULT_SECTION_TITLES;
+  const paperType: CookbookPaperType = cookbook?.paper_type ?? 'blank';
 
   if (isLoading || !recipe) {
     return (
@@ -295,7 +300,7 @@ export default function RecipeDetailScreen() {
 
       {view === 'clean'
         ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} />
-        : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} />
+        : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} paperType={paperType} />
       }
     </View>
     </ErrorBoundary>
