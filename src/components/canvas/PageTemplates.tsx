@@ -104,7 +104,12 @@ function useBlockResolver(templateKey: TemplateKey, pageWidth: number, blockOver
       cx: ov?.cx != null ? ov.cx * pageWidth  : base.cx,
       cy: ov?.cy != null ? ov.cy * pageHeight : base.cy,
       w:  ov?.w  != null ? ov.w  * pageWidth  : base.w,
-      h:  ov?.h  != null ? ov.h  * pageWidth  : base.h,
+      // Text-heavy blocks always use default h for translateY anchoring; the
+      // measured-content override would otherwise shift them vertically once
+      // onLayout commits (~200ms after mount / template change).
+      h: def.isTextHeavy
+        ? base.h
+        : (ov?.h != null ? ov.h * pageWidth : base.h),
       rotation: ov?.rotation ?? base.rotation,
       scale: ov?.scale ?? base.scale,
       fontScale,

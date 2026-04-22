@@ -9,18 +9,24 @@ interface Props {
   height: number;
 }
 
-// Geometry tuned for a ~560px design width. Values are absolute px on the
-// page — the containing View already scales the whole canvas, so absolute
-// pixels here give the same visual density across screen sizes.
-const LINE_STEP = 28;
-const DOT_STEP = 16;
-const GRID_STEP = 24;
-const TOP_MARGIN = 56; // leaves space for title / hero on every template
+// Geometry scales to A4 physical size (210mm wide) so pattern density
+// matches real stationery regardless of rendered canvas width.
+const A4_WIDTH_MM = 210;
+const LINE_MM = 8;   // standard notebook ruling
+const DOT_MM = 5;    // bullet journal grid
+const GRID_MM = 5;   // graph paper squares
+const TOP_MARGIN_MM = 0;
 
 const PATTERN_STROKE = colors.inkFaint;
 
 export function PaperPattern({ type, width, height }: Props) {
   if (type === 'blank') return null;
+
+  const mm = width / A4_WIDTH_MM;
+  const lineStep = LINE_MM * mm;
+  const dotStep = DOT_MM * mm;
+  const gridStep = GRID_MM * mm;
+  const topMargin = TOP_MARGIN_MM * mm;
 
   return (
     <Svg
@@ -29,16 +35,16 @@ export function PaperPattern({ type, width, height }: Props) {
       style={{ position: 'absolute', top: 0, left: 0 }}
       pointerEvents="none"
     >
-      {type === 'lined' && <LinedPattern width={width} height={height} />}
-      {type === 'dotted' && <DottedPattern width={width} height={height} />}
-      {type === 'grid' && <GridPattern width={width} height={height} />}
+      {type === 'lined' && <LinedPattern width={width} height={height} step={lineStep} topMargin={topMargin} />}
+      {type === 'dotted' && <DottedPattern width={width} height={height} step={dotStep} topMargin={topMargin} />}
+      {type === 'grid' && <GridPattern width={width} height={height} step={gridStep} topMargin={topMargin} />}
     </Svg>
   );
 }
 
-function LinedPattern({ width, height }: { width: number; height: number }) {
+function LinedPattern({ width, height, step, topMargin }: { width: number; height: number; step: number; topMargin: number }) {
   const lines: React.ReactElement[] = [];
-  for (let y = TOP_MARGIN; y < height; y += LINE_STEP) {
+  for (let y = topMargin; y < height; y += step) {
     lines.push(
       <Line
         key={y}
@@ -47,83 +53,83 @@ function LinedPattern({ width, height }: { width: number; height: number }) {
         x2={width}
         y2={y}
         stroke={PATTERN_STROKE}
-        strokeWidth={1}
-        strokeOpacity={0.35}
+        strokeWidth={0.75}
+        strokeOpacity={0.4}
       />,
     );
   }
   return <>{lines}</>;
 }
 
-function DottedPattern({ width, height }: { width: number; height: number }) {
+function DottedPattern({ width, height, step, topMargin }: { width: number; height: number; step: number; topMargin: number }) {
   return (
     <>
       <Defs>
         <Pattern
           id="dotted"
           x={0}
-          y={TOP_MARGIN}
-          width={DOT_STEP}
-          height={DOT_STEP}
+          y={topMargin}
+          width={step}
+          height={step}
           patternUnits="userSpaceOnUse"
         >
           <Circle
-            cx={DOT_STEP / 2}
-            cy={DOT_STEP / 2}
-            r={1.2}
+            cx={step / 2}
+            cy={step / 2}
+            r={0.5}
             fill={PATTERN_STROKE}
-            fillOpacity={0.45}
+            fillOpacity={0.6}
           />
         </Pattern>
       </Defs>
       <Rect
         x={0}
-        y={TOP_MARGIN}
+        y={topMargin}
         width={width}
-        height={height - TOP_MARGIN}
+        height={height - topMargin}
         fill="url(#dotted)"
       />
     </>
   );
 }
 
-function GridPattern({ width, height }: { width: number; height: number }) {
+function GridPattern({ width, height, step, topMargin }: { width: number; height: number; step: number; topMargin: number }) {
   return (
     <>
       <Defs>
         <Pattern
           id="grid"
           x={0}
-          y={TOP_MARGIN}
-          width={GRID_STEP}
-          height={GRID_STEP}
+          y={topMargin}
+          width={step}
+          height={step}
           patternUnits="userSpaceOnUse"
         >
           <Line
             x1={0}
             y1={0}
-            x2={GRID_STEP}
+            x2={step}
             y2={0}
             stroke={PATTERN_STROKE}
-            strokeWidth={0.75}
+            strokeWidth={0.5}
             strokeOpacity={0.3}
           />
           <Line
             x1={0}
             y1={0}
             x2={0}
-            y2={GRID_STEP}
+            y2={step}
             stroke={PATTERN_STROKE}
-            strokeWidth={0.75}
+            strokeWidth={0.5}
             strokeOpacity={0.3}
           />
         </Pattern>
       </Defs>
       <Rect
         x={0}
-        y={TOP_MARGIN}
+        y={topMargin}
         width={width}
-        height={height - TOP_MARGIN}
+        height={height - topMargin}
         fill="url(#grid)"
       />
     </>

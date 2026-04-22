@@ -8,7 +8,7 @@
 | **B** — Atomize every recipe field | ⏳ Not started | Depends on A |
 | **C** — Book-level template + font defaults | ✅ **Shipped** | Migration applied via dashboard; server-authoritative hydration wired |
 | **D** — Cookbook-level section titles | ✅ **Shipped** | Migration applied; landed in commit `20330e7` |
-| **E** — Paper type at cookbook level | 🟡 **In progress** | Code landed; migration applied; device test pending |
+| **E** — Paper type at cookbook level | ✅ **Shipped** | Initial landing `6eb9810`; pattern geometry polish + BUG-010 logged in follow-up commit |
 | **F** — Print alignment contract | ⏳ Not started | Large slice, separate PR |
 
 ### Phase C — what's landed
@@ -34,7 +34,7 @@
 
 ### Phase C follow-up bugs (found during device test 2026-04-21)
 
-All fixed, uncommitted at time of writing — see `.claude/test-plans/bug-log.md` for details.
+All fixed, uncommitted at time of writing — see `BUGS.md` for details.
 
 - ✅ **BUG-006** — `PageTypePicker` (Add page → Choose Recipe) recipe list covered by iOS keyboard. Fixed with `Keyboard.addListener` + animated offset pattern (custom absolute-positioned sheets can't use `KeyboardAvoidingView`).
 - ✅ **BUG-007** — Book Settings modal had no Save button and auto-saved per-tap. Reworked to draft state + explicit **Cancel / Save** buttons.
@@ -62,12 +62,25 @@ All fixed, uncommitted at time of writing — see `.claude/test-plans/bug-log.md
 - `app/editor/[recipeId].tsx` — `<PaperPattern>` rendered inside the canvas `<View>` before `<PageTemplate>`, reading `cookbook?.paper_type ?? 'blank'`.
 - `app/recipe/[id].tsx` — Scrapbook view gains a `paperType` prop; pattern renders beneath washi + template + stickers. Clean view left alone (pattern is scrapbook/page chrome, not cooking chrome).
 
+### Phase E polish (landed 2026-04-22)
+
+- `PaperPattern.tsx` — geometry switched from hardcoded px (tuned for a 560px design width) to A4 physical-mm scaling (8mm lines, 5mm dots, 5mm grid), so pattern density matches real stationery on any canvas width. Dot radius 0.9 → 0.5. Top margin removed (`34mm → 0`) — pattern now runs edge-to-edge like real notebook paper.
+- `BUGS.md` — logged `BUG-010` (paper pattern missing from exported PDF) as 🟡 Deferred to Phase F.
+- `CLAUDE.md` — added "Running the app on the user's iPhone" section so future Claude instances know the port / tunnel / QR workflow without re-discovering.
+- `.claude/plans/canvas-zoom.md` *(new)* — scoping plan for always-on pinch-to-zoom; deferred until after A + B because atomization rewrites the block tree that zoom has to wire `simultaneousWith` relationships against.
+
+### Editor stability fixes (landed 2026-04-22)
+
+Surfaced during Phase E device testing; unrelated to the paper feature but fixed in the same session.
+
+- ✅ **BUG-011** — Drawing strokes silently dropped after app reload. Root cause: `drawingStore.partialize` excluded `activeLayerId`. Fix: persist `activeLayerId` + make `init` idempotent (restore it to the first layer's id when null).
+- ✅ **BUG-012** — Text-heavy blocks jumped 40–80px down ~200ms after template change. Root cause: `onContentLayout`-measured height was committed to `blockOverrides[id].h` and fed back into `translateY = cy - h/2`. Fix: `useBlockResolver` now ignores `ov.h` for text-heavy blocks (always uses template default); `GestureBlock` still tracks real content height via its own `measuredH` shared value.
+- ✅ **BUG-013** — Delete `×` unreachable on short blocks in Arrange mode. Root cause: side handle rendered after delete in the JSX tree and its hitSlop completely covered the 22×22 button. Fix: delete now rendered **last**, `zIndex: 3`, pushed out to `top/right: -14`.
+
 ### Next up (in order)
 
-1. **Run Phase E device tests** (manual-device-tests.md § Phase E).
-2. **Commit Phase E** (single commit).
-3. **Phases A + B** — canvas atomization (one PR).
-4. **Phase F** — print contract.
+1. **Phases A + B** — canvas atomization. See § "Phase A" and § "Phase B" below. One PR, biggest refactor in this plan.
+2. **Phase F** — print contract. Unblocks BUG-010 and Phase 9 PDF export quality.
 
 ---
 

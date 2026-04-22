@@ -60,7 +60,15 @@ export const useDrawingStore = create<DrawingState>()(
       history: [],
 
       init(recipeId) {
-        if (get().recipeId === recipeId) return;
+        const state = get();
+        if (state.recipeId === recipeId) {
+          // Same recipe — just make sure activeLayerId points at a real layer
+          // (it isn't persisted, so a reload resets it to null and drawing silently fails).
+          if (!state.activeLayerId && state.layers.length > 0) {
+            set({ activeLayerId: state.layers[0].id });
+          }
+          return;
+        }
         const layers = DEFAULT_LAYERS();
         set({ recipeId, layers, activeLayerId: layers[0].id, history: [] });
       },
@@ -142,7 +150,7 @@ export const useDrawingStore = create<DrawingState>()(
     {
       name: 'spoonsketch-drawing',
       storage: createJSONStorage(() => storage),
-      partialize: (s) => ({ recipeId: s.recipeId, layers: s.layers }),
+      partialize: (s) => ({ recipeId: s.recipeId, layers: s.layers, activeLayerId: s.activeLayerId }),
     }
   )
 );

@@ -25,10 +25,11 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 | # | File | Read when |
 |---|---|---|
 | 1 | `PLAN.md` | Always — master plan, all decisions, phase tracker, north-star test |
-| 2 | `ARCHITECTURE.md` | Before writing any client-side code |
-| 3 | `BACKEND.md` | Before writing any Edge Function, migration, or API call |
-| 4 | `SCREENS.md` | Before building any screen — UX specs, microcopy, empty/error states |
-| 5 | `USER_FLOW.md` | Before working on onboarding, notifications, or paywall logic |
+| 2 | `FEATURES.md` | Before touching any user-facing surface — source-of-truth for features, forms, states, limits, enums |
+| 3 | `ARCHITECTURE.md` | Before writing any client-side code |
+| 4 | `BACKEND.md` | Before writing any Edge Function, migration, or API call |
+| 5 | `SCREENS.md` | Before building any screen — UX specs, microcopy, empty/error states |
+| 6 | `USER_FLOW.md` | Before working on onboarding, notifications, or paywall logic |
 
 > If this file and any other file disagree, the other file is more recent. Trust it.
 
@@ -59,7 +60,7 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 
 ---
 
-## 7 rules you must never break
+## 8 rules you must never break
 
 1. **Screens are thin.** Screen files import hooks and render components. Zero business logic.
 2. **`src/api/` is pure.** No React. All functions `async`, throw `ApiError`. No try/catch in components.
@@ -68,6 +69,15 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 5. **TypeScript strict, always.** Run `supabase gen types` after every migration. No `any`.
 6. **One `AnalyticsEvent` type entry per new event.** Type lives in `src/lib/analytics.ts`. Update the type first.
 7. **Error boundaries on every tab root and the editor.** Canvas crash must not crash the app.
+8. **Keep the living docs current in the same commit as the code.** Four docs at repo root + one folder are the source of truth for "what the app is, what's broken, what's tested, what we're working on". Never let them drift from the code:
+
+   - **`FEATURES.md`** — any user-visible change (new route / modal row / form field / enum / limit / action / empty+error state) updates the matching section, including Appendix A for limits and Appendix B for enums.
+   - **`BUGS.md`** — the moment a bug is found (device test, user report, or audit), add a row with the next `BUG-NNN`, severity, status `🔴 Open`, and a full detail block (repro, root cause once known). Fix it; then fill in the fix commit SHA, flip status to `✅ Fixed`, and add the Test column pointer (the automated test or the `MANUAL_TESTS.md` scenario that locks it). A bug is not fixed until this row is complete.
+   - **`MANUAL_TESTS.md`** — every new phase or user-visible feature adds its test scenarios under the matching phase heading. Every `BUGS.md` row should either point at an existing scenario here or add a new one.
+   - **`.claude/plans/<plan>.md`** — the active plan's "what's landed" and "next up" sections get updated as work ships. New multi-commit work gets its own plan file here before coding starts.
+   - **`.claude/plans/automated-testing.md`** — this is the test strategy; new bug clusters or feature contracts get added here as they emerge.
+
+   If any of the above drifts, the automated-test plan breaks and you end up re-running every phone scenario by hand. Don't do that.
 
 ---
 
@@ -92,6 +102,40 @@ Do not run or screenshot the prototype. Read its source directly for design toke
 
 Phase 1 (Foundation + design system) is the starting point.
 See the Phase tracker in `PLAN.md` for the full 11-phase roadmap.
+
+---
+
+## Running the app on the user's iPhone (do this yourself, don't ask the user)
+
+The user has no Xcode. **Expo Go + iPhone is the only dev path on this laptop.** Do not suggest `npx expo run:ios` — it won't work.
+
+**Startup flow (follow exactly):**
+
+1. **Always pass `--port 8082`.** Port 8081 is often held by a stale process that non-root `lsof` can't see. Non-interactive `npx expo` can't answer the "Use 8082 instead?" prompt and just exits — skip the fight.
+
+2. **Pick tunnel or LAN by Wi-Fi:**
+   - On **`BELL807`** (Bell router, client isolation ON) → **must use `--tunnel`**. LAN peer traffic is blocked.
+   - On **any other network** → **try `--lan` first** (faster, no ngrok handshake). Tunnel has failed transiently on this laptop even when ngrok.com shows green (errors: `Cannot read properties of undefined (reading 'body')`, `remote gone away`). Fall back to tunnel only if LAN doesn't connect.
+   - Check: `networksetup -getairportnetwork en0`, or `ipconfig getifaddr en0` — a `192.168.2.x` IP means not-BELL807.
+
+3. **Launch in background, monitor output:**
+   ```
+   npx expo start --lan --port 8082          # or --tunnel --port 8082
+   ```
+   Run via Bash with `run_in_background: true`. Then `Monitor` the output file with `tail -f ... | grep -E --line-buffered "exp://|Bundled|error|Error|CommandError|Failed|EADDRINUSE"`.
+
+4. **Generate the QR yourself — don't ask the user to.**
+   - **LAN mode** prints no QR. Build the URL: `exp://$(ipconfig getifaddr en0):8082`.
+   - **Tunnel mode**: read the `exp://...exp.direct` URL from the output.
+   - Then:
+     ```
+     npx --yes qrcode "exp://..." -o /tmp/expo-qr.png && open /tmp/expo-qr.png
+     ```
+   - **Do NOT use `qrcode-terminal`** — the ANSI output gets cut off in the Claude Code TUI.
+
+5. **User scans with iPhone's Camera app.** Recent Expo Go removed its built-in scanner and "Enter URL manually" field. The CLI is not signed in to Expo, so the dev server does NOT auto-appear in Expo Go.
+
+**Env sanity check before bundling:** `EXPO_PUBLIC_SUPABASE_URL` must start with `https://` and end with `.supabase.co`. Key looks like a JWT (`eyJ...`) or `sb_publishable_...` — if the user pastes the key into the URL slot, Metro bundles but auth fails at runtime.
 
 ---
 
@@ -148,10 +192,16 @@ If the result looks like something you'd be proud to give as a gift: ship it.
 
 ```
 PLAN.md              Master plan — read first
+FEATURES.md          User-facing source of truth — features, forms, states, enums, limits (update with every user-visible change)
 ARCHITECTURE.md      Client architecture — folder structure, state, nav, API, auth, testing
 BACKEND.md           Backend — schema, RLS, Edge Functions, webhooks, push, payments, hosting
 SCREENS.md           UX specs — 7 critical-path screens fully specced (more to come)
 USER_FLOW.md         User journeys — 9 flows, drop-off risks, analytics events, 30-day timeline
+
+BUGS.md              BUG-NNN registry — every bug logged with repro, root cause, fix SHA, and test pointer
+MANUAL_TESTS.md      Phone test scenarios per phase (living doc, run via Expo Go + tunnel)
+
+.claude/plans/                        Implementation + testing plans (automated-testing.md is the living test strategy)
 
 .claude/samples/spoonsketch-design/   HTML/CSS/JSX design prototype (read source, don't run)
   └── spoonandsketch/project/

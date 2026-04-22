@@ -153,6 +153,30 @@ Grab the Expo terminal log for the failing step — the stack trace tells us exa
 
 ---
 
+## Editor stability (post-Phase E, landed 2026-04-22)
+
+Covers BUG-011 (drawing), BUG-012 (block jump), BUG-013 (delete ×). Run after any reload of the app to confirm the regressions stay dead.
+
+### 1. Drawing survives reload (BUG-011)
+- Editor → Draw → scribble a line. ✅ Line renders and stays after releasing the finger.
+- Kill app / Metro reload / pull-to-refresh on device → reopen the **same recipe**'s editor.
+- Draw again. ✅ New stroke also stays committed (not just the live flash that vanishes on release).
+- Open a **different** recipe's editor → Draw → scribble. ✅ Stroke commits.
+
+### 2. Blocks don't jump after template change (BUG-012)
+- Editor → Layout → switch template from **Classic** → **Journal** (accept the reset alert if it appears).
+- ✅ Expect: blocks render in their final positions immediately. No visible downward shift ~200ms after the template swaps.
+- Switch back to **Classic** → same expectation. Repeat for **Minimal**, **Two-Column**, **Photo Hero**, **Recipe Card**.
+
+### 3. Delete × works on short blocks (BUG-013)
+- Open any recipe with tags set (e.g. `["quick","veg"]`).
+- Editor → Layout → **Arrange Blocks** → tap the tags block (usually renders as a 1-line compact row).
+- Tap the red `×` at the top-right corner. ✅ Expect: block disappears (soft-hide; restored via **Reset**).
+- Repeat on a compact title or 1-line description.
+- Also try on a tall block (method / ingredients) — ✅ `×` still works there too, just to confirm no regression on the normal case.
+
+---
+
 ## Phases A + B — Canvas atomization (not yet implemented)
 
 _To fill in once A+B lands. Placeholder scenarios:_

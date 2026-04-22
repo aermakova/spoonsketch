@@ -9,8 +9,8 @@ I'm continuing work on Spoon & Sketch (repo: see current working dir / GitHub: e
 
 1. CLAUDE.md
 2. .claude/plans/book-templates-paper-atomization.md  — the active plan
-3. .claude/test-plans/bug-log.md  — canonical bug register
-4. .claude/test-plans/manual-device-tests.md  — manual regression scenarios
+3. BUGS.md  — canonical bug register
+4. MANUAL_TESTS.md  — manual regression scenarios
 
 ## State
 
@@ -24,7 +24,7 @@ Phase C (book-level template + font defaults) code is complete. Commits on main:
 
 I'm about to re-run the Phase C device test on my iPhone via Expo Go. Help me in this order:
 
-1. **Verify the 4 just-fixed bugs.** For each of BUG-006, BUG-007, BUG-008, BUG-009 in bug-log.md:
+1. **Verify the 4 just-fixed bugs.** For each of BUG-006, BUG-007, BUG-008, BUG-009 in BUGS.md:
    - Read the Repro section.
    - Walk me through the exact steps on device.
    - Tell me what the ✅ expected outcome is and what would indicate the fix regressed.
@@ -32,7 +32,7 @@ I'm about to re-run the Phase C device test on my iPhone via Expo Go. Help me in
 
 2. **Note on BUG-008:** the fix only helps recipes linked to a book AFTER commit 08ac9f5. My pre-existing test recipe has cookbook_id=null and won't inherit. Either I delete+recreate it (Add page → Recipe → new), or give me the one-line Supabase SQL to backfill cookbook_id for it (I'll run it in the dashboard SQL editor).
 
-3. **Once all 9 bugs pass re-test,** update bug-log.md to mark commit SHAs confirmed and move to Phase D — cookbook-level section titles. The plan has a full spec; start by reading it and sketch the migration + UI before writing code.
+3. **Once all 9 bugs pass re-test,** update BUGS.md to mark commit SHAs confirmed and move to Phase D — cookbook-level section titles. The plan has a full spec; start by reading it and sketch the migration + UI before writing code.
 
 ## Ground rules from CLAUDE.md you must follow
 
@@ -45,8 +45,8 @@ I'm about to re-run the Phase C device test on my iPhone via Expo Go. Help me in
 ## How I work
 
 - Terse updates, not essays.
-- When you find a new bug on device, add a BUG-NNN row to .claude/test-plans/bug-log.md using the existing entries as the template.
-- When you add a new manual test scenario, put it in manual-device-tests.md under the matching phase.
+- When you find a new bug on device, add a BUG-NNN row to BUGS.md using the existing entries as the template.
+- When you add a new manual test scenario, put it in MANUAL_TESTS.md under the matching phase.
 - Do not commit without me asking.
 
 Start by listing the 4 bug verifications as a short checklist, then wait for me to try the first one.

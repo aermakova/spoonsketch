@@ -316,12 +316,6 @@ function GestureBlock({
         {selected && <View style={styles.ring} pointerEvents="none" />}
 
         {selected && (
-          <TouchableOpacity style={styles.del} onPress={() => onDelete(blockId)} hitSlop={8}>
-            <Text style={styles.delText}>×</Text>
-          </TouchableOpacity>
-        )}
-
-        {selected && (
           <GestureDetector gesture={rotHandle}>
             <Animated.View style={[styles.handle, styles.rotHandle, rotHandleStyle]}>
               <Text style={styles.rotIcon}>↻</Text>
@@ -346,6 +340,14 @@ function GestureBlock({
           <GestureDetector gesture={rightEdgePan}>
             <View style={[styles.sideHandle, styles.rightHandle]} hitSlop={SIDE_HANDLE_HIT_SLOP} />
           </GestureDetector>
+        )}
+
+        {/* Delete button rendered LAST so it sits above the side handles' hitSlop
+            on short 1-line blocks where handle + delete overlap. */}
+        {selected && (
+          <TouchableOpacity style={styles.del} onPress={() => onDelete(blockId)} hitSlop={8}>
+            <Text style={styles.delText}>×</Text>
+          </TouchableOpacity>
         )}
       </Animated.View>
     </GestureDetector>
@@ -382,15 +384,15 @@ const styles = StyleSheet.create({
   },
   del: {
     position: 'absolute',
-    top: -10,
-    right: -10,
+    top: -14,
+    right: -14,
     width: 22,
     height: 22,
     borderRadius: 11,
     backgroundColor: '#d97b7b',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
+    zIndex: 3,
   },
   delText: { color: '#fff', fontSize: 15, lineHeight: 17, fontWeight: '700' },
   handle: {

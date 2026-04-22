@@ -151,8 +151,10 @@ export default function EditorScreen() {
   }, [editorMode, select]);
 
   const canvasTapGesture = useMemo(() =>
-    Gesture.Tap().onEnd(() => runOnJS(handleCanvasTap)()),
-  [handleCanvasTap]);
+    Gesture.Tap()
+      .enabled(editorMode !== 'draw')
+      .onEnd(() => runOnJS(handleCanvasTap)()),
+  [handleCanvasTap, editorMode]);
 
   const handleAddSticker = useCallback((key: string) => {
     const x = canvasWidth / 2 + (Math.random() - 0.5) * 80;
