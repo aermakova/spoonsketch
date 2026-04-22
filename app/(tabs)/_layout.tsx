@@ -14,7 +14,7 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
   return (
     <View style={styles.tabItem}>
       <Text style={[styles.tabEmoji, { opacity: focused ? 1 : 0.55 }]}>{emoji}</Text>
-      <Text style={[styles.tabLabel, { color: active }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.tabLabel, { color: active }]}>{label}</Text>
     </View>
   );
 }
