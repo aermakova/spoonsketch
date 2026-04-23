@@ -23,6 +23,35 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-015 | **High** | ✅ Fixed | Canvas / persistence | Opening a different recipe destroyed the previous recipe's blocks, stickers, text edits, template, and font |
 | BUG-016 | Medium | ✅ Fixed | Editor / Arrange | Selected block's text visually covered by next sibling block when font bumped |
 | BUG-017 | Medium | ✅ Fixed | Editor / Arrange | Cooking time pills font size didn't respond to A+ / A− |
+| BUG-018 | Low | ✅ Fixed | Editor / Stickers | Stickers-mode bottom panel cut off after Phase 7.2 added Make-me-Sketch button above the tray |
+| BUG-019 | Medium | 🔴 Open | Export / PDF | User reports exported PDF shows a prior version of their stickers / drawings / block arrangement rather than the current state (preview-PDF mismatch). Needs concrete repro. |
+
+---
+
+## BUG-019 — PDF export shows old decoration (preview-PDF mismatch)
+- **Found:** 2026-04-22 (phone test — user reported)
+- **Severity:** Medium — user cannot trust what they'll print.
+- **Repro (user report, not yet locally reproduced):** open a recipe, make edits in the editor (add / move stickers, draw, rearrange blocks), press Done → Detail → Export PDF. The PDF contains decoration but it's an older version, not the edits that just landed.
+- **Root cause (unknown):** static analysis of the write path shows every canvasStore / drawingStore mutation commits synchronously to both the working copy and the per-recipe map (`recipeStates[id]` / `drawings[id]`). `exportRecipePdf` and the freshly-fixed Scrapbook preview (BUG B2) both read from the same map, so they should agree. Analysis can't identify a staleness source.
+- **What needs narrowing down** (asked user):
+  1. Does the Scrapbook preview match the PDF, or do they differ? (If they differ, the export path has a distinct bug; if they match, the preview itself is showing stale data and the bug is upstream.)
+  2. What gets exported — stickers, drawings, and/or block arrangement? Is it one category or all three?
+  3. Is the "old" state one edit old, or much older (e.g. from a previous app session)?
+  4. Were you on the latest main (commit 1cbd34e or later) when you tested? BUG B2 before that fix meant Scrapbook preview could show empty even when the map had data.
+  5. Does app reload (shake → Reload) change the outcome?
+  6. Did you see the same decoration in the Scrapbook *preview* view, or only in the PDF?
+- **Fix:** deferred until repro or more info.
+- **Test scenario:** to be added under Phase F Export scenarios once the specific flow is confirmed.
+
+---
+
+## BUG-018 — Stickers tab panel cut off
+- **Found:** 2026-04-22 (phone test, reported after Phase 7.2 landed)
+- **Severity:** Low — visual; sticker tray partially clipped at the bottom, still usable.
+- **Repro:** Editor → Stickers mode. The bottom panel is 148pt + safe-area, but Phase 7.2 added a Make-me-Sketch button above the horizontal sticker tray, pushing the tray into the clipped area.
+- **Root cause:** `panelHeight` in `app/editor/[recipeId].tsx` was sized for the old content (tray only). Phase 7.2 added the Make-me-Sketch button + success/error toasts without updating the height.
+- **Fix:** bump stickers-mode height from 148 to 210 (matching Draw mode). Commit: (this commit).
+- **Test scenario:** `MANUAL_TESTS.md § Phase 7.2 #1` already asserts the button is visible with the tray below — will catch regressions here.
 
 ---
 

@@ -234,12 +234,14 @@ export default function EditorScreen() {
   const showFontToolbar =
     editorMode === 'layout' && blockEditMode && !!selectedBlockId && !!selectedBlockDef?.isTextHeavy;
 
-  // Panel height: layout mode grows to fit template + font pickers + arrange row
-  // (+ font toolbar row when a text-heavy block is selected).
+  // Panel height: layout mode grows to fit template + font pickers + arrange
+  // row (+ font toolbar row when a text-heavy block is selected). Stickers
+  // mode grew with Phase 7.2 — it now also has the Make-me-Sketch button
+  // above the sticker tray, so 148 clipped the tray. 210 matches Draw mode.
   const panelHeight = (
     editorMode === 'draw' ? 210
     : editorMode === 'layout' ? (showFontToolbar ? 312 : 264)
-    : 148
+    : 210
   ) + insets.bottom;
 
   return (
