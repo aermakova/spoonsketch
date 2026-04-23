@@ -995,6 +995,9 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Attribute values need the same full escape set as text content — &, <, >,
+// ", '. Anything less lets user content break out of an attribute via an
+// HTML-entity form (e.g. &quot; decodes to " and closes the attribute).
 function escapeAttr(s: string): string {
-  return s.replace(/"/g, '&quot;');
+  return escapeHtml(s);
 }

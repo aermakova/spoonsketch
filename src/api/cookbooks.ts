@@ -14,6 +14,10 @@ export async function fetchCookbooks(): Promise<Cookbook[]> {
 
 export type CookbookWithCount = Cookbook & { recipe_count: number };
 
+type CookbookRowWithPages = Cookbook & {
+  book_pages: Array<{ page_type: string }> | null;
+};
+
 // Cookbooks + recipe_count in one PostgREST query via a left-join on
 // book_pages. The client groups counts locally so an empty cookbook still
 // appears (with recipe_count: 0).
@@ -24,11 +28,12 @@ export async function fetchCookbooksWithCounts(): Promise<CookbookWithCount[]> {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false });
   if (error) throw new ApiError(error.message, error.code);
-  return (data ?? []).map((c: any) => {
-    const pages: Array<{ page_type: string }> = Array.isArray(c.book_pages) ? c.book_pages : [];
-    const recipe_count = pages.filter(p => p.page_type === 'recipe').length;
-    const { book_pages, ...rest } = c;
-    return { ...(rest as Cookbook), recipe_count };
+  const rows = (data ?? []) as CookbookRowWithPages[];
+  return rows.map((c) => {
+    const pages = Array.isArray(c.book_pages) ? c.book_pages : [];
+    const recipe_count = pages.filter((p) => p.page_type === 'recipe').length;
+    const { book_pages: _unused, ...rest } = c;
+    return { ...rest, recipe_count };
   });
 }
 

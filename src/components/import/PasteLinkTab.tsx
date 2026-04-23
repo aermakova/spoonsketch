@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -19,47 +19,66 @@ import type { ExtractedRecipe, ExtractErrorCode } from '../../types/ai';
 import { SupportedSitesRow } from './SupportedSitesRow';
 import { ImportTipCard } from './ImportTipCard';
 
+export interface PasteLinkInlineError {
+  code: ExtractErrorCode;
+  message: string;
+}
+export interface PasteLinkCapped {
+  used: number;
+  limit: number;
+}
+
 interface Props {
+  url: string;
+  onUrlChange: (url: string) => void;
+  inlineError: PasteLinkInlineError | null;
+  onInlineErrorChange: (err: PasteLinkInlineError | null) => void;
+  capped: PasteLinkCapped | null;
+  onCappedChange: (capped: PasteLinkCapped | null) => void;
   onImported: (recipe: ExtractedRecipe) => void;
   onUpgradePress: () => void;
 }
 
-export function PasteLinkTab({ onImported, onUpgradePress }: Props) {
+// State (url, inlineError, capped) is lifted to the parent ImportRecipeScreen
+// so switching tabs doesn't unmount this component and lose the user's input.
+// See CODE_REVIEW R4.
+export function PasteLinkTab({
+  url,
+  onUrlChange,
+  inlineError,
+  onInlineErrorChange,
+  capped,
+  onCappedChange,
+  onImported,
+  onUpgradePress,
+}: Props) {
   const { palette } = useThemeStore();
-  const [url, setUrl] = useState('');
-  const [inlineError, setInlineError] = useState<{
-    code: ExtractErrorCode;
-    message: string;
-  } | null>(null);
-  const [capped, setCapped] = useState<{ used: number; limit: number } | null>(
-    null,
-  );
   const extract = useExtractRecipe();
 
   const canSubmit = url.trim().length > 0 && !extract.isPending;
 
   async function handleImport() {
     Keyboard.dismiss();
-    setInlineError(null);
+    onInlineErrorChange(null);
     try {
       const recipe = await extract.mutateAsync({ url: url.trim() });
       onImported(recipe);
     } catch (e) {
       if (e instanceof AiError) {
         if (e.errorCode === 'monthly_limit_reached') {
-          setCapped({
+          onCappedChange({
             used: e.details?.used ?? 0,
             limit: e.details?.limit ?? 20,
           });
           return;
         }
-        setInlineError({
+        onInlineErrorChange({
           code: mapToExtractCode(e.errorCode),
           message: e.message,
         });
         return;
       }
-      setInlineError({ code: 'unknown', message: 'Something went wrong.' });
+      onInlineErrorChange({ code: 'unknown', message: 'Something went wrong.' });
     }
   }
 
@@ -79,8 +98,8 @@ export function PasteLinkTab({ onImported, onUpgradePress }: Props) {
           style={styles.input}
           value={url}
           onChangeText={(t) => {
-            setUrl(t);
-            if (inlineError) setInlineError(null);
+            onUrlChange(t);
+            if (inlineError) onInlineErrorChange(null);
           }}
           placeholder="Paste a recipe URL"
           placeholderTextColor={colors.inkFaint}
@@ -93,7 +112,7 @@ export function PasteLinkTab({ onImported, onUpgradePress }: Props) {
         />
         {url.length > 0 ? (
           <Pressable
-            onPress={() => setUrl('')}
+            onPress={() => onUrlChange('')}
             hitSlop={10}
             style={styles.clearBtn}
           >

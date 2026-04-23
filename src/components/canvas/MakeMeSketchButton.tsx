@@ -35,6 +35,12 @@ export function MakeMeSketchButton({
   const mutation = useAutoSticker();
   const [status, setStatus] = useState<StatusMessage>({ kind: 'none' });
 
+  // Reset the status (especially a paywall card) whenever the recipe changes,
+  // so opening a different recipe doesn't keep the previous paywall visible.
+  useEffect(() => {
+    setStatus({ kind: 'none' });
+  }, [recipeId]);
+
   // Auto-dismiss success toast after 3.5 s so the canvas stays uncluttered.
   useEffect(() => {
     if (status.kind !== 'success') return;
@@ -129,6 +135,15 @@ export function MakeMeSketchButton({
             { backgroundColor: palette.bg2, borderColor: palette.accent },
           ]}
         >
+          <Pressable
+            onPress={() => setStatus({ kind: 'none' })}
+            hitSlop={10}
+            style={styles.paywallDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss paywall"
+          >
+            <Feather name="x" size={16} color={colors.inkSoft} />
+          </Pressable>
           <Text style={[styles.paywallHeader, { color: palette.accent }]}>
             {status.used} / {status.limit} sketches used this month
           </Text>
@@ -226,6 +241,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 12,
     gap: 8,
+    position: 'relative',
+  },
+  paywallDismiss: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   paywallHeader: {
     fontFamily: fonts.bodyBold,

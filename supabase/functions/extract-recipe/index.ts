@@ -263,7 +263,24 @@ function isPrivateHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost')) return true;
   if (h.endsWith('.local')) return true;
-  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+
+  // IPv6 literal checks — only trigger when the hostname is actually an IPv6
+  // literal (has a colon or is wrapped in brackets). Without this guard a
+  // hostname like `fc-support.com` would match `h.startsWith('fc')` and get
+  // wrongly blocked.
+  const isIPv6Literal = h.includes(':') || (h.startsWith('[') && h.endsWith(']'));
+  if (isIPv6Literal) {
+    // Strip brackets if present, for substring matching.
+    const v6 = h.replace(/^\[|\]$/g, '');
+    if (v6 === '::1') return true;                     // loopback
+    if (v6.startsWith('fc') || v6.startsWith('fd')) return true; // unique local
+    if (v6.startsWith('fe80:')) return true;           // link-local
+    if (v6.startsWith('::ffff:')) {                     // IPv4-mapped — recurse on the v4 part
+      const mapped = v6.slice('::ffff:'.length);
+      return isPrivateHost(mapped);
+    }
+    return false;
+  }
 
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
   if (!ipv4) return false;

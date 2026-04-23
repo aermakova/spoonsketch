@@ -23,7 +23,14 @@ export async function getUserTier(
     .select('tier')
     .eq('id', userId)
     .single();
-  if (error || !data) return 'free';
+  if (error) {
+    // Fail closed on the permissive side: treat unreachable users row as
+    // `free` so we still enforce free-tier caps during a DB blip rather than
+    // unlock unlimited for everyone.
+    console.error('[getUserTier] DB error, defaulting to free', error);
+    return 'free';
+  }
+  if (!data) return 'free';
   return data.tier === 'premium' ? 'premium' : 'free';
 }
 
@@ -44,7 +51,10 @@ export async function getQuota(
   jobType: AiJobType,
 ): Promise<QuotaStatus> {
   const tier = await getUserTier(supabaseAdmin, userId);
-  const monthStart = startOfMonthUtc(new Date());
+  // Compute `now` once so the month-window used for counting and the
+  // resetAt boundary we return can't straddle UTC midnight.
+  const now = new Date();
+  const monthStart = startOfMonthUtc(now);
 
   const { count, error } = await supabaseAdmin
     .from('ai_jobs')
@@ -65,7 +75,7 @@ export async function getQuota(
     used,
     limit,
     remaining,
-    resetAt: startOfNextMonthUtc(new Date()).toISOString(),
+    resetAt: startOfNextMonthUtc(now).toISOString(),
   };
 }
 
@@ -115,7 +125,13 @@ export async function checkRateLimit(
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return { ok: true };
+  if (error) {
+    // Fail open to avoid blocking legit calls during a DB blip, but make the
+    // error visible in function logs so a real outage is noticeable.
+    console.error('[checkRateLimit] DB error, failing open', error);
+    return { ok: true };
+  }
+  if (!data) return { ok: true };
 
   const lastMs = new Date(data.created_at).getTime();
   const elapsedSeconds = (Date.now() - lastMs) / 1000;

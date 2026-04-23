@@ -16,7 +16,11 @@ import { useThemeStore } from '../../src/lib/store';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import { ImportTabs, type ImportTabKey } from '../../src/components/import/ImportTabs';
-import { PasteLinkTab } from '../../src/components/import/PasteLinkTab';
+import {
+  PasteLinkTab,
+  type PasteLinkCapped,
+  type PasteLinkInlineError,
+} from '../../src/components/import/PasteLinkTab';
 import {
   TypeTab,
   EMPTY_TYPE_FORM,
@@ -54,6 +58,12 @@ function ImportRecipeScreen() {
   const [importedFromDomain, setImportedFromDomain] = useState<string | null>(
     null,
   );
+  // Paste Link tab state lives here so switching tabs doesn't wipe the URL
+  // the user just pasted. See CODE_REVIEW R4.
+  const [pasteUrl, setPasteUrl] = useState('');
+  const [pasteInlineError, setPasteInlineError] =
+    useState<PasteLinkInlineError | null>(null);
+  const [pasteCapped, setPasteCapped] = useState<PasteLinkCapped | null>(null);
 
   function handleClose() {
     if (router.canGoBack()) router.back();
@@ -95,6 +105,12 @@ function ImportRecipeScreen() {
         <View style={styles.body}>
           {activeTab === 'paste' ? (
             <PasteLinkTab
+              url={pasteUrl}
+              onUrlChange={setPasteUrl}
+              inlineError={pasteInlineError}
+              onInlineErrorChange={setPasteInlineError}
+              capped={pasteCapped}
+              onCappedChange={setPasteCapped}
               onImported={handleImported}
               onUpgradePress={handleUpgradePress}
             />

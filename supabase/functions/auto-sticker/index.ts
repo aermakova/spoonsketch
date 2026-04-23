@@ -172,19 +172,29 @@ interface RecipeForPrompt {
   tags: string[] | unknown;
 }
 
+// Cap lengths before building the Haiku prompt so a pathologically long
+// recipe title or description can't blow the input-token budget.
+const MAX_TITLE_CHARS = 200;
+const MAX_DESCRIPTION_CHARS = 500;
+const MAX_INGREDIENT_NAME_CHARS = 80;
+
 function buildRecipeSummary(recipe: RecipeForPrompt): string {
   const bits: string[] = [];
-  if (recipe.title) bits.push(`Title: ${recipe.title}`);
-  if (recipe.description) bits.push(`Description: ${recipe.description}`);
+  if (recipe.title) bits.push(`Title: ${recipe.title.slice(0, MAX_TITLE_CHARS)}`);
+  if (recipe.description) {
+    bits.push(`Description: ${recipe.description.slice(0, MAX_DESCRIPTION_CHARS)}`);
+  }
   if (Array.isArray(recipe.ingredients) && recipe.ingredients.length) {
     const names = (recipe.ingredients as Array<{ name?: string }>)
       .map((i) => i.name)
       .filter((n): n is string => !!n)
-      .slice(0, 20);
+      .slice(0, 20)
+      .map((n) => n.slice(0, MAX_INGREDIENT_NAME_CHARS));
     if (names.length) bits.push(`Ingredients: ${names.join(', ')}`);
   }
   if (Array.isArray(recipe.tags) && recipe.tags.length) {
-    bits.push(`Tags: ${(recipe.tags as string[]).join(', ')}`);
+    const tags = (recipe.tags as string[]).slice(0, 10).map((t) => t.slice(0, 40));
+    bits.push(`Tags: ${tags.join(', ')}`);
   }
   return bits.join('\n');
 }
@@ -231,7 +241,9 @@ function parseStickerPicks(raw: string): Pick[] {
     });
     if (picks.length >= MAX_STICKERS) break;
   }
-  return picks.length >= MIN_STICKERS ? picks : picks; // pass through even if <MIN — we logged the raw response.
+  // Pass through even if the count is below MIN_STICKERS — the outer handler
+  // treats an empty result as ai_failed, and <MIN but >0 is better than nothing.
+  return picks;
 }
 
 interface PlacedSticker {
