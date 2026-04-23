@@ -51,7 +51,10 @@ async function resolveStickerUris(kinds: string[]): Promise<Record<string, strin
   const entries = await Promise.all(
     unique.map(async kind => {
       const source = getStickerSource(kind);
-      if (source == null) return null;
+      // Metro resolves `require('…png')` to a numeric asset id. The sticker
+      // registry only uses `require` so this branch covers every real case;
+      // the guard just satisfies the ImageSourcePropType union for tsc.
+      if (typeof source !== 'number') return null;
       try {
         const asset = Asset.fromModule(source);
         if (!asset.localUri) await asset.downloadAsync();
