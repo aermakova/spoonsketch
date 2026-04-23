@@ -95,6 +95,11 @@ interface CanvasState {
   bumpBlockFontScale: (blockId: string, direction: 1 | -1) => void;
   removeBlock: (blockId: string) => void;
   clearBlockOverrides: () => void;
+  // Nuclear "start over" — removes every decoration the user has added to
+  // this recipe (stickers, block rearrangement, per-step/per-ingredient
+  // edits). Template + font stay — those are layout choices, not decoration.
+  // Drawing strokes are cleared separately via drawingStore.clearRecipeStrokes.
+  clearRecipeDecorations: () => void;
   saveStepOverride: (stepNum: number, o: StepOverride) => void;
   saveIngOverride: (ingId: string, o: IngOverride) => void;
   undo: () => void;
@@ -389,6 +394,24 @@ export const useCanvasStore = create<CanvasState>()(
             ingOverrides: {},
             layoutResetVersion: s.layoutResetVersion + 1,
             recipeStates: commitRecipeState(s.recipeStates, s.recipeId, {
+              blockOverrides: {},
+              stepOverrides: {},
+              ingOverrides: {},
+            }),
+          }));
+        },
+
+        clearRecipeDecorations() {
+          pushSnap();
+          set(s => ({
+            elements: [],
+            blockOverrides: {},
+            stepOverrides: {},
+            ingOverrides: {},
+            selectedId: null,
+            layoutResetVersion: s.layoutResetVersion + 1,
+            recipeStates: commitRecipeState(s.recipeStates, s.recipeId, {
+              elements: [],
               blockOverrides: {},
               stepOverrides: {},
               ingOverrides: {},

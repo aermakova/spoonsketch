@@ -30,6 +30,10 @@ interface DrawingState {
   addLayer: () => void;
   removeLayer: (id: string) => void;
   setActiveLayer: (id: string) => void;
+  // Empty every layer's strokes for the current recipe. Layers + settings
+  // (visibility, opacity, blend) are preserved so the user has a clean
+  // canvas to draw on without rebuilding their layer stack.
+  clearRecipeStrokes: () => void;
   reorderLayer: (id: string, dir: 'up' | 'down') => void;
   toggleVisible: (id: string) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
@@ -236,6 +240,17 @@ export const useDrawingStore = create<DrawingState>()(
           layers: prevLayers,
           history: history.slice(0, -1),
           drawings: snapshot(drawings, recipeId, prevLayers, activeLayerId),
+        });
+      },
+
+      clearRecipeStrokes() {
+        const { layers, recipeId, drawings, activeLayerId, history } = get();
+        if (layers.every(l => l.strokes.length === 0)) return;
+        const cleared = layers.map(l => ({ ...l, strokes: [] }));
+        set({
+          layers: cleared,
+          history: [...history, layers],
+          drawings: snapshot(drawings, recipeId, cleared, activeLayerId),
         });
       },
 

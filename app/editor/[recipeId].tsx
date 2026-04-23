@@ -97,9 +97,15 @@ export default function EditorScreen() {
     setBlockOverride, setBlockHeightSilent, removeBlock, clearBlockOverrides,
     bumpBlockFontScale,
     saveStepOverride, saveIngOverride,
+    clearRecipeDecorations,
     undo: undoSticker,
   } = useCanvasStore();
-  const { init: initDrawing, undo: undoDrawing } = useDrawingStore();
+  const {
+    init: initDrawing,
+    undo: undoDrawing,
+    layers: drawingLayers,
+    clearRecipeStrokes,
+  } = useDrawingStore();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -195,6 +201,28 @@ export default function EditorScreen() {
     Object.keys(blockOverrides).length > 0 ||
     Object.keys(stepOverrides).length > 0 ||
     Object.keys(ingOverrides).length > 0;
+  const hasAnyStrokes = drawingLayers.some(l => l.strokes.length > 0);
+  const hasAnyDecorations = elements.length > 0 || hasBlockOverrides || hasAnyStrokes;
+
+  const handleClearAll = useCallback(() => {
+    Alert.alert(
+      'Clear this page?',
+      'Removes every sticker, drawing, and block arrangement from this recipe. Template and font stay. The recipe itself is not deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            clearRecipeDecorations();
+            clearRecipeStrokes();
+            setSelectedBlockId(null);
+            setBlockEditMode(false);
+          },
+        },
+      ],
+    );
+  }, [clearRecipeDecorations, clearRecipeStrokes]);
 
   const selectedBlockDef = useMemo(() => {
     if (!selectedBlockId) return null;
@@ -377,6 +405,14 @@ export default function EditorScreen() {
                   <Text style={styles.resetBtnText}>Reset</Text>
                 </TouchableOpacity>
               )}
+              {hasAnyDecorations && (
+                <TouchableOpacity
+                  style={[styles.resetBtn, styles.clearBtn]}
+                  onPress={handleClearAll}
+                >
+                  <Text style={[styles.resetBtnText, styles.clearBtnText]}>Clear</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {showFontToolbar && selectedBlockId && (
@@ -528,6 +564,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 12,
     color: 'rgba(196,106,76,0.7)',
+  },
+  clearBtn: {
+    marginLeft: 'auto',
+  },
+  clearBtnText: {
+    color: 'rgba(217,123,123,0.85)', // colors.rose, slightly transparent to hint destructive
   },
   fontRow: {
     flexDirection: 'row',

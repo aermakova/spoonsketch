@@ -506,6 +506,7 @@ Three modes across the bottom of the editor plus a **?** help button. Exactly on
   - **Options:** Caveat, Marck Script, Bad Script, Amatic SC
 - **⊹ Arrange Blocks** (toggle): enables block-level editing — tapping a block selects it, drag handles appear, edge drag resizes, tapping opens a text edit sheet.
 - **Reset** (visible only when there are block overrides): clears all position / size / font scale / hidden / text overrides for the current recipe after a confirm alert.
+- **Clear** (visible only when there is at least one sticker, drawing stroke, or block override): nuclear "start over" — removes **every** sticker, drawing stroke, and block arrangement from this recipe after a confirm alert. Template and font stay intact. The recipe itself (title, ingredients, instructions) is never touched. Undoable via the editor's ↩ Undo button.
 - **Font scale toolbar** (visible only when a text-heavy block is selected): A− / A+ buttons step the scale. The current percent is shown between them.
   - **Range:** 60% – 180% in 10% steps.
 

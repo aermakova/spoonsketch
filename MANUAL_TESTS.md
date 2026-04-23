@@ -85,6 +85,40 @@ Add a BUG-NNN row to BUGS.md (see BUG-017 for a template), wire it to the specif
 
 ---
 
+## Editor — Clear button (landed pending)
+
+### 1. Clear button appears only when there's something to clear
+- Open a recipe that has no stickers / drawings / block arrangements
+- Switch to **Layout** mode
+- ✅ Expect: no "Clear" button in the arrange row
+- Drop one sticker in Stickers mode
+- Switch back to Layout
+- ✅ Expect: "Clear" button now visible on the right side
+
+### 2. Clear prompts before wiping
+- Open a recipe with a mix of stickers, drawings, and block overrides
+- Layout mode → tap **Clear**
+- ✅ Expect: alert "Clear this page? Removes every sticker, drawing, and block arrangement from this recipe. Template and font stay. The recipe itself is not deleted."
+- Tap **Cancel** → ✅ nothing changes
+
+### 3. Confirming Clear wipes everything decorative
+- Same setup as #2 → tap **Clear** → tap **Clear** in alert
+- ✅ Expect: all stickers gone, drawing strokes gone (layers still present), block positions reset to defaults
+- ✅ Expect: template + font unchanged (the recipe's layout choice persists)
+- ✅ Expect: recipe content (title, ingredients, steps) unchanged — visible on Clean view
+
+### 4. Clear is undoable
+- Perform a Clear as in #3
+- Immediately tap the ↩ Undo in the top bar
+- ✅ Expect: stickers + block overrides return (first undo pops the canvas snapshot)
+- Tap Undo again → ✅ drawings return (second undo pops the drawing snapshot)
+
+### 5. Clear per recipe, not app-wide
+- Open Recipe A → add stickers + drawings → Clear
+- Open Recipe B → ✅ stickers and drawings still there (unaffected)
+
+---
+
 ## Phase 7.2 — Make me Sketch (auto-sticker) (landed pending)
 
 Prereqs:
