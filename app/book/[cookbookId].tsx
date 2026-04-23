@@ -22,9 +22,17 @@ import type { BookPage, PageType, Cookbook, CookbookTemplateKey, CookbookFontKey
 import { DEFAULT_SECTION_TITLES } from '../../src/types/cookbook';
 
 function TocModal({ pages, onClose }: { pages: BookPage[]; onClose: () => void }) {
+  // Book position = index of the page in the whole cookbook (cover, TOC,
+  // recipes, …). Recipe-only filtering must happen AFTER we've captured the
+  // true position, otherwise recipes appear as pages 1,2,3 regardless of
+  // cover / TOC / dedication pages pushing them down. See BUG B3.
   const entries = pages
+    .map((p, bookIdx) => ({ ...p, pageNum: bookIdx + 1 }))
     .filter(p => p.page_type === 'recipe')
-    .map((p, i) => ({ title: p.recipe_title ?? p.title ?? 'Recipe', pageNum: i + 1 }));
+    .map(p => ({
+      title: p.recipe_title ?? p.title ?? 'Recipe',
+      pageNum: p.pageNum,
+    }));
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">

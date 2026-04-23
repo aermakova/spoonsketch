@@ -5,19 +5,31 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { DrawingLayer } from './DrawingLayer';
 import { useDrawingStore } from '../../lib/drawingStore';
-import type { StrokePoint } from '../../types/drawing';
+import type { StrokePoint, DrawingLayer as DrawingLayerType } from '../../types/drawing';
 
 interface Props {
   width: number;
   height: number;
   isDrawing: boolean;
+  // Optional static layers override. When provided, SkiaCanvas renders these
+  // layers instead of the store's working copy — lets the Recipe Detail
+  // preview show drawings for recipes that aren't the last-opened editor
+  // recipe. Forces isDrawing=false semantics (no commit path here).
+  layersOverride?: DrawingLayerType[];
 }
 
-export function SkiaCanvas({ width, height, isDrawing }: Props) {
+export function SkiaCanvas({ width, height, isDrawing, layersOverride }: Props) {
   const [livePoints, setLivePoints] = useState<StrokePoint[]>([]);
   const liveRef = useRef<StrokePoint[]>([]);
 
-  const { layers, activeLayerId, activeTool, strokeWidth, color, opacity, commitStroke } = useDrawingStore();
+  const storeLayers = useDrawingStore((s) => s.layers);
+  const activeLayerId = useDrawingStore((s) => s.activeLayerId);
+  const activeTool = useDrawingStore((s) => s.activeTool);
+  const strokeWidth = useDrawingStore((s) => s.strokeWidth);
+  const color = useDrawingStore((s) => s.color);
+  const opacity = useDrawingStore((s) => s.opacity);
+  const commitStroke = useDrawingStore((s) => s.commitStroke);
+  const layers = layersOverride ?? storeLayers;
   const sorted = useMemo(() => [...layers].sort((a, b) => a.zIndex - b.zIndex), [layers]);
 
   const beginStroke = useCallback((pt: StrokePoint) => {

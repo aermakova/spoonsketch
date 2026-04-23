@@ -296,10 +296,13 @@ export default function EditorScreen() {
               isDrawing={editorMode === 'draw'}
             />
 
-            {/* Sticker elements — disabled while in block-edit mode */}
+            {/* Sticker elements — disabled while in block-edit mode.
+                Keyed with layoutResetVersion so undo/reset triggers a remount
+                that re-initialises CanvasElement's shared values from the
+                reverted props (see BUG B1). */}
             {elements.map(el => (
               <CanvasElement
-                key={el.id}
+                key={`${el.id}-${layoutResetVersion}`}
                 el={el}
                 selected={selectedId === el.id}
                 disabled={editorMode === 'draw' || blockEditMode}

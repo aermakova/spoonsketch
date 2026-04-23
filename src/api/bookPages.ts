@@ -31,11 +31,16 @@ export async function addBookPage(input: BookPageInsert): Promise<BookPage> {
   // can find the book defaults. Only backfills when the recipe has
   // no home book yet — being added to a second book doesn't overwrite.
   if (input.page_type === 'recipe' && input.recipe_id) {
-    await supabase
+    const { error: backfillErr } = await supabase
       .from('recipes')
       .update({ cookbook_id: input.cookbook_id })
       .eq('id', input.recipe_id)
       .is('cookbook_id', null);
+    if (backfillErr) {
+      // Surface the error so the caller can retry rather than letting the
+      // recipe silently lose its cookbook link. See BUG B5.
+      throw new ApiError(backfillErr.message, backfillErr.code);
+    }
   }
 
   return data as BookPage;

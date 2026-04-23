@@ -33,10 +33,19 @@ const STICKER_SIZE = 64;
 function ScrapbookView({ recipe, palette, sectionTitles, paperType, onExport, exporting }: { recipe: Recipe; palette: Palette; sectionTitles?: CookbookSectionTitles; paperType: CookbookPaperType; onExport: () => void; exporting: boolean }) {
   const { width: screenWidth } = useWindowDimensions();
   const pageWidth = screenWidth - 48;
-  const { elements, recipeId: canvasRecipeId, templateKey, recipeFont, blockOverrides, stepOverrides, ingOverrides } = useCanvasStore();
-  const pageElements = canvasRecipeId === recipe.id ? elements : [];
-  const { recipeId: drawingRecipeId } = useDrawingStore();
-  const hasDrawing = drawingRecipeId === recipe.id;
+  // Read per-recipe canvas + drawing state directly from the keyed maps so
+  // the Scrapbook preview is correct even for recipes that aren't the
+  // last-opened editor recipe. See BUG B2.
+  const canvasRecord = useCanvasStore((s) => s.recipeStates[recipe.id]);
+  const drawingRecord = useDrawingStore((s) => s.drawings[recipe.id]);
+  const pageElements = canvasRecord?.elements ?? [];
+  const recipeTemplateKey = canvasRecord?.templateKey ?? 'classic';
+  const recipeFontKey = canvasRecord?.recipeFont ?? 'caveat';
+  const blockOverrides = canvasRecord?.blockOverrides;
+  const stepOverrides = canvasRecord?.stepOverrides;
+  const ingOverrides = canvasRecord?.ingOverrides;
+  const drawingLayers = drawingRecord?.layers;
+  const hasDrawing = !!drawingLayers && drawingLayers.length > 0;
   const pageHeight = Math.round(pageWidth * 1.4142); // true A4 ratio
   const imgSize = Math.round(pageWidth * 0.38);
 
@@ -62,12 +71,12 @@ function ScrapbookView({ recipe, palette, sectionTitles, paperType, onExport, ex
           recipe={recipe}
           pageWidth={pageWidth}
           palette={palette}
-          templateKey={canvasRecipeId === recipe.id ? templateKey : 'classic'}
-          recipeFont={canvasRecipeId === recipe.id ? recipeFont : 'caveat'}
+          templateKey={recipeTemplateKey}
+          recipeFont={recipeFontKey}
           sectionTitles={sectionTitles}
-          blockOverrides={canvasRecipeId === recipe.id ? blockOverrides : undefined}
-          stepOverrides={canvasRecipeId === recipe.id ? stepOverrides : undefined}
-          ingOverrides={canvasRecipeId === recipe.id ? ingOverrides : undefined}
+          blockOverrides={blockOverrides}
+          stepOverrides={stepOverrides}
+          ingOverrides={ingOverrides}
         />
 
         {/* Corner sticker */}
@@ -78,9 +87,15 @@ function ScrapbookView({ recipe, palette, sectionTitles, paperType, onExport, ex
         {/* Page number */}
         <Text style={[sb.pageNum, { color: colors.inkFaint }]}>1</Text>
 
-        {/* Drawing layer */}
+        {/* Drawing layer — renders from the per-recipe map directly so the
+            preview works even when this isn't the last-opened editor recipe. */}
         {hasDrawing && (
-          <SkiaCanvas width={pageWidth} height={pageHeight} isDrawing={false} />
+          <SkiaCanvas
+            width={pageWidth}
+            height={pageHeight}
+            isDrawing={false}
+            layersOverride={drawingLayers}
+          />
         )}
 
         {/* Stickers placed in the editor */}

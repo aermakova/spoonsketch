@@ -148,8 +148,12 @@ export const useDrawingStore = create<DrawingState>()(
         set({ activeLayerId: id, drawings: snapshot(drawings, recipeId, layers, id) });
       },
 
+      // Layer panel ops push a history snapshot so the editor's Undo button
+      // can revert an accidental visibility / blend-mode / reorder change.
+      // See BUG B10.
+
       reorderLayer(id, dir) {
-        const { layers, recipeId, drawings, activeLayerId } = get();
+        const { layers, recipeId, drawings, activeLayerId, history } = get();
         const idx = layers.findIndex(l => l.id === id);
         if (idx < 0) return;
         const swapIdx = dir === 'up' ? idx + 1 : idx - 1;
@@ -159,27 +163,46 @@ export const useDrawingStore = create<DrawingState>()(
         next[idx] = { ...next[idx], zIndex: next[swapIdx].zIndex };
         next[swapIdx] = { ...next[swapIdx], zIndex: tmpZ };
         const sorted = next.sort((a, b) => a.zIndex - b.zIndex);
-        set({ layers: sorted, drawings: snapshot(drawings, recipeId, sorted, activeLayerId) });
+        set({
+          layers: sorted,
+          history: [...history, layers],
+          drawings: snapshot(drawings, recipeId, sorted, activeLayerId),
+        });
       },
 
       toggleVisible(id) {
         set(s => {
           const next = s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l);
-          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+          return {
+            layers: next,
+            history: [...s.history, s.layers],
+            drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId),
+          };
         });
       },
 
       setLayerOpacity(id, opacity) {
         set(s => {
           const next = s.layers.map(l => l.id === id ? { ...l, opacity } : l);
-          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+          // NOTE: if we ever wire a draggable opacity slider, gate the
+          // history push so only the drag-end state snapshots, otherwise
+          // every slider tick floods history.
+          return {
+            layers: next,
+            history: [...s.history, s.layers],
+            drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId),
+          };
         });
       },
 
       setLayerBlendMode(id, mode) {
         set(s => {
           const next = s.layers.map(l => l.id === id ? { ...l, blendMode: mode } : l);
-          return { layers: next, drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId) };
+          return {
+            layers: next,
+            history: [...s.history, s.layers],
+            drawings: snapshot(s.drawings, s.recipeId, next, s.activeLayerId),
+          };
         });
       },
 

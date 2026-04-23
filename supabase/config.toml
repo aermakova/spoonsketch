@@ -1,9 +1,7 @@
 # Supabase local development config.
 # Docs: https://supabase.com/docs/guides/local-development/cli/config
 
-# Replace with your actual project ref (from the Supabase dashboard URL)
-# before running `supabase link` or `supabase functions deploy`.
-project_id = "spoonsketch"
+project_id = "uvxkipafnzclvxtlhfqi"
 
 [api]
 enabled = true
@@ -17,7 +15,10 @@ port = 54322
 enabled = true
 port = 54323
 
-[functions]
-# Verify the caller's JWT by default. Local testing can override with
-# `supabase functions serve <name> --no-verify-jwt`.
-verify_jwt = true
+# Newer CLI expects per-function settings (map keyed by function name) — a
+# top-level `[functions] verify_jwt = bool` block fails to parse. The default
+# for deployed functions is `verify_jwt = true`, so we don't need to set it
+# unless we want to override per function. Local-only override pattern:
+#
+#   [functions.<name>]
+#   verify_jwt = false   # for testing without a JWT during `supabase functions serve <name>`
