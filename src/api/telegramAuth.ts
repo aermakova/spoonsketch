@@ -17,7 +17,7 @@ export interface TelegramTokenResult {
   fallbackUrl: string;    // https://t.me/... — works without app installed
 }
 
-const BOT_USERNAME = process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'SpoonAndSketchBot';
+const BOT_USERNAME = process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'spoonsketch_bot';
 const TOKEN_TTL_MS = 10 * 60 * 1000;
 
 export async function generateTelegramToken(): Promise<TelegramTokenResult> {
