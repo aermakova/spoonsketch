@@ -15,7 +15,7 @@ const MAX_REDIRECTS = 3;
 const USER_AGENT =
   'Mozilla/5.0 (compatible; SpoonAndSketchBot/1.0; +https://spoonsketch.app)';
 
-const EXTRACTION_SYSTEM_PROMPT = `You are a recipe extraction assistant. Given scraped text from a recipe webpage, extract exactly this JSON shape and nothing else:
+const EXTRACTION_SYSTEM_PROMPT = `You are a recipe extraction assistant. The input is either scraped text from a recipe webpage OR an image of a recipe (a screenshot, photo, scanned cookbook page, etc.). Extract exactly this JSON shape and nothing else:
 
 {
   "title": string,
@@ -36,6 +36,18 @@ Rules:
 - If you cannot find a recipe in the content, return this instead and nothing else: { "partial": true, "reason": "<short reason>" }.
 - Output valid JSON only. No prose. No markdown fences.`;
 
+// Restrict accepted image URLs to our own Supabase Storage host, computed from
+// SUPABASE_URL (e.g. https://<project-ref>.supabase.co). Stops attackers from
+// pointing the Haiku call at arbitrary URLs to inflate our bill or fetch
+// internal hosts. Bot uploads land in Storage first, then hand the URL here.
+const SUPABASE_HOST = (() => {
+  try {
+    return new URL(Deno.env.get('SUPABASE_URL') ?? '').host;
+  } catch {
+    return '';
+  }
+})();
+
 Deno.serve(async (req) => {
   const preflight = handlePreflight(req);
   if (preflight) return preflight;
@@ -45,82 +57,126 @@ Deno.serve(async (req) => {
   const ctx = await requireUser(req);
   if (ctx instanceof Response) return ctx;
 
-  // Parse body
-  let body: { url?: unknown; locale?: unknown };
+  // Parse body. Accepts EITHER `url` (scrape + extract) OR `image_url`
+  // (Haiku reads the image directly — no scrape). Mutually exclusive.
+  let body: { url?: unknown; image_url?: unknown; locale?: unknown };
   try {
     body = await req.json();
   } catch {
     return jsonError(400, 'bad_request', 'Invalid JSON body');
   }
   const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
+  const rawImageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : '';
   const locale = typeof body.locale === 'string' ? body.locale : 'en';
-  if (!rawUrl) return jsonError(400, 'invalid_url', 'URL is required');
 
-  const validated = validateUrl(rawUrl);
-  if (!validated.ok) return jsonError(400, 'invalid_url', validated.reason);
+  if (!rawUrl && !rawImageUrl) {
+    return jsonError(400, 'invalid_input', 'url or image_url is required');
+  }
+  if (rawUrl && rawImageUrl) {
+    return jsonError(400, 'invalid_input', 'Pass either url or image_url, not both');
+  }
 
-  // Rate limit: single user hammering the endpoint
-  const rate = await checkRateLimit(ctx.supabaseAdmin, ctx.userId, 'url_extract');
+  const isImageMode = !!rawImageUrl;
+  const jobType = isImageMode ? 'image_extract' as const : 'url_extract' as const;
+
+  // Validate input per-mode
+  let validatedTarget: string;
+  if (isImageMode) {
+    const v = validateImageUrl(rawImageUrl);
+    if (!v.ok) return jsonError(400, 'invalid_image_url', v.reason);
+    validatedTarget = v.url;
+  } else {
+    const v = validateUrl(rawUrl);
+    if (!v.ok) return jsonError(400, 'invalid_url', v.reason);
+    validatedTarget = v.url;
+  }
+
+  // Rate limit: single user hammering the endpoint (per job type)
+  const rate = await checkRateLimit(ctx.supabaseAdmin, ctx.userId, jobType);
   if (!rate.ok) {
     return jsonError(429, 'rate_limited', 'Too many requests', {
       retry_after_seconds: rate.retryAfterSeconds,
     });
   }
 
-  // Monthly quota
-  const quota = await getQuota(ctx.supabaseAdmin, ctx.userId, 'url_extract');
+  // Monthly quota (per job type — image_extract has its own counter)
+  const quota = await getQuota(ctx.supabaseAdmin, ctx.userId, jobType);
   const capped = checkQuotaAllowed(quota);
   if (capped) return jsonError(429, capped.error, undefined, capped);
 
-  // Scrape
-  let scraped: string;
-  try {
-    scraped = await scrapeUrl(validated.url);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    await logAiJob({
-      supabaseAdmin: ctx.supabaseAdmin,
-      userId: ctx.userId,
-      jobType: 'url_extract',
-      status: 'failed',
-      input: { url: rawUrl },
-      errorMessage: `scrape_failed: ${message}`,
-    });
-    return jsonResponse(
+  // Build the input the model sees:
+  // - URL mode: scrape the page → text payload.
+  // - Image mode: skip scrape; emit an image content block referencing the
+  //   storage URL. Haiku fetches the bytes itself.
+  const inputForLog: Record<string, unknown> = isImageMode
+    ? { image_url: rawImageUrl }
+    : { url: rawUrl };
+
+  let userMessageContent: string | Array<Record<string, unknown>>;
+
+  if (isImageMode) {
+    userMessageContent = [
       {
-        partial: true,
-        reason: 'scrape_failed',
-        title: 'Untitled Recipe',
-        ingredients: [],
-        instructions: [],
+        type: 'image',
+        source: { type: 'url', url: validatedTarget },
       },
-      206,
-    );
+      {
+        type: 'text',
+        text: `Locale: ${locale}\n\nExtract the recipe from this image.`,
+      },
+    ];
+  } else {
+    let scraped: string;
+    try {
+      scraped = await scrapeUrl(validatedTarget);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await logAiJob({
+        supabaseAdmin: ctx.supabaseAdmin,
+        userId: ctx.userId,
+        jobType,
+        status: 'failed',
+        input: inputForLog,
+        errorMessage: `scrape_failed: ${message}`,
+      });
+      return jsonResponse(
+        {
+          partial: true,
+          reason: 'scrape_failed',
+          title: 'Untitled Recipe',
+          ingredients: [],
+          instructions: [],
+        },
+        206,
+      );
+    }
+
+    if (scraped.length < 50) {
+      // Empty-ish response (paywalled, JS-only, 404 masquerading as 200, etc.)
+      await logAiJob({
+        supabaseAdmin: ctx.supabaseAdmin,
+        userId: ctx.userId,
+        jobType,
+        status: 'failed',
+        input: inputForLog,
+        errorMessage: 'empty_scrape',
+      });
+      return jsonResponse(
+        {
+          partial: true,
+          reason: 'empty_page',
+          title: 'Untitled Recipe',
+          ingredients: [],
+          instructions: [],
+        },
+        206,
+      );
+    }
+
+    userMessageContent = `Locale: ${locale}\nSource URL: ${validatedTarget}\n\nScraped content:\n${scraped}`;
   }
 
-  if (scraped.length < 50) {
-    // Empty-ish response (paywalled, JS-only, 404 masquerading as 200, etc.)
-    await logAiJob({
-      supabaseAdmin: ctx.supabaseAdmin,
-      userId: ctx.userId,
-      jobType: 'url_extract',
-      status: 'failed',
-      input: { url: rawUrl },
-      errorMessage: 'empty_scrape',
-    });
-    return jsonResponse(
-      {
-        partial: true,
-        reason: 'empty_page',
-        title: 'Untitled Recipe',
-        ingredients: [],
-        instructions: [],
-      },
-      206,
-    );
-  }
-
-  // Haiku extraction
+  // Haiku extraction (text or image input — same prompt, same response shape)
   let haikuResponse;
   try {
     haikuResponse = await anthropic.messages.create({
@@ -137,7 +193,7 @@ Deno.serve(async (req) => {
       messages: [
         {
           role: 'user',
-          content: `Locale: ${locale}\nSource URL: ${validated.url}\n\nScraped content:\n${scraped}`,
+          content: userMessageContent as never,
         },
       ],
     });
@@ -146,9 +202,9 @@ Deno.serve(async (req) => {
     await logAiJob({
       supabaseAdmin: ctx.supabaseAdmin,
       userId: ctx.userId,
-      jobType: 'url_extract',
+      jobType,
       status: 'failed',
-      input: { url: rawUrl },
+      input: inputForLog,
       errorMessage: `haiku_call_failed: ${message}`,
     });
     return jsonError(502, 'ai_unavailable', 'AI service unavailable');
@@ -165,9 +221,9 @@ Deno.serve(async (req) => {
     await logAiJob({
       supabaseAdmin: ctx.supabaseAdmin,
       userId: ctx.userId,
-      jobType: 'url_extract',
+      jobType,
       status: 'failed',
-      input: { url: rawUrl },
+      input: inputForLog,
       output: { raw: rawText.slice(0, 500) },
       tokensUsed,
       errorMessage: 'json_parse_failed',
@@ -184,14 +240,18 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Image mode never has a "source URL" worth storing on the recipe — the
+  // image is a one-shot input. URL mode keeps the canonical source link.
+  const sourceUrlPatch = isImageMode ? {} : { source_url: validatedTarget };
+
   // Haiku returned an explicit partial
   if (parsed && typeof parsed === 'object' && (parsed as { partial?: boolean }).partial) {
     await logAiJob({
       supabaseAdmin: ctx.supabaseAdmin,
       userId: ctx.userId,
-      jobType: 'url_extract',
+      jobType,
       status: 'done',
-      input: { url: rawUrl },
+      input: inputForLog,
       output: parsed,
       tokensUsed,
     });
@@ -203,7 +263,7 @@ Deno.serve(async (req) => {
         title: 'Untitled Recipe',
         ingredients: [],
         instructions: [],
-        source_url: validated.url,
+        ...sourceUrlPatch,
       },
       206,
     );
@@ -211,15 +271,15 @@ Deno.serve(async (req) => {
 
   const recipe = {
     ...(parsed as Record<string, unknown>),
-    source_url: validated.url,
+    ...sourceUrlPatch,
   };
 
   await logAiJob({
     supabaseAdmin: ctx.supabaseAdmin,
     userId: ctx.userId,
-    jobType: 'url_extract',
+    jobType,
     status: 'done',
-    input: { url: rawUrl },
+    input: inputForLog,
     output: recipe,
     tokensUsed,
   });
@@ -236,6 +296,30 @@ interface UrlOk {
 interface UrlBad {
   ok: false;
   reason: string;
+}
+
+// Image URLs must point at our own Supabase Storage host. Anthropic's Files /
+// `image.url` mode happily fetches arbitrary HTTPS, but we don't want to be
+// the proxy for someone using their bot quota to scrape the internet — and
+// we want a place to enforce per-bucket access policy later.
+function validateImageUrl(raw: string): UrlOk | UrlBad {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, reason: 'image_url is malformed' };
+  }
+  if (parsed.protocol !== 'https:') {
+    return { ok: false, reason: 'image_url must be https' };
+  }
+  if (!SUPABASE_HOST) {
+    // Server config issue; fail closed.
+    return { ok: false, reason: 'server cannot validate image hosts' };
+  }
+  if (parsed.host !== SUPABASE_HOST) {
+    return { ok: false, reason: 'image_url must be on this project’s Supabase Storage' };
+  }
+  return { ok: true, url: parsed.toString() };
 }
 
 function validateUrl(raw: string): UrlOk | UrlBad {
