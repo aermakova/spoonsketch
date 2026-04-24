@@ -1,189 +1,172 @@
-# Next steps when you're back at the laptop
+# Where I left off — next steps
 
-Everything below assumes you're in the repo root on `main`. This session wrote code only — nothing was committed, nothing was deployed, no secrets were set.
+Pick this up whenever. Everything here is what the user (Angy) needs to do personally — code is already written + committed. Last updated: Phase 8 code-complete, ran out of session on the deploy side.
+
+## TL;DR
+
+- ✅ Phase 7 (AI: URL import + Make me Sketch): **shipped + deployed**, works on device.
+- 🟡 Phase 8 (Telegram bot): **code shipped, not yet running**. Needs 2–4 manual steps on Telegram / Railway / Upstash. Fully testable locally with just the bot token.
+- ⏸ Everything else: see `.claude/plans/` for active plans, `PLAN.md` for master tracker.
 
 ---
 
-## 1. Review what changed (5 min)
+## 1. Phase 8 — Telegram bot: get it running (local, 10 minutes)
+
+This path skips Railway + Upstash and runs the bot on your Mac during development. Fine for smoke-testing. See step 3 below for production.
+
+### 1a. Confirm what's already done
+
+- ✅ `@spoonsketch_bot` registered in BotFather, token saved.
+- ✅ `ANTHROPIC_API_KEY` + `TELEGRAM_BOT_SHARED_SECRET` set on Supabase (`supabase secrets list` to verify).
+- ✅ All 3 Phase 8 migrations applied via Supabase dashboard SQL editor.
+- ✅ Edge Functions deployed (`extract-recipe`, `telegram-auth`).
+
+If any of the above looks wrong, check `.claude/plans/phase-8-telegram-bot.md` for the one-line fix.
+
+### 1b. Set up the bot's local env
 
 ```bash
+cd telegram-bot
+cp .env.example .env
+```
+
+Open `.env` and fill in (4 values — skip `REDIS_URL` for now):
+
+| Variable | Where to get it |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | BotFather — if lost: DM @BotFather → `/mybots` → Spoon & Sketch Bot → API Token → "Show token" |
+| `TELEGRAM_BOT_SHARED_SECRET` | The hex string you pasted into `supabase secrets set` for the bot. Same value must be on both sides. If lost: generate a new one with `openssl rand -hex 32`, set on Supabase, also use here |
+| `SUPABASE_URL` | `https://uvxkipafnzclvxtlhfqi.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Project Settings → API → `service_role` key (long JWT, starts with `eyJ…`). Do NOT confuse with the anon key. |
+
+### 1c. Run the bot
+
+```bash
+npm install
+npm run dev
+```
+
+Expected output:
+
+```
+[queue] ⚠️  REDIS_URL not set — running in no-queue fallback mode. ...
+[queue] in-process worker ready (no Redis)
+[bot] launched (long polling)
+```
+
+Keep the terminal open. The bot is now listening for messages. It'll die if you close the terminal — for always-on, see step 3.
+
+### 1d. Test it end-to-end
+
+1. Reload the Spoon & Sketch app on your phone.
+2. Me tab → **Connect Telegram**.
+3. Telegram opens with `@spoonsketch_bot`. Tap **Start**.
+4. Bot should reply: `Connected, @yourhandle!`.
+5. Send the bot a recipe URL: `https://www.bbcgoodfood.com/recipes/tomato-soup`.
+6. Bot replies `Got it! Extracting your recipe…` → ~10s later → `Saved! *Tomato soup* [Open in app →]`.
+7. Tap the deep link → opens the recipe in the app.
+8. The recipe also appears in the app's library within ~2s (Realtime).
+
+If any step fails, tail the Mac terminal for the error. The first failure is usually: `extract-recipe` returns `401` — fix with `supabase functions deploy extract-recipe` (the current deployed version needs the bot-mode auth code that was added yesterday).
+
+---
+
+## 2. Phase 8 — Telegram bot: polish (~30 min) *(optional, do this when tests pass)*
+
+Plan sub-phase 8.5 — not code-critical, but needed to close out the plan cleanly.
+
+- Walk through the Phase 8 scenarios in `MANUAL_TESTS.md` (they don't exist yet — write them as you test).
+- Update `FEATURES.md` §1.7 (limits) + §13 (integrations) with Telegram.
+- Update `BACKEND.md` with a cross-reference to the new `telegram_auth_tokens` table + shared-secret pattern.
+- Flip `PLAN.md` Phase 8 row to ✅ Done.
+- Log any bugs surfaced during device testing in `BUGS.md`.
+
+---
+
+## 3. Phase 8 — Telegram bot: production (Redis + Railway, ~30 min)
+
+**Only needed when you're ready for the bot to run 24/7 without your laptop open.** Local dev is fine for testing.
+
+### 3a. Redis (Upstash, free tier)
+
+Full steps in `telegram-bot/README.md` §"Switch to Redis-backed queue". TL;DR:
+
+1. Sign up at https://upstash.com (3 min).
+2. Create Database → region closest to Railway (default `us-west-1`).
+3. Copy the `rediss://default:...@us1-xxx.upstash.io:6379` connection URL.
+4. Add `REDIS_URL=rediss://...` to your local `.env` and restart — you should now see `[queue] Redis-backed worker ready` instead of the no-queue warning.
+
+### 3b. Railway
+
+1. Sign up at https://railway.app, link GitHub account.
+2. New Project → Deploy from GitHub → select `spoonsketch` repo.
+3. In the service settings, set **Root Directory** to `telegram-bot`.
+4. Variables tab → paste the same 5 values from your local `.env`:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_BOT_SHARED_SECRET` (must match Supabase)
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `REDIS_URL`
+5. Deploy. Tail logs until you see `[bot] launched (long polling)`.
+
+Cost: Railway Hobby is $5/mo; Upstash free tier covers our bot traffic.
+
+### 3c. Once Railway is up
+
+Turn off your local Mac bot (`Cmd-C` in the terminal). The Railway bot takes over automatically. Both can't run on the same token simultaneously — Telegram rejects the second poller.
+
+---
+
+## 4. Smaller loose ends (lower priority)
+
+These aren't blockers but are noted in various docs:
+
+- **Shelves Phase 2** — asset-gated. Drop your sprig PNGs + wood PNG into `assets/sprigs/` and `assets/shelves/`, then uncomment the source map in `src/components/shelves/Sprig.tsx` + `WoodShelf.tsx`. Then flip the plan's Phase 2 to in-progress + add the DB migration for `cover_color` / `cover_sprig`.
+- **Tab bar icon swap** — emojis → `@expo/vector-icons` Feather set. ~15 min cosmetic polish.
+- **BUG-010** — paper pattern in PDF export. Deferred since Phase F server renderer; documented on the ticket.
+- **MVP integrations still missing** — RevenueCat, Apple/Google/magic-link sign-in, push notifications, MMKV, PostHog, Sentry, i18n, password reset. None blocking the north-star test but all promised in `PLAN.md`.
+
+---
+
+## 5. How to resume with a fresh Claude session
+
+If you want a fresh Claude session to pick up where the last one left off, the recipe is:
+
+1. Open `.claude/handoff-prompt.md`.
+2. Copy the fenced code block inside.
+3. Paste into a new Claude Code session (claude.ai/code or a fresh CLI run).
+4. The new session will read the plan files + docs and orient itself.
+
+Or just say: "continue Phase 8 per `.claude/plans/phase-8-telegram-bot.md` — last commit was `d2f61a6`, Redis switch + 8.5 polish still pending". Either works.
+
+---
+
+## 6. Daily commands cheat sheet
+
+```bash
+# Pull latest changes
+git pull
+
+# What's changed since my last commit
+git log --oneline -10
 git status
-git diff --stat
-```
 
-Expected: a bunch of new files under `supabase/functions/`, `src/components/import/`, `app/recipe/import.tsx`, `app/upgrade.tsx`, `docs/edge-functions.md`, and edits to `app/_layout.tsx`, `app/(tabs)/_layout.tsx`, `app/recipe/create.tsx`, `FEATURES.md`, `MANUAL_TESTS.md`, `BACKEND.md`, `tsconfig.json`, `.gitignore`.
-
-Also new: this file and `.claude/plans/phase-7-ai-features.md` (the active plan).
-
-Read the plan first:
-```bash
-open .claude/plans/phase-7-ai-features.md
-```
-
----
-
-## 2. Install the Supabase CLI (one-time)
-
-```bash
-brew install supabase/tap/supabase
-```
-
-Verify:
-```bash
-supabase --version
-```
-
----
-
-## 3. Link the repo to your Supabase project (one-time)
-
-Get your project ref from the Supabase dashboard URL: `https://supabase.com/dashboard/project/<ref>` — the `<ref>` is the slug in the URL.
-
-```bash
-supabase link --project-ref <your-project-ref>
-```
-
-This writes a `.temp/` directory (already gitignored).
-
-You also need to edit `supabase/config.toml` and set `project_id = "<your-project-ref>"` (I left it as `"spoonsketch"` as a placeholder).
-
----
-
-## 4. Set the Anthropic secret (one-time per project)
-
-```bash
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Optional: create `supabase/.env.local` (already gitignored) for local `supabase functions serve` runs:
-```bash
-echo 'ANTHROPIC_API_KEY=sk-ant-...' > supabase/.env.local
-```
-
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected by the Supabase platform at runtime — you don't set them.
-
----
-
-## 5. Deploy the Edge Functions
-
-```bash
+# Deploy Edge Function changes (after editing supabase/functions/...)
 supabase functions deploy extract-recipe
+supabase functions deploy telegram-auth
 supabase functions deploy auto-sticker
+
+# Check Supabase secrets
+supabase secrets list
+
+# Run the Expo app
+npx expo start --lan --port 8082                                                   # normal
+npx --yes qrcode "exp://$(ipconfig getifaddr en0):8082" -o /tmp/qr.png && open /tmp/qr.png   # QR for phone
+
+# Run the Telegram bot (local)
+cd telegram-bot
+npm run dev
+
+# View function logs (dashboard only — CLI doesn't have logs command)
+# https://supabase.com/dashboard/project/uvxkipafnzclvxtlhfqi/functions/<name>/logs
 ```
-
-Sanity-check with curl after you have a user JWT:
-```bash
-# Grab a JWT from the app (inspect a logged-in session in Expo Go) or via supabase-js in a REPL.
-JWT="..."
-
-# Test extract-recipe
-curl -i -X POST "https://<your-ref>.supabase.co/functions/v1/extract-recipe" \
-  -H "Authorization: Bearer $JWT" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://www.bbcgoodfood.com/recipes/tomato-soup"}'
-
-# Test auto-sticker (use any real recipe UUID you own)
-curl -i -X POST "https://<your-ref>.supabase.co/functions/v1/auto-sticker" \
-  -H "Authorization: Bearer $JWT" \
-  -H "Content-Type: application/json" \
-  -d '{"recipe_id":"<recipe-uuid>"}'
-```
-
-Expected:
-- `extract-recipe`: 200 JSON with `title`, `ingredients`, etc.
-- `auto-sticker`: 200 JSON `{ elements: [{ sticker_key, x_frac, y_frac, rotation, scale, z_index_offset, reasoning }] }` with 3–5 entries.
-
-Tail logs live:
-```bash
-supabase functions logs extract-recipe --project-ref <ref>
-supabase functions logs auto-sticker --project-ref <ref>
-```
-
----
-
-## 6. Run the app on your iPhone
-
-Per `CLAUDE.md § "Running the app on the user's iPhone"`:
-
-```bash
-# On any wifi that isn't BELL807:
-npx expo start --lan --port 8082
-npx --yes qrcode "exp://$(ipconfig getifaddr en0):8082" -o /tmp/expo-qr.png && open /tmp/expo-qr.png
-
-# On BELL807 (client isolation on):
-npx expo start --tunnel --port 8082
-# The tunnel URL will print; build a QR from that.
-```
-
-Scan with iPhone Camera app → opens Expo Go.
-
----
-
-## 7. Run the Phase 7 manual test scenarios
-
-Two sections in `MANUAL_TESTS.md`:
-- `"Phase 7.1 — AI recipe import from URL"` — 13 scenarios
-- `"Phase 7.2 — Make me Sketch (auto-sticker)"` — 13 scenarios
-
-Walk each top to bottom. Log bugs as new rows in `BUGS.md` (template in existing BUG-0xx rows).
-
----
-
-## 8. Commit checkpoint — both 7.1 and 7.2 landed together
-
-Phase 7.1 + 7.2 + 7.3 were coded in a single session with no commit between. Suggested single commit once device-green, or split into two if you prefer:
-
-### Option A — single commit (recommended: they share infra)
-
-```bash
-git add supabase/functions supabase/config.toml \
-  src/api/ai.ts src/types/ai.ts \
-  src/hooks/useExtractRecipe.ts src/hooks/useAutoSticker.ts \
-  src/components/import \
-  src/components/canvas/MakeMeSketchButton.tsx \
-  src/lib/canvasStore.ts \
-  app/recipe/import.tsx app/recipe/create.tsx app/upgrade.tsx \
-  app/editor/\[recipeId\].tsx \
-  app/_layout.tsx app/\(tabs\)/_layout.tsx \
-  FEATURES.md MANUAL_TESTS.md BACKEND.md \
-  docs/edge-functions.md \
-  tsconfig.json .gitignore package.json package-lock.json \
-  .claude/plans/phase-7-ai-features.md \
-  NEXT_STEPS.md
-
-git commit -m "Phase 7: AI features — URL import + Make me Sketch
-
-- Edge Functions scaffolding (cors/auth/ai/tier/errors shared helpers)
-- extract-recipe function: SSRF-guarded scrape + Haiku + ai_jobs log
-- auto-sticker function: Haiku picks 3-5 stickers, server rolls placement
-- /recipe/import modal with 4 tabs (Paste Link / Type / Photo / File)
-- Make-me-Sketch button in editor stickers mode, single-frame undo
-- Free-tier caps: 20 url_extract/month, 5 auto_sticker/month
-- /upgrade placeholder + paywall cards on both surfaces"
-```
-
-### Option B — split commits
-
-Two commits with the same file set divided at the natural fault line (URL-import files vs. auto-sticker files). Slightly more churn, slightly better `git bisect` later. Pick whichever you prefer — the diff is the same either way.
-
-(Do not commit until the manual tests pass and you've skimmed the diff.)
-
----
-
-## 9. What's next after Phase 7
-
-Phase 7 is code-complete. After device regression passes:
-- Flip `PLAN.md` Phase 7 row to ✅ Done.
-- Optional follow-ups deferred from 7.3: extracting the shared `AiPaywallSheet` component (currently inlined in PasteLinkTab + MakeMeSketchButton), and adding a `useTier()` hook — neither load-bearing today since the server 429 is the source of truth for caps.
-- Phase 8 (Telegram bot) is the master tracker's next item; it reuses `extract-recipe` for screenshots.
-- Shelves Phase 2 is still asset-gated (sprig PNGs + wood plank) if you want to unblock that first.
-
----
-
-## Troubleshooting quick refs
-
-- **`supabase functions deploy` fails with Docker error:** CLI needs Docker running for some ops. If Docker Desktop isn't installed, `brew install --cask docker` and start it once. For `deploy` specifically it's optional — try `supabase functions deploy extract-recipe --no-verify-jwt=false` first; if it still complains, install Docker.
-- **Expo Go can't connect:** check `networksetup -getairportnetwork en0`. If you're on BELL807, use `--tunnel`. Otherwise `--lan` should work.
-- **tsc error in `exportRecipePdf.ts`:** pre-existing, not related to Phase 7. Leave it alone for now.
-- **Secrets didn't stick:** `supabase secrets list` to verify `ANTHROPIC_API_KEY` is present.
-- **Fresh Expo install complained about native modules:** `npx expo install --check` to reconcile SDK-compatible versions.
