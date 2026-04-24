@@ -36,6 +36,47 @@ Rules:
 - If you cannot find a recipe in the content, return this instead and nothing else: { "partial": true, "reason": "<short reason>" }.
 - Output valid JSON only. No prose. No markdown fences.`;
 
+// Bot-mode auth: pulls user_id from the body, validates it exists in
+// auth.users, returns an AuthContext shaped like requireUser's. The
+// outer handler has already verified the shared secret header.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const botModeAdmin: SupabaseClient | null = SUPABASE_URL && SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : null;
+
+interface BotAuthContext {
+  userId: string;
+  jwt: string; // empty for bot mode — kept for type compat with requireUser
+  supabaseAdmin: SupabaseClient;
+}
+
+async function botContext(req: Request): Promise<BotAuthContext | Response> {
+  if (!botModeAdmin) return jsonError(500, 'server_misconfigured', 'Missing Supabase env');
+  // We need to read user_id from the body without consuming the stream the
+  // main handler will read later. Clone first.
+  let body: { user_id?: unknown };
+  try {
+    body = await req.clone().json();
+  } catch {
+    return jsonError(400, 'bad_request', 'Invalid JSON body');
+  }
+  const userId = typeof body.user_id === 'string' ? body.user_id.trim() : '';
+  if (!userId) return jsonError(400, 'invalid_input', 'bot mode requires user_id in body');
+
+  // Cheap existence check — confirms the user_id is real before we start
+  // racking up Anthropic spend on a bogus id.
+  const { data, error } = await botModeAdmin.auth.admin.getUserById(userId);
+  if (error || !data?.user) {
+    return jsonError(404, 'user_not_found', 'No user with that id');
+  }
+  return { userId, jwt: '', supabaseAdmin: botModeAdmin };
+}
+
 // Restrict accepted image URLs to our own Supabase Storage host, computed from
 // SUPABASE_URL (e.g. https://<project-ref>.supabase.co). Stops attackers from
 // pointing the Haiku call at arbitrary URLs to inflate our bill or fetch
@@ -54,8 +95,25 @@ Deno.serve(async (req) => {
 
   if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
 
-  const ctx = await requireUser(req);
-  if (ctx instanceof Response) return ctx;
+  // Auth path: regular client calls present a JWT in Authorization. The
+  // Telegram bot service (Phase 8.2) instead presents a shared secret
+  // header + a `user_id` field in the body, and we trust it to act on that
+  // user's behalf. The bot already authenticated the user via the
+  // /telegram-auth flow, so re-authing is redundant.
+  const botSecret = req.headers.get('X-Spoon-Bot-Secret') ?? '';
+  const expectedBotSecret = Deno.env.get('TELEGRAM_BOT_SHARED_SECRET') ?? '';
+  const isBotCall = !!expectedBotSecret && botSecret === expectedBotSecret;
+
+  let ctx: Awaited<ReturnType<typeof requireUser>>;
+  if (isBotCall) {
+    // Bot mode: pull user_id from the body, skip JWT verification.
+    // We still need the supabaseAdmin handle for quota / logging.
+    ctx = await botContext(req);
+    if (ctx instanceof Response) return ctx;
+  } else {
+    ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+  }
 
   // Parse body. Accepts EITHER `url` (scrape + extract) OR `image_url`
   // (Haiku reads the image directly — no scrape). Mutually exclusive.
