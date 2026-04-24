@@ -629,6 +629,7 @@ function renderClassic(page: RecipePage, pageWidth: number, pageHeight: number):
   const c = page.content;
   const titles = page.style.sectionTitles;
   const fontClass = `f-${page.style.font}`;
+  const accent = page.style.paletteAccent;
 
   const parts: string[] = [];
 
@@ -663,10 +664,7 @@ function renderClassic(page: RecipePage, pageWidth: number, pageHeight: number):
 
   const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
   if (ingList && c.ingredients.length > 0) {
-    const rows = c.ingredients
-      .map(i => `<div class="ing-row"><span class="dot"></span><span>${escapeHtml(i.text)}</span></div>`)
-      .join('');
-    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${rows}</div>`);
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients, accent)}</div>`);
   }
 
   const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
@@ -676,10 +674,7 @@ function renderClassic(page: RecipePage, pageWidth: number, pageHeight: number):
 
   const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
   if (methodList && c.instructions.length > 0) {
-    const rows = c.instructions
-      .map(s => `<div class="step-row"><span class="step-badge">${s.step}</span><span>${escapeHtml(s.text)}</span></div>`)
-      .join('');
-    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${rows}</div>`);
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions, accent)}</div>`);
   }
 
   const tags = resolveBlock(page, 'tags', pageWidth, pageHeight);
@@ -702,9 +697,24 @@ function pillsInline(c: RecipePage['content']): string {
   return parts.join('');
 }
 
-function ingRowsDotted(ingredients: RecipePage['content']['ingredients']): string {
+// Inline-SVG dot — replaces empty `<span class="dot">` because empty inline-block
+// spans with only a background colour don't paint reliably in expo-print's
+// WebView. SVG <circle> always rasterizes.
+function dotSvg(accent: string, size = 5): string {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:inline-block;vertical-align:middle;margin-right:6px;flex-shrink:0"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${accent}"/></svg>`;
+}
+
+// Inline-SVG step badge — same reasoning as dotSvg. White text on coloured
+// circle; size and font set so editor's 12pt body weight matches the visual.
+function stepBadgeSvg(num: number, accent: string, size = 20, fontSize = 12): string {
+  // baseline-shift via y = size/2 + fontSize*0.35 keeps the digit visually centred
+  const ty = size / 2 + fontSize * 0.35;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:inline-block;vertical-align:top;margin-right:10px;flex-shrink:0"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${accent}"/><text x="${size / 2}" y="${ty}" font-size="${fontSize}" font-weight="700" fill="#fff" text-anchor="middle" font-family="Nunito,Helvetica,sans-serif">${num}</text></svg>`;
+}
+
+function ingRowsDotted(ingredients: RecipePage['content']['ingredients'], accent: string, dotSize = 5): string {
   return ingredients
-    .map(i => `<div class="ing-row"><span class="dot"></span><span>${escapeHtml(i.text)}</span></div>`)
+    .map(i => `<div class="ing-row">${dotSvg(accent, dotSize)}<span>${escapeHtml(i.text)}</span></div>`)
     .join('');
 }
 
@@ -720,9 +730,9 @@ function ingRowsJournal(ingredients: RecipePage['content']['ingredients']): stri
     .join('');
 }
 
-function stepRowsBadged(instructions: RecipePage['content']['instructions']): string {
+function stepRowsBadged(instructions: RecipePage['content']['instructions'], accent: string, badgeSize = 20, badgeFont = 12): string {
   return instructions
-    .map(s => `<div class="step-row"><span class="step-badge">${s.step}</span><span>${escapeHtml(s.text)}</span></div>`)
+    .map(s => `<div class="step-row">${stepBadgeSvg(s.step, accent, badgeSize, badgeFont)}<span>${escapeHtml(s.text)}</span></div>`)
     .join('');
 }
 
@@ -738,6 +748,7 @@ function renderPhotoHero(page: RecipePage, pageWidth: number, pageHeight: number
   const c = page.content;
   const titles = page.style.sectionTitles;
   const fontClass = `f-${page.style.font}`;
+  const accent = page.style.paletteAccent;
   const parts: string[] = [];
 
   const image = resolveBlock(page, 'image', pageWidth, pageHeight);
@@ -770,7 +781,7 @@ function renderPhotoHero(page: RecipePage, pageWidth: number, pageHeight: number
 
   const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
   if (ingList && c.ingredients.length > 0) {
-    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients)}</div>`);
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients, accent, 4)}</div>`);
   }
 
   const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
@@ -780,7 +791,7 @@ function renderPhotoHero(page: RecipePage, pageWidth: number, pageHeight: number
 
   const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
   if (methodList && c.instructions.length > 0) {
-    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions, accent, 16, 10)}</div>`);
   }
 
   parts.push(`<div class="page-number">1</div>`);
@@ -841,6 +852,7 @@ function renderMinimal(page: RecipePage, pageWidth: number, pageHeight: number):
 function renderTwoColumn(page: RecipePage, pageWidth: number, pageHeight: number): string {
   const c = page.content;
   const titles = page.style.sectionTitles;
+  const accent = page.style.paletteAccent;
   const parts: string[] = [];
 
   const title = resolveBlock(page, 'title', pageWidth, pageHeight);
@@ -870,7 +882,7 @@ function renderTwoColumn(page: RecipePage, pageWidth: number, pageHeight: number
 
   const ingList = resolveBlock(page, 'ingredients-list', pageWidth, pageHeight);
   if (ingList && c.ingredients.length > 0) {
-    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients)}</div>`);
+    parts.push(`<div class="block block-ingredients-list" style="${blockStyle(ingList, false)}">${ingRowsDotted(c.ingredients, accent, 4)}</div>`);
   }
 
   const methodHeading = resolveBlock(page, 'method-heading', pageWidth, pageHeight);
@@ -880,7 +892,7 @@ function renderTwoColumn(page: RecipePage, pageWidth: number, pageHeight: number
 
   const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
   if (methodList && c.instructions.length > 0) {
-    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions, accent, 14, 9)}</div>`);
   }
 
   parts.push(`<div class="page-number">1</div>`);
@@ -950,6 +962,7 @@ function renderRecipeCard(page: RecipePage, pageWidth: number, pageHeight: numbe
   const c = page.content;
   const titles = page.style.sectionTitles;
   const fontClass = `f-${page.style.font}`;
+  const accent = page.style.paletteAccent;
   const parts: string[] = [];
 
   const title = resolveBlock(page, 'title', pageWidth, pageHeight);
@@ -987,7 +1000,7 @@ function renderRecipeCard(page: RecipePage, pageWidth: number, pageHeight: numbe
 
   const methodList = resolveBlock(page, 'method-list', pageWidth, pageHeight);
   if (methodList && c.instructions.length > 0) {
-    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions)}</div>`);
+    parts.push(`<div class="block block-method-list" style="${blockStyle(methodList, false)}">${stepRowsBadged(c.instructions, accent, 16, 10)}</div>`);
   }
 
   const tags = resolveBlock(page, 'tags', pageWidth, pageHeight);
