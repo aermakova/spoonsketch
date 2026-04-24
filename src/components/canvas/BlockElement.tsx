@@ -248,15 +248,22 @@ function GestureBlock({
   []);
 
   const animStyle = useAnimatedStyle(() => {
-    const curH = isTextHeavy ? measuredH.value : h;
-    // Text-heavy blocks are top-anchored by prop `h` so the vertical anchor matches
-    // StaticBlock (which translates by `cy - h/2` and lets content grow downward).
-    // Using measuredH here would shift the block when measured content height differs
-    // from h at the Static→Gesture transition.
-    const anchorH = isTextHeavy ? h : curH;
+    // For non-text-heavy (image / photo) blocks, force a fixed height. For
+    // text-heavy blocks DO NOT set height — letting it default to "auto" so
+    // the View grows with its content. (Setting `height: measuredH.value`
+    // creates a feedback loop: Yoga constrains the inner View's measured
+    // size to the current `height`, so after a font bump the inner content
+    // never reports its true new size and the block stays at the old
+    // height. This made font-size bumps look like "text cut at the bottom"
+    // for description / pills / heading blocks; only `steps` worked because
+    // its generous default never hit the constraint. — BUG B11.)
+    //
+    // Top-anchor stays anchored to `h` (template default) so the visible
+    // top edge doesn't jump as the content grows downward.
+    const anchorH = h;
     return {
       width: wShared.value,
-      height: curH,
+      ...(isTextHeavy ? {} : { height: measuredH.value }),
       transform: [
         { translateX: x.value - wShared.value / 2 },
         { translateY: y.value - anchorH / 2 },

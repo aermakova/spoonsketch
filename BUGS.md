@@ -25,8 +25,18 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-017 | Medium | ✅ Fixed | Editor / Arrange | Cooking time pills font size didn't respond to A+ / A− |
 | BUG-018 | Low | ✅ Fixed | Editor / Stickers | Stickers-mode bottom panel cut off after Phase 7.2 added Make-me-Sketch button above the tray |
 | BUG-019 | **High** | ✅ Fixed | Export / PDF | PDF used wrong fonts, broken sticker images, missing pill backgrounds, missing step badges, white page bg — preview vs PDF looked like different documents |
+| BUG-020 | Medium | ✅ Fixed | Editor / Arrange | Font-size bump didn't grow text-heavy blocks (description / pills / headings) — text overflowed and got covered by next sibling. Only `method-list` worked because its default h was big enough to hide the bug. |
 
 ---
+
+## BUG-020 — Font-size bump didn't grow text-heavy blocks
+- **Found:** 2026-04-23 (phone test — user noticed only `steps` worked)
+- **Severity:** Medium — most blocks (`description`, `pills`, `ingredients-heading`, `method-heading`, `tags`) didn't visually grow when the user tapped A+, so text reflowed bigger but stayed clipped to the original block height. The next sibling block below covered the overflow, making the bumped text look "cut at the bottom".
+- **Repro:** Editor → Layout → Arrange Blocks → select description (or pills, or any text-heavy block other than `method-list` / `ingredients-list`) → tap A+ a few times. ✅ Expected: block grows to fit the larger text. Actual: block stayed the same height; bigger text rendered but bottom lines hidden under the next block.
+- **Root cause:** `GestureBlock.animStyle` set `height: measuredH.value` on the outer `Animated.View`. That height became a Yoga constraint on the inner `<View onLayout={onContentLayout}>` — the inner View's measured size couldn't exceed the parent's explicit height. So once `measuredH` settled at the initial measurement, every subsequent `onLayout` after a font bump reported the same constrained height, and `measuredH` never grew. `method-list` accidentally worked because its template default `h` was generous (≥ 32 % of usable page height) and the constraint was rarely hit; for `description` (8 %) the constraint hit on the very first measurement.
+- **Fix:** Drop `height` from `animStyle` for text-heavy blocks. The Animated.View now sizes to its content (matching StaticBlock's behaviour). Top-anchor still uses `h` (template default) so the visible top edge doesn't jump when content grows downward. Non-text-heavy blocks (image / photo) still get an explicit height — they need fixed bounds because their child (FoodImage) has no intrinsic size to drive growth.
+- **Commit:** _(this commit)_
+- **Test:** new scenario in `MANUAL_TESTS.md § Editor stability` (next pass): select each of description / pills / ingredients-heading / method-heading → A+ until text wraps to N+1 lines → block visibly grows; selection ring grows with it; no visual clipping at the bottom.
 
 ## BUG-019 — PDF export visually diverged from Scrapbook preview
 - **Found:** 2026-04-22, narrowed to specific symptoms 2026-04-23 with side-by-side screenshots from the user.
