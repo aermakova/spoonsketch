@@ -448,14 +448,11 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       font-family: 'Nunito', sans-serif;
     }
 
-    /* ── Per-preset font overrides ──────────────────────────────────────
-       The editor renders titles in `preset.title` and all body copy
-       (description / pills / headings / list rows / tags) in
-       `preset.section`. Up to here CSS hard-codes Fraunces / Nunito for
-       title and body, which only matched the default `caveat` preset by
-       coincidence and got `ingredients-list` / `method-list` wrong even
-       there. Append matching overrides last so they win on equal
-       specificity. — BUG-021. */
+    /* Per-preset font overrides — BUG-021. Editor uses preset.title for
+       titles and preset.section for all body copy; pre-fix CSS hard-coded
+       Fraunces / Nunito which only matched the default caveat preset for
+       a couple of selectors. Append matching overrides last so they win
+       on equal specificity. */
     ${presetOverrideCSS(page.style.template, page.style.font)}
   `;
 }
