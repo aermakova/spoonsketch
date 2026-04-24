@@ -26,8 +26,18 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-018 | Low | ✅ Fixed | Editor / Stickers | Stickers-mode bottom panel cut off after Phase 7.2 added Make-me-Sketch button above the tray |
 | BUG-019 | **High** | ✅ Fixed | Export / PDF | PDF used wrong fonts, broken sticker images, missing pill backgrounds, missing step badges, white page bg — preview vs PDF looked like different documents |
 | BUG-020 | Medium | ✅ Fixed | Editor / Arrange | Font-size bump didn't grow text-heavy blocks (description / pills / headings) — text overflowed and got covered by next sibling. Only `method-list` worked because its default h was big enough to hide the bug. |
+| BUG-021 | Medium | ✅ Fixed | Export / PDF | PDF body fonts (ingredients-list, method-list, pills) hardcoded to Nunito instead of the recipe's `preset.section` font (Caveat by default). Title hardcoded to Fraunces instead of `preset.title`. |
 
 ---
+
+## BUG-021 — PDF didn't honour the recipe's font preset for body text
+- **Found:** 2026-04-23 (phone test, follow-up to BUG-019 fixes)
+- **Severity:** Medium — title + ingredients list + method list rendered in the wrong font family in the PDF compared to the in-app Scrapbook preview. Description + section headings happened to match because the default `caveat` preset's section font (Caveat) coincided with the hardcoded HTML CSS (also Caveat).
+- **Repro:** Open any recipe with the default `caveat` font preset → Scrapbook → Export PDF. Compare the ingredients list / method list font in the PDF vs the editor preview. Editor: handwritten Caveat. PDF (before fix): sans-serif Nunito.
+- **Root cause:** `renderRecipePage.ts` baseCSS hardcoded `font-family` per template-block selector (Fraunces for `.block-title`, Caveat for descriptions / headings, Nunito for `.block-ingredients-list` / `.block-method-list` / pills, etc.). The editor doesn't work that way — it applies `preset.title` (e.g. `Caveat_700Bold`) to the title and `preset.section` (e.g. `Caveat_400Regular`) to all body text via inline `{ fontFamily: f }` overrides. So the PDF only matched the editor by coincidence on the section font, and only for description / headings; ingredients / method / pills were always wrong.
+- **Fix:** Append a per-preset CSS override block at the end of `baseCSS`. New `presetFonts(key)` maps each preset to `{ title: { family, weight }, section: { family, weight } }`. New `presetOverrideCSS(template, presetKey)` emits CSS with the same specificity as the template-block rules but later in the cascade, so it wins. Title gets `preset.title`; description / pills / both list blocks / both headings / step-row / ing-row / tags / pill labels / step badges all get `preset.section`. `.pill strong` and `.step-badge` keep their existing bold weight from the template CSS for the visual emphasis on prep/cook numbers and step numbers.
+- **Commit:** _(this commit)_
+- **Test:** export PDF in each of the 4 font presets (Caveat / Marck / Bad Script / Amatic) → ingredients-list and method-list font matches the editor's preset.section. Title matches preset.title.
 
 ## BUG-020 — Font-size bump didn't grow text-heavy blocks
 - **Found:** 2026-04-23 (phone test — user noticed only `steps` worked)

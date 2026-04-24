@@ -447,6 +447,71 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       font-size: 11px;
       font-family: 'Nunito', sans-serif;
     }
+
+    /* ── Per-preset font overrides ──────────────────────────────────────
+       The editor renders titles in `preset.title` and all body copy
+       (description / pills / headings / list rows / tags) in
+       `preset.section`. Up to here CSS hard-codes Fraunces / Nunito for
+       title and body, which only matched the default `caveat` preset by
+       coincidence and got `ingredients-list` / `method-list` wrong even
+       there. Append matching overrides last so they win on equal
+       specificity. — BUG-021. */
+    ${presetOverrideCSS(page.style.template, page.style.font)}
+  `;
+}
+
+interface PresetFontMapping {
+  family: string;
+  weight: number;
+}
+
+interface PresetFonts {
+  title: PresetFontMapping;
+  section: PresetFontMapping;
+}
+
+function presetFonts(key: RecipePage['style']['font']): PresetFonts {
+  switch (key) {
+    case 'marck':      return { title: { family: 'Marck Script', weight: 400 }, section: { family: 'Marck Script', weight: 400 } };
+    case 'bad-script': return { title: { family: 'Bad Script',   weight: 400 }, section: { family: 'Bad Script',   weight: 400 } };
+    case 'amatic':     return { title: { family: 'Amatic SC',    weight: 700 }, section: { family: 'Amatic SC',    weight: 400 } };
+    case 'caveat':
+    default:           return { title: { family: 'Caveat',       weight: 700 }, section: { family: 'Caveat',       weight: 400 } };
+  }
+}
+
+// Emit a CSS block that targets the current template + assigns the recipe's
+// font preset to title and body blocks. Higher-specificity-equal-but-later
+// rules win the cascade, matching the editor's inline-style `{ fontFamily:
+// preset.title }` / `{ fontFamily: preset.section }` overrides.
+function presetOverrideCSS(template: RecipePage['style']['template'], presetKey: RecipePage['style']['font']): string {
+  const p = presetFonts(presetKey);
+  const t = `.t-${template}`;
+  // Two passes: the body-text selector list assigns family + the section
+  // weight (400 by default for our handwriting fonts). The pill `strong` and
+  // step-badge selectors then re-pin font-family but leave their existing
+  // bold weight from the template CSS untouched — so the prep/cook number
+  // and the step number stay visually emphasised.
+  return `
+    ${t} .block-title { font-family: '${p.title.family}', cursive; font-weight: ${p.title.weight}; }
+    ${t} .block-description,
+    ${t} .block-pills,
+    ${t} .pill,
+    ${t} .block-ingredients-heading,
+    ${t} .block-ingredients-list,
+    ${t} .ing-row,
+    ${t} .block-method-heading,
+    ${t} .block-method-list,
+    ${t} .step-row,
+    ${t} .block-tags {
+      font-family: '${p.section.family}', cursive;
+      font-weight: ${p.section.weight};
+    }
+    ${t} .pill strong,
+    ${t} .step-badge,
+    ${t} .step-num {
+      font-family: '${p.section.family}', cursive;
+    }
   `;
 }
 
