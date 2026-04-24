@@ -16,6 +16,7 @@
 import type { RecipePage, RecipePageStroke } from './recipePage';
 import { TEMPLATE_BLOCKS } from './blockDefs';
 import { getStroke } from 'perfect-freehand';
+import { fontFaceCSS, type FontDataUriMap } from './pdfFontEmbed';
 
 export interface RenderOptions {
   // Physical page width in pixels. Defaults to A4 at 96 DPI (screen preview
@@ -24,10 +25,14 @@ export interface RenderOptions {
   // Show a subtle drop shadow around the page in a grey background —
   // matches how browsers preview print pages. Disable for actual printing.
   previewChrome?: boolean;
-  // Resolve a sticker kind to an image URL the WebView can load. On device
-  // this is typically a file:// URI from expo-asset; for a server renderer
-  // it'd be an https:// URL. Returning null/undefined skips the sticker.
+  // Resolve a sticker kind to an image URL the WebView can load. For the
+  // print path on iOS, this needs to be a `data:image/png;base64,…` URI —
+  // expo-print's WKWebView refuses `file://`. Returning null/undefined
+  // skips the sticker (no broken-image placeholder).
   stickerSrc?: (kind: string) => string | null | undefined;
+  // Inlined @font-face entries. Required for the print path; optional for
+  // a hypothetical server renderer that has its own font supply.
+  fontDataUris?: FontDataUriMap;
 }
 
 const DEFAULT_WIDTH_PX = 794; // A4 @ 96 DPI
@@ -37,14 +42,16 @@ export function renderRecipePage(page: RecipePage, opts: RenderOptions = {}): st
   const pageHeight = Math.round(pageWidth * page.pageAspectRatio);
   const previewChrome = opts.previewChrome ?? true;
 
+  const inlineFontFaces = opts.fontDataUris ? fontFaceCSS(opts.fontDataUris) : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(page.content.title || 'Recipe')}</title>
-  ${fontLinks()}
-  <style>${baseCSS(pageWidth, pageHeight, page, previewChrome)}</style>
+  ${inlineFontFaces ? '' : fontLinks()}
+  <style>${inlineFontFaces}\n${baseCSS(pageWidth, pageHeight, page, previewChrome)}</style>
 </head>
 <body>
   <div class="page t-${page.style.template}">
@@ -52,9 +59,19 @@ export function renderRecipePage(page: RecipePage, opts: RenderOptions = {}): st
     ${renderTemplate(page, pageWidth, pageHeight)}
     ${renderDrawingLayers(page, pageWidth, pageHeight)}
     ${renderStickers(page, pageWidth, pageHeight, opts.stickerSrc)}
+    ${renderCornerDecoration(opts.stickerSrc)}
   </div>
 </body>
 </html>`;
+}
+
+// Decorative leaf in the bottom-right of every page — matches the Scrapbook
+// preview's hardcoded sticker at app/recipe/[id].tsx:83-84. Falls through
+// silently if the sticker resolver doesn't have a 'leaf' entry.
+function renderCornerDecoration(stickerSrc?: RenderOptions['stickerSrc']): string {
+  const src = stickerSrc?.('leaf');
+  if (!src) return '';
+  return `<img class="corner-leaf" src="${escapeAttr(src)}" alt="">`;
 }
 
 // ─── Font imports ────────────────────────────────────────────────────────────
@@ -72,7 +89,11 @@ function fontLinks(): string {
 // ─── Base CSS (page geometry + typography + print rules) ─────────────────────
 
 function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, preview: boolean): string {
-  const { paletteAccent, palettePaper, paletteInk, paletteInkSoft, paletteInkFaint } = page.style;
+  const { paletteAccent, paletteBg2, palettePaper, paletteInk, paletteInkSoft, paletteInkFaint } = page.style;
+  // Defensive fallbacks: if a colour is missing the page should still look
+  // like the editor's default cream paper rather than collapsing to white.
+  const paperBg = palettePaper || '#faf4e6';
+  const pillBg  = paletteBg2 || '#ede2ce';
 
   return `
     * { box-sizing: border-box; }
@@ -86,17 +107,30 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     @page { size: A4; margin: 0; }
     @media print {
       body { margin: 0; padding: 0; background: #fff; }
-      .page { box-shadow: none !important; }
+      .page { box-shadow: none !important; background: ${paperBg} !important; }
     }
 
     .page {
       position: relative;
       width: ${pageWidth}px;
       height: ${pageHeight}px;
-      background: ${palettePaper};
+      background: ${paperBg};
       margin: 0 auto;
       overflow: hidden;
       ${preview ? `box-shadow: 0 8px 32px rgba(0,0,0,0.3);` : ''}
+    }
+
+    /* Decorative corner leaf — matches Scrapbook preview's hardcoded
+       <Sticker kind="leaf"> at app/recipe/[id].tsx:83-84. */
+    .corner-leaf {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      width: 44px;
+      height: 44px;
+      transform: rotate(15deg);
+      transform-origin: center;
+      pointer-events: none;
     }
 
     .paper-pattern {
@@ -130,22 +164,22 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       line-height: 24px;
     }
     .t-classic .block-pills {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+      /* Block-level container; pills space themselves with margin-right.
+         Avoids inline-flex which renders inconsistently in expo-print. */
     }
     .t-classic .pill {
-      display: inline-flex;
-      gap: 4px;
+      display: inline-block;
       padding: 4px 10px;
       border-radius: 8px;
-      background: ${paletteAccent}22;
+      background: ${pillBg};
       font-size: 13px;
       color: ${paletteInkSoft};
+      margin-right: 8px;
     }
     .t-classic .pill strong {
       color: ${paletteAccent};
       font-weight: 700;
+      margin-left: 4px;
     }
     .t-classic .block-image img {
       width: 100%; height: 100%; object-fit: cover;
@@ -168,11 +202,14 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       color: ${paletteInk};
     }
     .t-classic .ing-row {
-      display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px;
+      margin-bottom: 4px;
     }
     .t-classic .ing-row .dot {
+      display: inline-block;
       width: 5px; height: 5px; border-radius: 50%;
-      background: ${paletteAccent}; margin-top: 7px; flex-shrink: 0;
+      background: ${paletteAccent};
+      margin-right: 6px;
+      vertical-align: middle;
     }
     .t-classic .block-method-list {
       font-family: 'Nunito', sans-serif;
@@ -181,14 +218,19 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       color: ${paletteInk};
     }
     .t-classic .step-row {
-      display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px;
+      margin-bottom: 6px;
     }
     .t-classic .step-badge {
-      width: 20px; height: 20px; border-radius: 50%;
+      display: inline-block;
+      width: 20px; height: 20px;
+      line-height: 20px;
+      text-align: center;
+      border-radius: 50%;
       background: ${paletteAccent};
       color: #fff; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; flex-shrink: 0; margin-top: 1px;
+      font-size: 12px;
+      vertical-align: top;
+      margin-right: 10px;
     }
     .t-classic .block-tags {
       background: #fff;
@@ -220,12 +262,13 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       font-family: 'Caveat', cursive; color: ${paletteInkSoft};
       font-size: 17px; line-height: 22px; text-align: center;
     }
-    .t-photo-hero .block-pills { display: flex; gap: 6px; justify-content: center; }
+    .t-photo-hero .block-pills { text-align: center; }
     .t-photo-hero .pill {
-      display: inline-flex; gap: 4px; padding: 3px 8px; border-radius: 6px;
-      background: ${paletteAccent}22; font-size: 11px; color: ${paletteInkSoft};
+      display: inline-block; padding: 3px 8px; border-radius: 6px;
+      background: ${pillBg}; font-size: 11px; color: ${paletteInkSoft};
+      margin-right: 6px;
     }
-    .t-photo-hero .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-photo-hero .pill strong { color: ${paletteAccent}; font-weight: 700; margin-left: 3px; }
     .t-photo-hero .block-ingredients-heading,
     .t-photo-hero .block-method-heading {
       font-family: 'Caveat', cursive; color: ${paletteAccent};
@@ -235,13 +278,18 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-photo-hero .block-method-list {
       font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 17px; color: ${paletteInk};
     }
-    .t-photo-hero .ing-row { display: flex; gap: 5px; margin-bottom: 3px; align-items: flex-start; }
-    .t-photo-hero .ing-row .dot { width: 4px; height: 4px; border-radius: 50%; background: ${paletteAccent}; margin-top: 6px; flex-shrink: 0; }
-    .t-photo-hero .step-row { display: flex; gap: 6px; margin-bottom: 5px; align-items: flex-start; }
+    .t-photo-hero .ing-row { margin-bottom: 3px; }
+    .t-photo-hero .ing-row .dot {
+      display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+      background: ${paletteAccent}; margin-right: 5px; vertical-align: middle;
+    }
+    .t-photo-hero .step-row { margin-bottom: 5px; }
     .t-photo-hero .step-badge {
-      width: 16px; height: 16px; border-radius: 50%; background: ${paletteAccent};
+      display: inline-block;
+      width: 16px; height: 16px; line-height: 16px; text-align: center;
+      border-radius: 50%; background: ${paletteAccent};
       color: #fff; font-weight: 700; font-size: 10px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+      vertical-align: top; margin-right: 6px;
     }
 
     /* ── Minimal template ────────────────────────────────────────────── */
@@ -254,12 +302,13 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       font-family: 'Nunito', sans-serif; color: ${paletteInkSoft};
       font-size: 14px; line-height: 20px; font-style: italic;
     }
-    .t-minimal .block-pills { display: flex; gap: 10px; }
+    .t-minimal .block-pills { /* row of pills as inline-block elements */ }
     .t-minimal .pill {
-      display: inline-flex; gap: 4px; font-size: 11px; color: ${paletteInkSoft};
+      display: inline-block; font-size: 11px; color: ${paletteInkSoft};
       text-transform: uppercase; letter-spacing: 0.5px;
+      margin-right: 10px;
     }
-    .t-minimal .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-minimal .pill strong { color: ${paletteAccent}; font-weight: 700; margin-left: 4px; }
     .t-minimal .block-ingredients-heading,
     .t-minimal .block-method-heading {
       font-family: 'Nunito', sans-serif; font-weight: 700;
@@ -269,8 +318,8 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-minimal .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 20px; color: ${paletteInk}; }
     .t-minimal .ing-row { margin-bottom: 2px; }
     .t-minimal .block-method-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 19px; color: ${paletteInk}; }
-    .t-minimal .step-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: flex-start; }
-    .t-minimal .step-num { color: ${paletteAccent}; font-weight: 700; }
+    .t-minimal .step-row { margin-bottom: 6px; }
+    .t-minimal .step-num { color: ${paletteAccent}; font-weight: 700; margin-right: 8px; }
 
     /* ── Two Column template ─────────────────────────────────────────── */
     .t-two-column .block-title {
@@ -285,26 +334,32 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-two-column .block-image img {
       width: 100%; height: 100%; object-fit: cover; border-radius: 6px;
     }
-    .t-two-column .block-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .t-two-column .block-pills { /* inline-block pills wrap naturally */ }
     .t-two-column .pill {
-      display: inline-flex; gap: 3px; padding: 2px 6px; border-radius: 4px;
-      background: ${paletteAccent}22; font-size: 10px; color: ${paletteInkSoft};
+      display: inline-block; padding: 2px 6px; border-radius: 4px;
+      background: ${pillBg}; font-size: 10px; color: ${paletteInkSoft};
+      margin-right: 6px;
     }
-    .t-two-column .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-two-column .pill strong { color: ${paletteAccent}; font-weight: 700; margin-left: 3px; }
     .t-two-column .block-ingredients-heading,
     .t-two-column .block-method-heading {
       font-family: 'Caveat', cursive; color: ${paletteAccent};
       font-size: 18px; line-height: 22px;
     }
     .t-two-column .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 17px; color: ${paletteInk}; }
-    .t-two-column .ing-row { display: flex; gap: 5px; margin-bottom: 3px; align-items: flex-start; }
-    .t-two-column .ing-row .dot { width: 4px; height: 4px; border-radius: 50%; background: ${paletteAccent}; margin-top: 6px; flex-shrink: 0; }
+    .t-two-column .ing-row { margin-bottom: 3px; }
+    .t-two-column .ing-row .dot {
+      display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+      background: ${paletteAccent}; margin-right: 5px; vertical-align: middle;
+    }
     .t-two-column .block-method-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
-    .t-two-column .step-row { display: flex; gap: 5px; margin-bottom: 4px; align-items: flex-start; }
+    .t-two-column .step-row { margin-bottom: 4px; }
     .t-two-column .step-badge {
-      width: 14px; height: 14px; border-radius: 50%; background: ${paletteAccent};
+      display: inline-block;
+      width: 14px; height: 14px; line-height: 14px; text-align: center;
+      border-radius: 50%; background: ${paletteAccent};
       color: #fff; font-weight: 700; font-size: 9px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+      vertical-align: top; margin-right: 5px;
     }
 
     /* ── Journal template ────────────────────────────────────────────── */
@@ -319,12 +374,13 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-journal .block-photo img {
       width: 100%; height: 100%; object-fit: cover; border-radius: 4px;
     }
-    .t-journal .block-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+    .t-journal .block-pills { /* inline-block pills */ }
     .t-journal .pill {
-      display: inline-flex; gap: 3px; padding: 2px 7px; border-radius: 4px;
-      background: ${paletteAccent}22; font-size: 10px; color: ${paletteInkSoft};
+      display: inline-block; padding: 2px 7px; border-radius: 4px;
+      background: ${pillBg}; font-size: 10px; color: ${paletteInkSoft};
+      margin-right: 5px;
     }
-    .t-journal .pill strong { color: ${paletteAccent}; font-weight: 700; }
+    .t-journal .pill strong { color: ${paletteAccent}; font-weight: 700; margin-left: 3px; }
     .t-journal .block-ingredients-heading,
     .t-journal .block-method-heading {
       font-family: 'Caveat', cursive; color: ${paletteAccent};
@@ -336,11 +392,11 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-journal .ing-row { margin-bottom: 2px; }
     .t-journal .block-method-list { font-family: 'Nunito', sans-serif; font-size: 13px; line-height: 22px; color: ${paletteInk}; }
     .t-journal .step-row {
-      display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;
+      margin-bottom: 4px;
       border-bottom: 1px dashed ${paletteAccent}22;
       padding-bottom: 4px;
     }
-    .t-journal .step-num { color: ${paletteAccent}; font-weight: 700; font-family: 'Fraunces', serif; font-size: 15px; }
+    .t-journal .step-num { color: ${paletteAccent}; font-weight: 700; font-family: 'Fraunces', serif; font-size: 15px; margin-right: 8px; }
     .t-journal .block-tags {
       background: #fff; padding: 4px 10px; transform: rotate(-1.2deg);
       box-shadow: 0 2px 4px rgba(0,0,0,0.08); font-family: 'Caveat', cursive;
@@ -352,8 +408,8 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
       background: ${paletteAccent}; color: #fff;
       font-family: 'Fraunces', serif; font-weight: 700;
       font-size: 24px; line-height: 1;
-      display: flex; align-items: center; justify-content: center;
       text-align: center;
+      padding-top: 14px;
     }
     .t-recipe-card .block-description {
       font-family: 'Nunito', sans-serif; color: ${paletteInkSoft};
@@ -369,11 +425,13 @@ function baseCSS(pageWidth: number, pageHeight: number, page: RecipePage, previe
     .t-recipe-card .block-ingredients-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
     .t-recipe-card .ing-row { margin-bottom: 2px; }
     .t-recipe-card .block-method-list { font-family: 'Nunito', sans-serif; font-size: 12px; line-height: 16px; color: ${paletteInk}; }
-    .t-recipe-card .step-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: flex-start; }
+    .t-recipe-card .step-row { margin-bottom: 4px; }
     .t-recipe-card .step-badge {
-      width: 16px; height: 16px; border-radius: 50%; background: ${paletteAccent};
+      display: inline-block;
+      width: 16px; height: 16px; line-height: 16px; text-align: center;
+      border-radius: 50%; background: ${paletteAccent};
       color: #fff; font-weight: 700; font-size: 10px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+      vertical-align: top; margin-right: 6px;
     }
     .t-recipe-card .block-tags {
       background: #fff; padding: 6px 12px; transform: rotate(-1.2deg);

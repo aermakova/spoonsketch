@@ -24,24 +24,30 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-016 | Medium | ✅ Fixed | Editor / Arrange | Selected block's text visually covered by next sibling block when font bumped |
 | BUG-017 | Medium | ✅ Fixed | Editor / Arrange | Cooking time pills font size didn't respond to A+ / A− |
 | BUG-018 | Low | ✅ Fixed | Editor / Stickers | Stickers-mode bottom panel cut off after Phase 7.2 added Make-me-Sketch button above the tray |
-| BUG-019 | Medium | 🔴 Open | Export / PDF | User reports exported PDF shows a prior version of their stickers / drawings / block arrangement rather than the current state (preview-PDF mismatch). Needs concrete repro. |
+| BUG-019 | **High** | ✅ Fixed | Export / PDF | PDF used wrong fonts, broken sticker images, missing pill backgrounds, missing step badges, white page bg — preview vs PDF looked like different documents |
 
 ---
 
-## BUG-019 — PDF export shows old decoration (preview-PDF mismatch)
-- **Found:** 2026-04-22 (phone test — user reported)
-- **Severity:** Medium — user cannot trust what they'll print.
-- **Repro (user report, not yet locally reproduced):** open a recipe, make edits in the editor (add / move stickers, draw, rearrange blocks), press Done → Detail → Export PDF. The PDF contains decoration but it's an older version, not the edits that just landed.
-- **Root cause (unknown):** static analysis of the write path shows every canvasStore / drawingStore mutation commits synchronously to both the working copy and the per-recipe map (`recipeStates[id]` / `drawings[id]`). `exportRecipePdf` and the freshly-fixed Scrapbook preview (BUG B2) both read from the same map, so they should agree. Analysis can't identify a staleness source.
-- **What needs narrowing down** (asked user):
-  1. Does the Scrapbook preview match the PDF, or do they differ? (If they differ, the export path has a distinct bug; if they match, the preview itself is showing stale data and the bug is upstream.)
-  2. What gets exported — stickers, drawings, and/or block arrangement? Is it one category or all three?
-  3. Is the "old" state one edit old, or much older (e.g. from a previous app session)?
-  4. Were you on the latest main (commit 1cbd34e or later) when you tested? BUG B2 before that fix meant Scrapbook preview could show empty even when the map had data.
-  5. Does app reload (shake → Reload) change the outcome?
-  6. Did you see the same decoration in the Scrapbook *preview* view, or only in the PDF?
-- **Fix:** deferred until repro or more info.
-- **Test scenario:** to be added under Phase F Export scenarios once the specific flow is confirmed.
+## BUG-019 — PDF export visually diverged from Scrapbook preview
+- **Found:** 2026-04-22, narrowed to specific symptoms 2026-04-23 with side-by-side screenshots from the user.
+- **Severity:** **High** — PDF was unrecognisable vs. the in-app preview (different fonts, broken sticker images, missing pill backgrounds, missing step-badge circles, white page where preview was cream, no decorative corner sticker). User can't trust what they'll print.
+- **Repro:** Recipe with at least one user-placed sticker. Decorate → place stickers → Done → Recipe Detail → Scrapbook tab → Export PDF → Save to Files. Open the PDF: title in Times serif (not Fraunces), stickers as broken WebKit `?` placeholders, pills as plain text, step rows as plain numbers without circular badges, page background pure white.
+- **Root cause:** five independent regressions in the print path. expo-print on iOS opens a sandboxed WKWebView with the following constraints we hadn't accounted for:
+  1. **`file://` URIs blocked.** `<img src="file:///.../leaf.png">` from `Asset.localUri` won't load — WebView renders the broken-image placeholder. Stickers all gone.
+  2. **External CSS fetches racy.** The `<link rel="stylesheet" href="https://fonts.googleapis.com/...">` doesn't reliably finish before the page renders to PDF. Caveat happened to be cached and rendered correctly; Fraunces fell back to system serif. Non-deterministic.
+  3. **`display: inline-flex` on `<span>` in print mode.** Pills, step badges, ingredient dots all used `display: flex/inline-flex` on span elements. In expo-print's render pass, span+flex degrades — width/height/background are dropped. Step badges showed as plain numbers, dots vanished.
+  4. **Pill alpha colour faint.** `background: ${paletteAccent}22` is ~13% terracotta on cream. Visually almost invisible and JPEG compression hides what's left. Combined with #3, pills looked like plain text.
+  5. **No `palettePaper` fallback.** If serialization is missing the value, body's `background: #fff` wins → pure white page instead of cream paper.
+- **Fix:**
+  - **Stickers**: `resolveStickerUris` in `src/lib/exportRecipePdf.ts` now reads each PNG via `expo-file-system/legacy` and emits a `data:image/png;base64,...` URI. Inline payload, no sandbox dependency.
+  - **Fonts**: new `src/lib/pdfFontEmbed.ts` reads bundled `@expo-google-fonts/*` TTFs as base64 and emits an `@font-face` block inlined into the print HTML's `<style>`. 11 fonts (Fraunces 400/700, Nunito 400/600/700, Caveat 400/700, Marck Script, Bad Script, Amatic SC 400/700) — total ~1–2 MB HTML, expo-print handles fine. `<link>` to Google Fonts only fires now if no embedded set is supplied (preview path).
+  - **CSS layout**: every template's `.pill / .step-badge / .dot` rule changed from `display: (inline-)flex` on `<span>` to `display: inline-block` with `line-height` / `text-align: center` / `vertical-align`. Print-portable across all WebKit versions.
+  - **Pill background**: changed from `${paletteAccent}22` (alpha) to `${paletteBg2}` (solid cream tone). Mirrors what RN's TimePills uses in the editor.
+  - **Page bg fallback**: `.page { background: ${palettePaper} || '#faf4e6'; }` plus `@media print { .page { background: ... !important; } }`.
+  - **Corner sticker**: new `renderCornerDecoration` always emits a positioned `<img class="corner-leaf">` with the leaf sticker — matches the Scrapbook hardcoded `<Sticker kind="leaf">` at `app/recipe/[id].tsx:84`. `exportRecipePdf` always pre-resolves `'leaf'` even when the recipe has no user-placed stickers.
+  - **Schema**: `RecipePageStyle.paletteBg2` field added; serializer populates from `palette.bg2`.
+- **Commit:** _(this commit)_
+- **Test:** new scenario in `MANUAL_TESTS.md § PDF export — preview parity` (next commit). Smoke test: same recipe, Scrapbook view → Export PDF → open in Files. Verify Fraunces title, cream page, watercolor stickers, terracotta circular step badges, dotted ingredient bullets, leaf in bottom-right.
 
 ---
 

@@ -36,6 +36,7 @@ export interface RecipePageStyle {
   paletteName: PaletteName;
   paletteAccent: string;
   paletteBg: string;
+  paletteBg2: string;       // softer surface — used for pill backgrounds in PDF
   palettePaper: string;
   paletteInk: string;      // from theme/colors — not the palette variant
   paletteInkSoft: string;
@@ -164,6 +165,7 @@ export function serializeRecipePage(input: SerializeInput): RecipePage {
     paletteName,
     paletteAccent: palette.accent,
     paletteBg: palette.bg,
+    paletteBg2: palette.bg2,
     palettePaper: palette.paper,
     paletteInk: colors.ink,
     paletteInkSoft: colors.inkSoft,
