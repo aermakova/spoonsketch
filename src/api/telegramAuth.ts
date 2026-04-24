@@ -6,6 +6,7 @@
 // The bot service then calls the telegram-auth Edge Function (server-side)
 // to redeem the token and create the telegram_connections row.
 
+import * as Crypto from 'expo-crypto';
 import { supabase } from './client';
 import { ApiError } from './auth';
 
@@ -75,10 +76,10 @@ export async function fetchTelegramConnection(): Promise<TelegramConnection | nu
   return data;
 }
 
-// Browser/RN-safe random hex via crypto.getRandomValues. Avoids node:crypto.
+// React Native's Hermes runtime doesn't expose Web Crypto by default, so
+// we use expo-crypto's polyfilled getRandomBytes.
 function randomHex(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
+  const bytes = Crypto.getRandomBytes(byteLength);
   let out = '';
   for (let i = 0; i < bytes.length; i++) {
     out += bytes[i].toString(16).padStart(2, '0');
