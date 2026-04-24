@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { colors } from '../../src/theme/colors';
 import { useThemeStore } from '../../src/lib/store';
 import { fonts } from '../../src/theme/fonts';
+import { useRecipesRealtime } from '../../src/hooks/useRecipesRealtime';
 
 const TAB_BAR_HEIGHT = 64;
 
@@ -48,6 +49,10 @@ export default function TabLayout() {
   const { palette } = useThemeStore();
   const insets = useSafeAreaInsets();
   const tabBarHeight = TAB_BAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0);
+
+  // Subscribe to live `recipes` changes for the signed-in user — when the
+  // Telegram bot inserts a recipe, the library refreshes within ~2 s.
+  useRecipesRealtime();
 
   return (
     <Tabs
