@@ -38,6 +38,41 @@ The bot itself is the Telegraf process. The worker runs in the same Node process
 4. In the app: Me tab → Connect Telegram → it opens the bot with `/start <token>` → reply: "Connected, @your_handle!"
 5. Send a recipe URL or screenshot → 5–15s later you get "Saved!" with a deep link.
 
+## Switch to Redis-backed queue
+
+**Until you do this, the bot runs in an in-process queue fallback** — fine for solo testing, not safe for production.
+
+### Why it matters
+
+The default fallback (no `REDIS_URL`) processes jobs inline in the same Node process:
+- ❌ Jobs lost on crash or restart
+- ❌ No automatic retries on Haiku failure
+- ❌ No exponential backoff for rate limits
+- ❌ Can't scale beyond one Node instance
+- ❌ Worker boot warns loudly — look for `⚠️  REDIS_URL not set` in the logs.
+
+BullMQ + Redis (the production path) fixes all of the above. Upstash gives you a free hosted Redis instance with 10,000 commands/day, which is plenty for the bot.
+
+### What to do
+
+1. **Sign up at https://upstash.com** (3 minutes; free tier; GitHub login works).
+2. **Create Database** → name it `spoonsketch-bot` → region closest to your Railway region (Railway defaults to `us-west-1`, pair with Upstash `us-west-1`) → Create.
+3. In the database dashboard, find the **Redis connection string**. It looks like `rediss://default:abc…xyz@us1-xxx.upstash.io:6379` (two `s`es — TLS variant).
+4. **Set it on both environments:**
+   - Local `.env`: `REDIS_URL=rediss://default:...`
+   - Railway: Variables tab → `REDIS_URL` → paste the same string.
+5. Restart the bot. Look for `[queue] Redis-backed worker ready` in the logs instead of the in-process warning.
+
+No code change required — `src/queue.ts` autodetects the env var and picks the correct backend.
+
+### Things to verify once switched
+
+- Kill the bot mid-job (Cmd-C during a Make me Sketch) → the job retries once the bot restarts.
+- Send 5 messages in quick succession → all processed in parallel (up to 4 concurrent workers).
+- Open Upstash's DB dashboard → you should see spikes in the commands chart when messages come in.
+
+---
+
 ## Deploy to Railway
 
 1. Push the repo to GitHub if not already.

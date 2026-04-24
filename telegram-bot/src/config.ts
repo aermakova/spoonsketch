@@ -6,9 +6,13 @@ interface Config {
   botSharedSecret: string;
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
-  redisUrl: string;
+  // Optional — when unset, the bot runs in no-queue fallback mode. TODO
+  // (redis-prod): set this on Railway/locally to enable BullMQ retries +
+  // crash recovery. See telegram-bot/README.md §"Switch to Redis-backed
+  // queue" for the 3-line change.
+  redisUrl: string | undefined;
   extractRecipeFunctionUrl: string;
-  // Optional — defaults to spoonsketch:// scheme; set EXPO_DEEPLINK_BASE on
+  // Optional — defaults to spoonsketch:// scheme; set APP_DEEPLINK_BASE on
   // Railway if the iOS deep link host needs to differ.
   appDeeplinkBase: string;
   // Optional — used in the bot's reply markdown to label the "Open in app"
@@ -29,7 +33,7 @@ export const config: Config = {
   botSharedSecret: required('TELEGRAM_BOT_SHARED_SECRET'),
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
-  redisUrl: required('REDIS_URL'),
+  redisUrl: process.env.REDIS_URL || undefined,
   extractRecipeFunctionUrl: process.env.EXTRACT_RECIPE_FUNCTION_URL
     ?? `${required('SUPABASE_URL').replace(/\/$/, '')}/functions/v1/extract-recipe`,
   appDeeplinkBase: process.env.APP_DEEPLINK_BASE ?? 'spoonsketch://',

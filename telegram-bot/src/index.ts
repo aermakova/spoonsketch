@@ -7,7 +7,7 @@ import { createBot } from './bot.js';
 import { bootWorker } from './worker.js';
 
 const bot = createBot();
-bootWorker(bot);
+await bootWorker(bot);
 
 bot.launch().then(() => {
   console.log('[bot] launched (long polling)');

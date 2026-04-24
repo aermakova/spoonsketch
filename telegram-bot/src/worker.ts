@@ -4,7 +4,6 @@
 //
 // Started once from index.ts after the bot itself is up.
 
-import type { Job } from 'bullmq';
 import type { Telegraf } from 'telegraf';
 import { callExtractRecipe, type ExtractedRecipe } from './extract.js';
 import {
@@ -13,14 +12,13 @@ import {
   type InsertRecipeInput,
 } from './supabase.js';
 import {
-  startWorker,
+  extractQueue,
   type ExtractJobPayload,
 } from './queue.js';
 import { config } from './config.js';
 
-export function bootWorker(bot: Telegraf): void {
-  startWorker(async (job: Job<ExtractJobPayload>) => {
-    const payload = job.data;
+export async function bootWorker(bot: Telegraf): Promise<void> {
+  await extractQueue.startWorker(async (payload: ExtractJobPayload) => {
     const { jobRowId, userId, chatId } = payload;
 
     await updateTelegramJob(jobRowId, { status: 'processing' });
@@ -84,7 +82,6 @@ export function bootWorker(bot: Telegraf): void {
       .sendMessage(chatId, successCopy, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } })
       .catch(noop);
   });
-  console.log('[worker] ready');
 }
 
 function successFullMessage(recipe: ExtractedRecipe, deepLink: string): string {
