@@ -1,12 +1,56 @@
 # Where I left off — next steps
 
-Pick this up whenever. Everything here is what the user (Angy) needs to do personally — code is already written + committed. Last updated: Phase 8 code-complete, ran out of session on the deploy side.
+Pick this up whenever. Everything here is what the user (Angy) needs to do personally — code is already written + committed. Last updated: 2026-04-24.
 
-## TL;DR
+## Status at a glance
 
-- ✅ Phase 7 (AI: URL import + Make me Sketch): **shipped + deployed**, works on device.
-- 🟡 Phase 8 (Telegram bot): **code shipped, not yet running**. Needs 2–4 manual steps on Telegram / Railway / Upstash. Fully testable locally with just the bot token.
-- ⏸ Everything else: see `.claude/plans/` for active plans, `PLAN.md` for master tracker.
+### Done ✅
+
+| Area | What shipped |
+|---|---|
+| Phases 1–6 | Foundation, auth, library, canvas editor, drawing/layers, book builder |
+| Phase A | Description atomized into its own movable block in every template |
+| Phase B | Full canvas atomization (9-atom set per template) + schemaVersion: 3 migration |
+| Phase E | Paper pattern (blank/lined/dotted/grid) at cookbook level |
+| Phase F (client) | PDF export via expo-print: all 6 templates, embedded fonts, stickers as base64, drawing strokes as SVG, preset-aware fonts, corner leaf, dots + badges as inline SVG |
+| Phase 7.1 | AI URL import (FAB → Paste Link) — Edge Function live, credits flowing |
+| Phase 7.2 | Make me Sketch (auto-sticker) — tested on device |
+| Phase 8.0 | `extract-recipe` accepts `image_url`; `telegram-screenshots` bucket created |
+| Phase 8.1 | `telegram-auth` Edge Function + `telegram_auth_tokens` table |
+| Phase 8.2 | Bot service code (Telegraf + BullMQ + Upstash-ready + in-process fallback) |
+| Phase 8.3 | Connect Telegram UI in Me tab |
+| Phase 8.4 | Realtime subscription on `recipes` |
+| Shelves redesign | Phase 1 — books-on-wooden-shelves grid, long-press action sheet |
+| 21 bug fixes | BUG-001 → BUG-021 all ✅ Fixed (see BUGS.md) |
+
+### In progress 🟡
+
+| Area | Where it's at | What's blocking |
+|---|---|---|
+| Phase 8.2 (bot deploy) | Code shipped, **bot is not running anywhere** | Angy to run `npm run dev` locally OR set up Railway + Upstash |
+| Phase 8 polish | Not started | Blocked on device-testing the bot (needs 8.2 deploy) |
+
+### Next up ⏳
+
+| Priority | Item | Blocker / size |
+|---|---|---|
+| **Next** | Run the bot locally, test end-to-end | Section 1 below (~10 min) |
+| **Next** | Phase 8.5 — MANUAL_TESTS Phase 8 scenarios + FEATURES/BACKEND doc updates | Section 2 (~30 min) |
+| Soon | Phase 8 production — Upstash Redis + Railway | Section 3 (~30 min, $5/mo) |
+| Later | Shelves Phase 2 — `cover_color` + `cover_sprig` DB columns + pickers | Angy to drop sprig PNGs + wood PNG into `assets/` first |
+| Later | Phase 9 — PDF print order via Lulu xPress | Depends on Phase F server renderer (BUG-010) |
+| Later | Phase 10 — Cook mode (screen-on cooking view) | Not started |
+| Later | Phase 10.5 remaining — expanded colour picker, Apple Pencil pressure | Not started |
+| Later | MVP integrations — RevenueCat, Apple/Google/magic-link sign-in, push, MMKV, PostHog, Sentry, i18n, password reset | Each is its own 2-hour to 1-day effort |
+| Later | Phase 11 — Launch prep: north-star test, device regression, store assets | Everything else first |
+
+### Known deferrals 🟠
+
+| Item | Why deferred |
+|---|---|
+| BUG-010 — paper pattern missing from exported PDF | Needs Phase F server-side Puppeteer renderer; client-side expo-print doesn't handle this cleanly |
+| Phase F server renderer | Needed for bulk book export + Lulu. Non-blocking for single-recipe export, which ships today |
+| Tab bar icon swap (emojis → line icons) | Cosmetic; ~15 min whenever |
 
 ---
 
