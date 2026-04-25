@@ -12,6 +12,64 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Photo + File import tabs (landed 2026-04-25)
+
+Prereqs:
+- Signed-in user. Free-tier `image_extract` and `pdf_extract` quotas not exhausted.
+- `extract-recipe` Edge Function deployed with the multi-mode body shape.
+- RLS migration `20260425000001_telegram_screenshots_user_rls.sql` applied.
+
+### 1. Photo tab — single photo
+- Add tab → Import a Recipe → **Photo** tab.
+- Tap **Choose Photos** → first time: iOS permission prompt → Allow.
+- Pick 1 screenshot of an English recipe → tap **Import Recipe**.
+- ✅ Expect: button label cycles "Uploading…" → "Reading photos…" (~10-15s) → switches to **Type** tab pre-filled.
+- ✅ Expect: tags / ingredients / steps populated; sage banner *"Imported from … — review and save."*
+
+### 2. Photo tab — multi-photo album (Cyrillic)
+- Pick 2-3 screenshots of the SAME Russian or Ukrainian recipe (multi-page).
+- ✅ Expect: button cycles same as above; final recipe combines info across all photos in correct language (BUG-024 fix).
+- ✅ Expect: thumbnail strip remains until modal closes.
+
+### 3. Photo tab — 11 photos
+- Pick 11 screenshots from gallery.
+- ✅ Expect: only first 10 land (`selectionLimit` enforces) — no oversized warning needed.
+
+### 4. Photo tab — camera
+- Empty state → **Take a Photo** → permission prompt → snap a recipe page.
+- ✅ Expect: photo lands as 1-of-1 thumbnail.
+
+### 5. Photo tab — permission denied
+- Settings → Spoon & Sketch → Photos: Off.
+- Photo tab → Choose Photos → ✅ alert "Photo access needed" with **Open Settings** button.
+
+### 6. File tab — PDF
+- File tab → **Choose File** → pick a recipe PDF (e.g. NYT print export, ≤ 10MB).
+- ✅ Expect: file row with icon, filename, size, kind=PDF.
+- Tap **Import Recipe** → "Uploading…" → "Reading file…" → ~15-25s → Type tab pre-filled.
+
+### 7. File tab — .txt
+- Pick a `.txt` file with a copy-pasted recipe.
+- ✅ Expect: no "Uploading…" stage (text is read inline) — straight to "Reading file…" → Type tab pre-filled.
+
+### 8. File tab — oversized PDF
+- Pick a PDF > 10MB.
+- ✅ Expect: inline error "File is too large (max 10MB)." No upload attempted.
+
+### 9. File tab — unsupported type
+- Pick `.docx` (if picker even shows it).
+- ✅ Expect: inline error "Only PDF and .txt files are supported."
+
+### 10. Quota cap (Photo tab)
+- Burn through 20 `image_extract` calls (or temporarily set the user's count high).
+- 21st pick + Import → ✅ Replaces Import button with cap card "You've used 20 / 20 imports this month" + Upgrade button.
+
+### 11. RLS — negative test
+- Use anon key + a user JWT to attempt: `supabase.storage.from('telegram-screenshots').upload('<other-user-uid>/test.jpg', new Uint8Array([0]))`.
+- ✅ Expect: 403 / row-level security violation. User can only write to their own folder.
+
+---
+
 ## Edit recipe from Clean view (landed 2026-04-25)
 
 Prereqs: signed-in user with at least one recipe in the library.

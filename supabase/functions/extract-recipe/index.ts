@@ -127,6 +127,8 @@ Deno.serve(async (req) => {
     url?: unknown;
     image_url?: unknown;
     image_urls?: unknown;
+    pdf_url?: unknown;
+    text_content?: unknown;
     caption?: unknown;
     locale?: unknown;
   };
@@ -140,35 +142,60 @@ Deno.serve(async (req) => {
   const rawImageUrls: string[] = Array.isArray(body.image_urls)
     ? (body.image_urls as unknown[]).filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter((v) => v.length > 0)
     : [];
+  const rawPdfUrl = typeof body.pdf_url === 'string' ? body.pdf_url.trim() : '';
+  const rawTextContent = typeof body.text_content === 'string' ? body.text_content : '';
   const caption = typeof body.caption === 'string' ? body.caption.trim().slice(0, 500) : '';
   const locale = typeof body.locale === 'string' ? body.locale : 'en';
 
   // Normalize: collapse `image_url` (legacy) into the `image_urls` array.
   const allImageUrls = rawImageUrl ? [rawImageUrl, ...rawImageUrls] : rawImageUrls;
   const hasImage = allImageUrls.length > 0;
+  const hasPdf = rawPdfUrl.length > 0;
+  const hasText = rawTextContent.trim().length > 0;
+  const modesUsed = [hasImage, hasPdf, hasText, !!rawUrl].filter(Boolean).length;
 
-  if (!rawUrl && !hasImage) {
-    return jsonError(400, 'invalid_input', 'url, image_url, or image_urls is required');
+  if (modesUsed === 0) {
+    return jsonError(400, 'invalid_input', 'url, image_urls, pdf_url, or text_content is required');
   }
-  if (rawUrl && hasImage) {
-    return jsonError(400, 'invalid_input', 'Pass either url or image (not both)');
+  if (modesUsed > 1) {
+    return jsonError(400, 'invalid_input', 'Only one input mode at a time (url / image / pdf / text)');
   }
   if (allImageUrls.length > 10) {
     return jsonError(400, 'invalid_input', 'image_urls accepts at most 10 entries');
   }
+  if (hasText && rawTextContent.length > 100_000) {
+    return jsonError(400, 'invalid_input', 'text_content too long (max 100KB)');
+  }
 
   const isImageMode = hasImage;
-  const jobType = isImageMode ? 'image_extract' as const : 'url_extract' as const;
+  const isPdfMode = hasPdf;
+  const isTextMode = hasText;
+  // Quota counters: image_extract for images, pdf_extract for PDFs, otherwise
+  // url_extract (covers both URL scraping and pasted text — both are textual
+  // recipe input from Haiku's perspective).
+  const jobType = isImageMode
+    ? ('image_extract' as const)
+    : isPdfMode
+    ? ('pdf_extract' as const)
+    : ('url_extract' as const);
 
   // Validate input per-mode
   let validatedTarget: string = '';
   let validatedImageUrls: string[] = [];
+  let validatedPdfUrl: string = '';
   if (isImageMode) {
     for (const u of allImageUrls) {
       const v = validateImageUrl(u);
       if (!v.ok) return jsonError(400, 'invalid_image_url', v.reason);
       validatedImageUrls.push(v.url);
     }
+  } else if (isPdfMode) {
+    // Same SUPABASE_HOST check as images — PDF must come from our Storage.
+    const v = validateImageUrl(rawPdfUrl);
+    if (!v.ok) return jsonError(400, 'invalid_pdf_url', v.reason);
+    validatedPdfUrl = v.url;
+  } else if (isTextMode) {
+    // Nothing to validate beyond size cap above; trim handled below.
   } else {
     const v = validateUrl(rawUrl);
     if (!v.ok) return jsonError(400, 'invalid_url', v.reason);
@@ -194,8 +221,14 @@ Deno.serve(async (req) => {
   //   storage URLs (Haiku fetches the bytes itself). N == 1 is the original
   //   single-screenshot path; N > 1 is a Telegram album, treated as
   //   sequential pages of the same recipe.
+  // - PDF mode: emit a `document` content block; Haiku reads PDF natively.
+  // - Text mode: pasted text becomes the user message string directly.
   const inputForLog: Record<string, unknown> = isImageMode
     ? { image_urls: validatedImageUrls, ...(caption ? { caption } : {}) }
+    : isPdfMode
+    ? { pdf_url: validatedPdfUrl }
+    : isTextMode
+    ? { text_content_length: rawTextContent.length }
     : { url: rawUrl };
 
   let userMessageContent: string | Array<Record<string, unknown>>;
@@ -217,6 +250,19 @@ Deno.serve(async (req) => {
         text: promptText + captionLine,
       },
     ];
+  } else if (isPdfMode) {
+    userMessageContent = [
+      {
+        type: 'document',
+        source: { type: 'url', url: validatedPdfUrl },
+      },
+      {
+        type: 'text',
+        text: `Locale: ${locale}\n\nExtract the recipe from this PDF. If the PDF contains multiple pages of one recipe, combine them. If multiple distinct recipes appear, extract only the first/most prominent one.`,
+      },
+    ];
+  } else if (isTextMode) {
+    userMessageContent = `Locale: ${locale}\n\nUser-provided recipe text:\n\n${rawTextContent.trim()}`;
   } else {
     let scraped: string;
     try {

@@ -27,7 +27,18 @@ import {
   typeFormFromExtracted,
   type TypeFormValues,
 } from '../../src/components/import/TypeTab';
-import { ComingSoonTab } from '../../src/components/import/ComingSoonTab';
+import {
+  PhotoTab,
+  type PhotoTabPickedItem,
+  type PhotoTabInlineError,
+  type PhotoTabCapped,
+} from '../../src/components/import/PhotoTab';
+import {
+  FileTab,
+  type FileTabPicked,
+  type FileTabInlineError,
+  type FileTabCapped,
+} from '../../src/components/import/FileTab';
 import type { ExtractedRecipe } from '../../src/types/ai';
 
 const VALID_TABS: ImportTabKey[] = ['paste', 'type', 'photo', 'file'];
@@ -64,6 +75,19 @@ function ImportRecipeScreen() {
   const [pasteInlineError, setPasteInlineError] =
     useState<PasteLinkInlineError | null>(null);
   const [pasteCapped, setPasteCapped] = useState<PasteLinkCapped | null>(null);
+
+  // Photo tab state — same lifting pattern so picked photos survive a
+  // tab switch.
+  const [photoPicked, setPhotoPicked] = useState<PhotoTabPickedItem[]>([]);
+  const [photoInlineError, setPhotoInlineError] =
+    useState<PhotoTabInlineError | null>(null);
+  const [photoCapped, setPhotoCapped] = useState<PhotoTabCapped | null>(null);
+
+  // File tab state.
+  const [filePicked, setFilePicked] = useState<FileTabPicked | null>(null);
+  const [fileInlineError, setFileInlineError] =
+    useState<FileTabInlineError | null>(null);
+  const [fileCapped, setFileCapped] = useState<FileTabCapped | null>(null);
 
   function handleClose() {
     if (router.canGoBack()) router.back();
@@ -125,17 +149,32 @@ function ImportRecipeScreen() {
             />
           ) : null}
           {activeTab === 'photo' ? (
-            <ComingSoonTab
-              icon="camera"
-              title="Photo import coming soon"
-              body="Snap a photo of a cookbook page or screenshot — we’ll read the recipe for you."
+            <PhotoTab
+              picked={photoPicked}
+              onPickedChange={setPhotoPicked}
+              inlineError={photoInlineError}
+              onInlineErrorChange={setPhotoInlineError}
+              capped={photoCapped}
+              onCappedChange={setPhotoCapped}
+              onImported={(recipe) => {
+                // Imports flow into the Type tab pre-filled, same as Paste Link.
+                // Keep the picked photos around in case the user edits and wants
+                // to re-extract; they're cleared when the modal closes.
+                handleImported(recipe);
+              }}
+              onUpgradePress={handleUpgradePress}
             />
           ) : null}
           {activeTab === 'file' ? (
-            <ComingSoonTab
-              icon="file-text"
-              title="File import coming soon"
-              body="Drop in a PDF or text file and we’ll pull out the recipe."
+            <FileTab
+              picked={filePicked}
+              onPickedChange={setFilePicked}
+              inlineError={fileInlineError}
+              onInlineErrorChange={setFileInlineError}
+              capped={fileCapped}
+              onCappedChange={setFileCapped}
+              onImported={handleImported}
+              onUpgradePress={handleUpgradePress}
             />
           ) : null}
         </View>

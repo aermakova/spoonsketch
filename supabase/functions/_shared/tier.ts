@@ -6,6 +6,7 @@ export type Tier = 'free' | 'premium';
 export const FREE_MONTHLY_LIMITS: Record<AiJobType, number> = {
   url_extract: 20,
   image_extract: 20,
+  pdf_extract: 20,
   auto_sticker: 5,
 };
 

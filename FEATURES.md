@@ -353,8 +353,8 @@ Each cookbook renders as a shelf-like row with its palette accent.
 - **Tab bar** under the header, 4 tabs with Feather icons:
   1. **Paste Link** (`paperclip`) — active by default, functional since Phase 7.1
   2. **Type** (`edit-2`) — manual entry; functional (the former "Recipe create" screen lives here)
-  3. **Photo** (`camera`) — shown but disabled with a "Soon" pill; wires up in Phase 8
-  4. **File** (`file-text`) — shown but disabled with a "Soon" pill; later
+  3. **Photo** (`camera`) — pick up to 10 screenshots from gallery or camera, multi-image extraction (landed 2026-04-25)
+  4. **File** (`file-text`) — pick a PDF (≤ 10MB) or `.txt` (≤ 100KB) and extract via Anthropic document API (landed 2026-04-25)
 - **Legacy route:** `/recipe/create` redirects to `/recipe/import?tab=type` for any lingering links or deep-links that predate Phase 7.
 
 ### 8.2 Tab — Paste Link
@@ -389,30 +389,50 @@ Same form as the previous "Recipe create" screen. Save button at the bottom of t
 
 When the user arrives here via a Paste Link import, all fields are pre-populated and the top of the form shows the "Imported from *domain.com*" banner. `source_type` is `url_import` when the form was populated via Paste Link (otherwise `manual`).
 
-### 8.4 Tab — Photo (Coming soon)
+### 8.4 Tab — Photo
 
-- Empty state with camera icon and copy: "Snap a photo of a cookbook page or screenshot — we'll read the recipe for you."
-- Tab is disabled (no tap action). Will light up in Phase 8 alongside the Telegram bot.
+- Empty state with **Choose Photos** primary clay button + secondary **Take a Photo** link below.
+- Picker opens iOS photo library (or camera) — user can select up to **10 photos** at once. Multi-image albums are treated as sequential pages of one recipe (same pipeline as the Telegram bot).
+- After picking: thumbnail row (max 10) with `×` to remove individual photos and a `+` tile to add more (until the cap is hit). Counter "3 of 10".
+- **Import Recipe** primary button. Disabled until at least 1 photo is picked. Shows progressive labels: "Uploading…" → "Reading photos…" → success.
+- iOS permissions: first launch prompts via `expo-image-picker`. Denial shows a soft alert with **Open Settings** deep-link.
+- Server-side resize via `expo-image-manipulator` (max 1600px, JPEG q=0.85) before upload — bounds Storage cost and Anthropic input.
+- Files land in `telegram-screenshots/<user_id>/<uuid>.jpg` (bucket name is historical; reused for app uploads via per-user RLS policy added 2026-04-25).
+- **On success:** same handoff as Paste Link → switches to Type tab pre-filled.
+- **Errors:** identical UX to Paste Link (`monthly_limit_reached` → upgrade card; `rate_limited`, `ai_unavailable`, `network` → inline error).
 
-### 8.5 Tab — File (Coming soon)
+### 8.5 Tab — File
 
-- Empty state with document icon and copy: "Drop in a PDF or text file and we'll pull out the recipe."
-- Tab is disabled. No committed timeline.
+- Empty state with **Choose File** primary clay button.
+- `expo-document-picker` filtered to `application/pdf` and `text/plain`.
+- After picking: file row showing icon (`file-text` or `file`), name, size in bytes, and `×` to clear.
+- **Import Recipe** primary button. Shows progressive labels: "Uploading…" (PDF only) → "Reading file…" → success.
+- **PDF path:** uploads to the same `telegram-screenshots` bucket as a `.pdf` blob; Edge Function builds an Anthropic `document` content block with a URL source. Cap 10MB (client-side reject before upload).
+- **Text path:** read inline via `expo-file-system` (no upload). Edge Function injects the trimmed text directly into Haiku's user message — same shape as a URL scrape result. Cap 100KB.
+- **On success:** same handoff as Paste Link → switches to Type tab pre-filled.
+- **Errors:**
+  - "Only PDF and `.txt` files are supported." — local validation if picker returns an unexpected mime.
+  - "File is too large (max 10MB / 100KB)." — local validation before upload.
+  - Server-side errors (quota, AI unavailable, etc.) reuse the same UX as Paste Link.
 
 ### 8.6 Actions
 
 | Action | Confirmation | Effect |
 |---|---|---|
 | Close (× in header) | — | Dismisses the modal, returns to the previous screen |
-| Import Recipe (Paste Link) | — | Calls `extract-recipe` Edge Function; on success pre-fills Type tab |
+| Import Recipe (Paste Link / Photo / File) | — | Calls `extract-recipe` Edge Function with the appropriate input shape (`url`, `image_urls[]`, `pdf_url`, or `text_content`); on success pre-fills Type tab |
 | Save (Type tab) | — | Creates the recipe; dismisses modal; routes to new Recipe detail. Guarded against double-submit. |
 | Upgrade (paywall card) | — | Opens `/upgrade` modal (currently a placeholder screen) |
 
 ### 8.7 Realtime / Permissions / Limits
 
 - **Realtime:** —
-- **Permissions:** signed-in users only
-- **Limits:** URL imports are capped at 20/month on the Free tier (unlimited on Premium). Enforced server-side via `ai_jobs` row counts in the current UTC calendar month. See Appendix A.
+- **Permissions:** signed-in users only; in-app Photo + File uploads require a per-user RLS policy on `telegram-screenshots` bucket (`auth.uid()` matches the first path segment) — added 2026-04-25.
+- **Limits:** Free-tier monthly caps, enforced server-side via `ai_jobs` row counts in the current UTC calendar month:
+  - URL imports + pasted text: 20 / month (`url_extract`)
+  - Photo (image_urls): 20 / month (`image_extract`)
+  - PDF (pdf_url): 20 / month (`pdf_extract`)
+  - Each cap is independent. Premium = unlimited. See Appendix A.
 
 ---
 

@@ -35,7 +35,14 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Spoon & Sketch needs access to your photos so you can import recipe screenshots.",
+          "cameraPermission": "Spoon & Sketch needs camera access to snap a recipe."
+        }
+      ]
     ]
   }
 }

@@ -517,14 +517,38 @@ Local dev: `supabase functions serve extract-recipe --env-file supabase/.env.loc
 
 #### `POST /functions/v1/extract-recipe`
 
-Extracts a recipe from a URL or image using Claude Haiku.
+Extracts a recipe from a URL, screenshots, a PDF, or pasted text using Claude Haiku.
 
-**Request:**
+**Request — exactly one of these modes:**
 ```json
 { "url": "https://www.bbcgoodfood.com/recipes/tomato-soup" }
-// OR
-{ "image_url": "https://storage.supabase.../telegram_screenshots/abc.jpg" }
+// Single screenshot (legacy shape, still accepted)
+{ "image_url": "https://<project>.supabase.co/storage/v1/.../telegram-screenshots/<uid>/abc.jpg" }
+// 1-10 screenshots, treated as sequential pages of the SAME recipe
+{ "image_urls": ["https://...abc.jpg", "https://...def.jpg"] }
+// PDF document (≤ 10MB, served from this project's Supabase Storage)
+{ "pdf_url": "https://<project>.supabase.co/storage/v1/.../telegram-screenshots/<uid>/recipe.pdf" }
+// Plain-text recipe (≤ 100KB, e.g. .txt file content)
+{ "text_content": "Tomato soup\n\nIngredients:\n800g tomatoes\n..." }
+// Optional context, only meaningful for image_urls
+{ "image_urls": [...], "caption": "mom's tomato soup recipe" }
 ```
+
+**Quota counters** (free-tier monthly cap = 20 each, independent):
+| Mode | `ai_jobs.job_type` |
+|---|---|
+| `url` | `url_extract` |
+| `text_content` | `url_extract` (text input is treated as scraped URL content) |
+| `image_url` / `image_urls` | `image_extract` |
+| `pdf_url` | `pdf_extract` |
+
+**Validation rules:**
+- Modes are mutually exclusive — sending two raises `400 invalid_input`.
+- `image_urls` capped at 10 entries server-side.
+- `text_content` capped at 100KB.
+- All `image_url` / `image_urls` / `pdf_url` values must point at this project's Supabase Storage host (`SUPABASE_HOST` check). Cross-project URLs raise `400 invalid_image_url` / `invalid_pdf_url`.
+
+**Auth:** function deployed with `verify_jwt = false` (see `supabase/config.toml`); function code accepts either a user JWT (PostgREST `requireUser`) OR `X-Spoon-Bot-Secret` header (bot mode with `user_id` in body).
 
 **Response (200):**
 ```json
