@@ -421,7 +421,7 @@ When the user arrives here via a Paste Link import, all fields are pre-populated
 ### 9.1 Full page
 
 - **Route:** `/recipe/[id]`
-- **Top nav:** back button, a **Clean / Scrapbook** toggle in the centre, and a context action on the right — a heart (favourite toggle) in Clean view, or a **Decorate** button in Scrapbook view.
+- **Top nav:** back button, a **Clean / Scrapbook** toggle in the centre, and a context action on the right — an **edit pencil ✎** + heart (favourite toggle) in Clean view, or a **Decorate** button in Scrapbook view.
 - **Two views:** the user swipes through the segmented toggle between the cooking-friendly Clean view and the decorative Scrapbook preview.
 
 ### 9.2 Clean view
@@ -452,6 +452,7 @@ A preview of what the recipe looks like as a cookbook page.
 |---|---|---|---|
 | Back | top-left | — | Returns to the previous screen |
 | Clean / Scrapbook toggle | top-centre | — | Switches view |
+| Edit (✎) | Clean view, top-right | — | Opens `/recipe/edit/<id>` — pre-filled form for title / description / servings / prep+cook / tags / ingredients / steps. Save invalidates the library + detail caches. See §9.6. |
 | Favourite (♥ / ♡) | Clean view, top-right | — | Toggles the recipe's favourite state |
 | Decorate | Scrapbook view, top-right | — | Opens Recipe editor |
 | Share recipe | Clean view, bottom | — | Opens native share sheet with recipe text |
@@ -460,6 +461,22 @@ A preview of what the recipe looks like as a cookbook page.
 
 - **Realtime:** —
 - **Permissions:** signed-in users only; RLS scopes the read to the current user
+- **Limits:** —
+
+### 9.6 Edit recipe
+
+- **Route:** `/recipe/edit/[id]`
+- **Trigger:** edit pencil (✎) on Clean view, top-right.
+- **Form fields:** Title (required), Description, Servings · Prep · Cook (numeric), Tags (comma-separated), Ingredients (one per line), Instructions (one per line). Same form layout as the manual-entry tab in Import a Recipe — both surfaces share `RecipeFormFields` (`src/components/recipe/RecipeFormFields.tsx`) and `recipeForm.ts` helpers.
+- **Pre-fill:** loaded once from `fetchRecipe(id)` on mount; subsequent refetches don't clobber unsaved edits.
+- **Save changes:** writes through `updateRecipe(id, ...)`, invalidates `['recipes']` + `['recipe', id]`, pops back to detail.
+- **Delete recipe:** subtle terracotta-underlined link below Save. Triggers iOS confirmation alert ("Delete this recipe? This can't be undone…"). On confirm: calls `deleteRecipe(id)`, invalidates the library cache, pops both edit AND detail screens off the stack to land in Library (no orphaned 404 detail page).
+- **Known v1 limitation:** structured ingredient data (amount / unit / group from AI extraction) flattens to a single string in `name` after a save round-trip. The visible text is preserved; structure is lost. Planned fix: structured ingredient editor with separate amount/unit fields, post-launch.
+
+### 9.7 Realtime / Permissions / Limits — Edit
+
+- **Realtime:** the edit page is read-once; saves go through PostgREST and propagate to other open screens via `useRecipesRealtime`.
+- **Permissions:** signed-in users only; RLS scopes update + delete to the current user.
 - **Limits:** —
 
 ---

@@ -356,9 +356,18 @@ export default function RecipeDetailScreen() {
             <Text style={styles.decorateBtnText}>✦ Decorate</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.navFav}>
-            <Text style={styles.favIcon}>{recipe.is_favorite ? '♥' : '♡'}</Text>
-          </TouchableOpacity>
+          <View style={styles.navActions}>
+            <TouchableOpacity
+              style={styles.navIconBtn}
+              onPress={() => router.push(`/recipe/edit/${recipe.id}`)}
+              hitSlop={10}
+            >
+              <Text style={[styles.editIcon, { color: palette.accent }]}>✎</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navIconBtn} hitSlop={10}>
+              <Text style={styles.favIcon}>{recipe.is_favorite ? '♥' : '♡'}</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -397,6 +406,18 @@ const styles = StyleSheet.create({
   },
   toggleText: { fontFamily: fonts.bodyMedium, fontSize: 14 },
   navFav: { minWidth: 64, alignItems: 'flex-end' },
+  navActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 80,
+    gap: 6,
+  },
+  navIconBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  editIcon: { fontSize: 22, fontWeight: '600' },
   favIcon: { fontSize: 22, color: '#d97b7b' },
   decorateBtn: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
   decorateBtnText: { fontFamily: fonts.bodyBold, fontSize: 13, color: '#fff' },

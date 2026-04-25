@@ -12,6 +12,41 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Edit recipe from Clean view (landed 2026-04-25)
+
+Prereqs: signed-in user with at least one recipe in the library.
+
+### 1. Edit affordance visible
+- Open any recipe → defaults to Clean view → top-right shows pencil ✎ then heart ♡
+- ✅ Expect: tapping ✎ navigates to `/recipe/edit/<id>` (full-screen form, "Edit recipe" title, Cancel link top-left)
+
+### 2. Form pre-fills
+- ✅ Expect: title, description, servings, prep, cook, tags (comma-joined), ingredients (one per line, structured "200g flour" style joined from amount + unit + name), instructions (one per line) all populated from the recipe.
+
+### 3. Save changes
+- Edit the title to "X test"
+- Tap **Save changes** → spinner → returns to detail view → title now reads "X test" → Library tab shows updated title (TanStack invalidation) without pull-to-refresh.
+
+### 4. Cancel preserves data
+- Open edit → change title → tap **Cancel** → detail view shows the OLD title.
+
+### 5. Save validation
+- Open edit → clear the title field → ✅ Expect: Save button is disabled.
+
+### 6. Delete recipe
+- Edit screen → scroll to footer → "Delete recipe" link (terracotta-underlined, below Save).
+- Tap → iOS confirmation alert "Delete this recipe? This can't be undone…" with Cancel + Delete.
+- Tap Delete → spinner ("Deleting…") → both edit AND detail screens dismiss → land in Library tab.
+- ✅ Expect: deleted recipe is GONE from the library (no stale ghost row).
+
+### 7. Round-trip on AI-extracted recipe
+- Import a recipe via Telegram bot or Paste Link.
+- Open edit → expect ingredients shown as joined "200g flour" lines (not just "flour").
+- Save without changes → no error, recipe still readable.
+- ⚠️ Known limitation: amount/unit/group structure is lost on save (collapsed to `name`). Visible text is preserved.
+
+---
+
 ## Phase 8 — Telegram bot connect + recipe import (landed pending)
 
 Prereqs:
