@@ -788,7 +788,90 @@ Acceptance criteria:
 - [ ] Purchasing on one platform restores on others via RevenueCat
 - [ ] Free tier limits enforced server-side (Supabase RLS + Edge Function checks), not just client-side
 - [ ] Watermark on free PDF export applied during PDF generation (Edge Function)
-- [ ] "Restore purchases" button visible and functional (App Store requirement)
+- [ ] "Restore purchases" button visible and functional (App Store requirement) — lives in §18 Manage Subscription
+
+---
+
+### 17 · Order history
+
+> **🔴 LAUNCH BLOCKER — not yet implemented.** Required so users can see their print orders' status. Without this, "where's my Mother's Day cookbook?" has no answer in the app.
+
+**Route:** `/me/orders`
+
+Content:
+- Reverse-chronological list of the user's `print_orders` rows.
+- Per-row card: cookbook thumbnail, title, format (A5 Soft / A5 Hard / A4 Hard), placed-on date, status pill (Pending · Processing · Shipped · Delivered · Failed), shipping address (truncated), price.
+- Tappable row → order detail screen with: full status timeline, Lulu tracking link (if shipped), order ID, gift recipient if applicable, "Reorder" button (re-opens print flow with same details pre-filled).
+- Empty state: "No print orders yet" + CTA "Order your first cookbook".
+
+Acceptance criteria:
+- [ ] List sorted by `print_orders.created_at desc`
+- [ ] Status updates from Lulu webhook reflect within ~5 s via Supabase Realtime on `print_orders`
+- [ ] Tracking URL deep-links out to Lulu / carrier
+- [ ] RLS scopes the list to the current user only
+
+---
+
+### 18 · Manage Subscription
+
+> **🔴 LAUNCH BLOCKER — not yet implemented.** Apple Store requires a Restore Purchases button accessible from the app for any IAP. Currently planned only as an acceptance bullet on §16; it needs its own surface.
+
+**Route:** `/me/subscription`
+
+Content:
+- Current plan card (Free / Premium) with badge and benefits summary.
+- For Premium: renewal date, billing cycle (monthly/annual), price, "Manage in App Store" button (deep-link to `itms-apps://...subscriptions`), "Cancel subscription" copy directing to App Store (Apple owns cancellation).
+- For Free: "Upgrade to Premium" CTA → §16 Plans & Pricing.
+- **Restore Purchases** secondary button (always visible, both tiers) — calls RevenueCat `restorePurchases()` and refreshes `users.tier`.
+- Last successful restore timestamp (debug aid).
+- Receipt verification status (live from RevenueCat).
+
+Acceptance criteria:
+- [ ] Restore Purchases button calls RevenueCat SDK and reflects updated entitlements within 2 s
+- [ ] Cancel subscription deep-link opens the App Store subscription management screen for this app
+- [ ] Renewal date pulled from RevenueCat `customerInfo.entitlements.active['premium'].expirationDate`
+- [ ] Cross-platform restoration works (purchase on iOS, opens on web → tier shows Premium)
+
+---
+
+### 19 · Data Export (GDPR / right-to-portability)
+
+> **🔴 LAUNCH BLOCKER for EU launch — not yet implemented.** GDPR Art. 20 right to data portability. Also a strong trust signal in any market.
+
+**Route:** Settings → "Export my data" button (§15 Profile & Settings)
+
+Flow:
+- Tap "Export my data" → confirmation: "We'll email you a JSON file with all your recipes, cookbooks, and account data. This may take up to 5 minutes."
+- Edge Function `export-user-data` packages: `users` row (excluding push tokens), all `cookbooks`, all `recipes` (with ingredients/instructions/tags as JSON), all `print_orders`, `telegram_connections` (handle only), `ai_jobs` summary counts. Excludes: signed URLs (expired), service-internal IDs.
+- Output: signed URL to a JSON file in Storage (24-hour TTL), emailed to the user via Supabase Auth's email infrastructure (or transactional email provider).
+- Rate-limited to 1 export per 24 hours per user.
+
+Acceptance criteria:
+- [ ] Export job runs server-side (no PII in client logs)
+- [ ] JSON output validates against a documented schema (publish in `BACKEND.md` §"Data export shape")
+- [ ] Sensitive fields excluded (push token, OAuth tokens, raw service-role-only columns)
+- [ ] Email arrives within 5 minutes for a typical user (~50 recipes)
+- [ ] Repeat-export attempts within 24 h return a "still processing / please wait" message, not a duplicate run
+
+---
+
+### 20 · Email change / account recovery
+
+> **🟡 PRE-LAUNCH — not yet implemented.** Magic-link auth means no passwords, but users still lose access to their email or want to switch to a new one. Without this, "I lost my login email" is unrecoverable.
+
+**Route:** Settings → "Change email" (§15 Profile & Settings)
+
+Flow:
+- "Change email" opens a screen: shows current email (read-only), input for new email.
+- Submitting sends a verification magic link to the NEW email; tapping it confirms the change. The OLD email also receives a "your email was changed" notification with a "this wasn't me" recovery link.
+- Recovery link (sent to old email): 7-day window to revert the change, useful if account was compromised.
+- Edge case: user has lost access to BOTH old AND new email — manual support flow (out of scope for v1; document a `support@spoonsketch.app` contact).
+
+Acceptance criteria:
+- [ ] Verification link required on the new email before the change takes effect
+- [ ] Old email receives a notification; revert link works for 7 days
+- [ ] Apple Sign In users see "Manage Apple ID" deep-link instead (Apple owns that email)
+- [ ] Updated email reflects in `users.email` AND in Supabase `auth.users.email` consistently
 
 ---
 
@@ -1406,6 +1489,7 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 10 | Cook mode + polish | Week 16 | ⬜ Not started | Cook mode with screen-on, step checklist, all 4 palettes applied throughout |
 | 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
 | 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
+| 10.8 | Account management surfaces (order history, subscription manage, GDPR export, email change) | — | 🔴 **Launch blocker — not started** | Four account surfaces missing from the plan: (a) **Order history** `/me/orders` listing all `print_orders` rows with status + tracking; (b) **Manage subscription** `/me/subscription` showing current plan, renewal date, cancel button + **Restore Purchases** (Apple Store requires this for any IAP); (c) **GDPR data export** "Download my recipes + cookbooks as JSON" — required for EU users; (d) **Email change / recovery** flow — magic-link auth has no passwords but users still lose access to their email. Spec'd in §17, §18, §19, §20 below. **All four needed before App Store submission.** |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
 
 Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
