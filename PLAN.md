@@ -498,6 +498,7 @@ Content:
 Acceptance criteria:
 - [ ] Toggling "Scrapbook" navigates to 04a
 - [ ] Share button opens system share sheet with recipe text
+- [ ] **TODO** — Edit affordance: today there's no way to edit a recipe (title / description / ingredients / steps / times / tags) from Clean view. Required before launch — without it, AI extractions that come back partial or wrong are stuck. Likely shape: pencil icon in nav row, opens an inline edit mode (or routes to a `/recipe/[id]/edit` screen reusing the Create form). See Phase 10.5 below.
 
 ---
 
@@ -1440,6 +1441,7 @@ Items intentionally skipped during Phase 5 to keep scope tight. Implement before
 ### Other polish items
 - ✅ Per-recipe drawing persistence (landed 2026-04-22, see `BUGS.md` BUG-014): `drawingStore` now persists a `drawings` map keyed by `recipeId`; every mutation snapshots into it and `init` loads from it on recipe switch.
 - Apple Pencil pressure: wire `e.pressure` from the gesture event into `StrokePoint.pressure` for natural thinning (currently simulated at 0.5)
+- **Edit recipe from Clean view** — there's currently no edit affordance in Clean view (`/recipe/[id]?view=clean`). When AI extraction (URL import / Telegram bot screenshot) returns a partial or wrong recipe, the user has no way to fix the title / ingredients / steps / times / tags without re-importing. Required before launch. Shape: pencil icon in the nav row → routes to a `/recipe/[id]/edit` screen that reuses the Create / Edit form (`src/components/import/TypeTab.tsx` is a good base; pre-fill from the recipe and PATCH on save). See SCREENS.md §03b for the existing Create flow to mirror.
 
 ---
 

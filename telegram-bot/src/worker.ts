@@ -25,7 +25,11 @@ export async function bootWorker(bot: Telegraf): Promise<void> {
 
     const extractResult = payload.kind === 'url'
       ? await callExtractRecipe({ userId, url: payload.url })
-      : await callExtractRecipe({ userId, imageUrl: payload.imageUrl });
+      : await callExtractRecipe({
+          userId,
+          imageUrls: payload.imageUrls,
+          caption: payload.caption,
+        });
 
     if (!extractResult.ok) {
       const friendly = friendlyError(extractResult.errorCode, extractResult.status);

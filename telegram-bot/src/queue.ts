@@ -31,8 +31,14 @@ export interface ScreenshotJobPayload {
   userId: string;
   telegramId: number;
   chatId: number;
-  imageUrl: string;
-  storagePath: string;
+  // One or more sequential screenshots of the same recipe. Single-photo
+  // messages produce a 1-element array; Telegram albums (media_group)
+  // produce N. Capped at 10 in the upload step.
+  imageUrls: string[];
+  storagePaths: string[];
+  // Optional caption from the album's first photo. Passed to Haiku as
+  // user-provided context to disambiguate ambiguous screenshots.
+  caption?: string;
   jobRowId: string;
 }
 

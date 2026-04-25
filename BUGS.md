@@ -28,10 +28,34 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-020 | Medium | ✅ Fixed | Editor / Arrange | Font-size bump didn't grow text-heavy blocks (description / pills / headings) — text overflowed and got covered by next sibling. Only `method-list` worked because its default h was big enough to hide the bug. |
 | BUG-021 | Medium | ✅ Fixed | Export / PDF | PDF body fonts (ingredients-list, method-list, pills) hardcoded to Nunito instead of the recipe's `preset.section` font (Caveat by default). Title hardcoded to Fraunces instead of `preset.title`. |
 | BUG-022 | **High** | ✅ Fixed | Telegram bot / Edge Function auth | Bot calls to `telegram-auth` and `extract-recipe` blocked at Supabase gateway with `UNAUTHORIZED_NO_AUTH_HEADER` — function code never ran. Connect Telegram replied "Hmm, couldn't connect that." every time. |
+| BUG-023 | Medium | ✅ Fixed | AI extract / data shape | AI-extracted ingredients had no `id` field — `PageTemplates.tsx:286` rendered `<TouchableOpacity key={ing.id}>` with all keys `undefined`, triggering React duplicate-key warning. Tap-to-edit on ingredients was also broken (used `ing.id` as the edit target). |
+| BUG-024 | **High** | ✅ Fixed | AI extract / token budget | `max_tokens: 1024` truncated Haiku's JSON response on Cyrillic recipes (Russian/Ukrainian use ~3x the tokens of English) and on multi-image albums. Truncated JSON → `json_parse_failed` → bot replied "Got a partial read" with empty ingredients/instructions. |
 
 ---
 
-## BUG-022 — Bot calls to Edge Functions blocked by Supabase gateway
+## BUG-024 — Haiku output truncated, parsed as partial
+
+- **Found:** 2026-04-25 (phone test, 2-photo Ukrainian recipe album).
+- **Severity:** **High** — every Cyrillic recipe and most multi-image albums returned `partial: true` with empty content. User sees "Got a partial read" and a useless empty recipe row in the library. Effectively breaks i18n + Phase 1 multi-image for non-English users.
+- **Repro:** Send 2 screenshots of a Russian or Ukrainian recipe to the bot. Bot replies "Got a partial read — open in app to fill in the rest." Recipe row in DB has `title='Untitled Recipe'`, `ingredients=[]`, `instructions=[]`. `ai_jobs.output_data.raw` shows valid-looking JSON cut off mid-string.
+- **Root cause:** `extract-recipe/index.ts` hardcoded `max_tokens: 1024` on the Anthropic call. Anthropic's tokenizer uses ~3x more tokens for Cyrillic than for Latin scripts (each Cyrillic character ≈ multiple BPE tokens). A typical Russian recipe with 8-10 ingredients + 5 instructions easily exceeds 1024 output tokens. Multi-image input also adds modest pressure (more tokens spent on the system+image-context portion of the budget? No — that's input — but Haiku's response still got cut). The truncated raw text reached `safeJsonParse`, failed, and fell through to the explicit-partial branch.
+- **Fix:** Bump `max_tokens` to `4096`. Covers the largest realistic recipe across all supported languages. Cost is per actual output token used (not per cap), so no cost penalty for English/short recipes.
+- **Commit:** _(this commit)_
+- **Test:** new `MANUAL_TESTS.md` Phase 8 scenario — send a Russian or Ukrainian recipe screenshot, verify full extraction (no "Got a partial read"). Also adds: "send a 5-ingredient English recipe → still works" regression check.
+
+ — AI-extracted ingredients had no client id
+
+- **Found:** 2026-04-25 (phone test, after first successful Telegram bot extraction)
+- **Severity:** Medium — visual: every AI-imported recipe trips a noisy React warning when rendered in any template. Functional: tap-to-edit on ingredient rows was broken (`setEditing({ kind: 'ing', id: ing.id, ... })` carried `id: undefined`).
+- **Repro:** Send a recipe URL or screenshot to the bot, wait for "Saved!", open the recipe in the app, scroll to ingredients. Console (or in-app red box on iOS): `Each child in a list should have a unique "key" prop. … See <Classic />.`
+- **Root cause:** The Edge Function's extraction JSON schema (`extract-recipe/index.ts:18-37`) defines ingredients as `{ name, amount, unit, group }` — no `id`. But the client `Ingredient` type (`src/types/recipe.ts:1-7`) requires `id: string`, and `PageTemplates.tsx:286` keys the rendered list by `ing.id`. Manual recipes get ids from the Create form (`TypeTab.tsx`), but AI-imported ones land in the DB without ids and the type assertion in `fetchRecipes` silently coerced bad data.
+- **Fix:**
+  - **Server**: `extract-recipe/index.ts` post-parse normalization assigns `crypto.randomUUID()` to each ingredient that doesn't already have an id. New AI imports come back with valid ids.
+  - **Client read**: `src/api/recipes.ts` `normalizeIngredients()` ensures every ingredient on `fetchRecipes` / `fetchRecipe` has an id (and validated `name`/`amount`/`unit`/`group`). Defense in depth + handles legacy rows already in the DB.
+- **Commit:** _(this commit)_
+- **Test:** import a recipe via Telegram bot → open in Library → no React warning, ingredient tap-to-edit works. New `MANUAL_TESTS.md` Phase 8 scenario adds a verification step.
+
+
 
 - **Found:** 2026-04-25 (first attempt to run the bot end-to-end after Phase 8.2)
 - **Severity:** **High** — Connect Telegram + recipe-link import via the bot were both fully broken. Phase 8 unusable.

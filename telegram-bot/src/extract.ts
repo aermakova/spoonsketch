@@ -26,7 +26,11 @@ export interface ExtractedRecipe {
 interface ExtractInput {
   userId: string;
   url?: string;
-  imageUrl?: string;
+  // For image mode: one or more screenshot URLs of the SAME recipe. The
+  // Edge Function combines them into a single Haiku call with N image
+  // content blocks. Single-photo callers pass a 1-element array.
+  imageUrls?: string[];
+  caption?: string;
 }
 
 export type ExtractResult =
@@ -36,7 +40,10 @@ export type ExtractResult =
 export async function callExtractRecipe(input: ExtractInput): Promise<ExtractResult> {
   const body: Record<string, unknown> = { user_id: input.userId };
   if (input.url) body.url = input.url;
-  if (input.imageUrl) body.image_url = input.imageUrl;
+  if (input.imageUrls && input.imageUrls.length > 0) {
+    body.image_urls = input.imageUrls;
+  }
+  if (input.caption) body.caption = input.caption;
 
   // Function is deployed with verify_jwt=false (the gateway's JWT check is
   // skipped); auth is via X-Spoon-Bot-Secret + body user_id, enforced inside

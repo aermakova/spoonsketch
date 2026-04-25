@@ -33,7 +33,9 @@ Rules:
 - "tags" is at most 5 short lower-case tokens (e.g. "italian", "vegetarian", "quick").
 - "confidence" is between 0 and 1. Lower it when content is ambiguous or incomplete.
 - Preserve the original language of the recipe content in title / ingredients / instructions.
-- If you cannot find a recipe in the content, return this instead and nothing else: { "partial": true, "reason": "<short reason>" }.
+- "title" must always be a short, human-readable dish name (1-4 words). If no explicit title is visible in the source, synthesize one from the main ingredient or dish (e.g. "Tomato soup", "Garlic bread", "Chocolate cake", "Часниковий хліб", "Борщ"). Never return an empty title or a placeholder like "Untitled" / "Recipe" / "Без названия". Match the recipe's language.
+- If the user-provided context (passed in the user message as "User context: …") clearly names the dish AND no title is visible in the source, prefer that context as the title (cleaned up to 1-4 words, in the recipe's language).
+- If you cannot find a recipe in the content, return this instead and nothing else: { "partial": true, "reason": "<short reason>" }. A recipe missing only the title is still a recipe — synthesize the title per the rule above; do NOT return partial.
 - Output valid JSON only. No prose. No markdown fences.`;
 
 // Bot-mode auth: pulls user_id from the body, validates it exists in
@@ -115,9 +117,19 @@ Deno.serve(async (req) => {
     if (ctx instanceof Response) return ctx;
   }
 
-  // Parse body. Accepts EITHER `url` (scrape + extract) OR `image_url`
-  // (Haiku reads the image directly — no scrape). Mutually exclusive.
-  let body: { url?: unknown; image_url?: unknown; locale?: unknown };
+  // Parse body. Accepts ONE of:
+  //   - `url`            scrape + extract (URL mode)
+  //   - `image_url`      single screenshot — legacy single-image shape
+  //   - `image_urls[]`   1+ screenshots of the SAME recipe (multi-image)
+  // Modes are mutually exclusive. `caption` is an optional user-provided
+  // hint that gets folded into the Haiku prompt for image modes.
+  let body: {
+    url?: unknown;
+    image_url?: unknown;
+    image_urls?: unknown;
+    caption?: unknown;
+    locale?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -125,24 +137,38 @@ Deno.serve(async (req) => {
   }
   const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
   const rawImageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : '';
+  const rawImageUrls: string[] = Array.isArray(body.image_urls)
+    ? (body.image_urls as unknown[]).filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter((v) => v.length > 0)
+    : [];
+  const caption = typeof body.caption === 'string' ? body.caption.trim().slice(0, 500) : '';
   const locale = typeof body.locale === 'string' ? body.locale : 'en';
 
-  if (!rawUrl && !rawImageUrl) {
-    return jsonError(400, 'invalid_input', 'url or image_url is required');
+  // Normalize: collapse `image_url` (legacy) into the `image_urls` array.
+  const allImageUrls = rawImageUrl ? [rawImageUrl, ...rawImageUrls] : rawImageUrls;
+  const hasImage = allImageUrls.length > 0;
+
+  if (!rawUrl && !hasImage) {
+    return jsonError(400, 'invalid_input', 'url, image_url, or image_urls is required');
   }
-  if (rawUrl && rawImageUrl) {
-    return jsonError(400, 'invalid_input', 'Pass either url or image_url, not both');
+  if (rawUrl && hasImage) {
+    return jsonError(400, 'invalid_input', 'Pass either url or image (not both)');
+  }
+  if (allImageUrls.length > 10) {
+    return jsonError(400, 'invalid_input', 'image_urls accepts at most 10 entries');
   }
 
-  const isImageMode = !!rawImageUrl;
+  const isImageMode = hasImage;
   const jobType = isImageMode ? 'image_extract' as const : 'url_extract' as const;
 
   // Validate input per-mode
-  let validatedTarget: string;
+  let validatedTarget: string = '';
+  let validatedImageUrls: string[] = [];
   if (isImageMode) {
-    const v = validateImageUrl(rawImageUrl);
-    if (!v.ok) return jsonError(400, 'invalid_image_url', v.reason);
-    validatedTarget = v.url;
+    for (const u of allImageUrls) {
+      const v = validateImageUrl(u);
+      if (!v.ok) return jsonError(400, 'invalid_image_url', v.reason);
+      validatedImageUrls.push(v.url);
+    }
   } else {
     const v = validateUrl(rawUrl);
     if (!v.ok) return jsonError(400, 'invalid_url', v.reason);
@@ -164,23 +190,31 @@ Deno.serve(async (req) => {
 
   // Build the input the model sees:
   // - URL mode: scrape the page → text payload.
-  // - Image mode: skip scrape; emit an image content block referencing the
-  //   storage URL. Haiku fetches the bytes itself.
+  // - Image mode: skip scrape; emit N image content blocks referencing the
+  //   storage URLs (Haiku fetches the bytes itself). N == 1 is the original
+  //   single-screenshot path; N > 1 is a Telegram album, treated as
+  //   sequential pages of the same recipe.
   const inputForLog: Record<string, unknown> = isImageMode
-    ? { image_url: rawImageUrl }
+    ? { image_urls: validatedImageUrls, ...(caption ? { caption } : {}) }
     : { url: rawUrl };
 
   let userMessageContent: string | Array<Record<string, unknown>>;
 
   if (isImageMode) {
+    const imageBlocks = validatedImageUrls.map((url) => ({
+      type: 'image',
+      source: { type: 'url', url },
+    }));
+    const promptText =
+      validatedImageUrls.length === 1
+        ? `Locale: ${locale}\n\nExtract the recipe from this image.`
+        : `Locale: ${locale}\n\nExtract one recipe from these ${validatedImageUrls.length} images. They are sequential screenshots of the SAME recipe (different pages or scrolled sections of the same source). Combine the information across all images into one structured recipe. If a piece of information appears on multiple screenshots, take the clearest version.`;
+    const captionLine = caption ? `\n\nUser context: ${caption}` : '';
     userMessageContent = [
-      {
-        type: 'image',
-        source: { type: 'url', url: validatedTarget },
-      },
+      ...imageBlocks,
       {
         type: 'text',
-        text: `Locale: ${locale}\n\nExtract the recipe from this image.`,
+        text: promptText + captionLine,
       },
     ];
   } else {
@@ -239,7 +273,13 @@ Deno.serve(async (req) => {
   try {
     haikuResponse = await anthropic.messages.create({
       model: HAIKU_MODEL,
-      max_tokens: 1024,
+      // 4096 covers the largest realistic recipe payload across all
+      // supported languages. Cyrillic/Ukrainian use ~3x the tokens of
+      // English in Anthropic's tokenizer, and multi-image albums add
+      // input pressure too. 1024 was truncating Russian recipes
+      // mid-JSON → json_parse_failed → "Got a partial read" UX bug
+      // (BUG-024). Cost is per token used, not per cap, so this is safe.
+      max_tokens: 4096,
       temperature: 0,
       system: [
         {
@@ -301,6 +341,19 @@ Deno.serve(async (req) => {
   // Image mode never has a "source URL" worth storing on the recipe — the
   // image is a one-shot input. URL mode keeps the canonical source link.
   const sourceUrlPatch = isImageMode ? {} : { source_url: validatedTarget };
+
+  // Assign stable client-side ids to each ingredient. Haiku's output schema
+  // doesn't include ids; the React component (PageTemplates) renders the
+  // list with `key={ing.id}` and uses `ing.id` as the edit-target identifier
+  // (BUG-023). Without this, every AI-extracted recipe trips the React
+  // duplicate-key warning and breaks tap-to-edit.
+  if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { ingredients?: unknown[] }).ingredients)) {
+    const obj = parsed as Record<string, unknown>;
+    obj.ingredients = (obj.ingredients as Array<Record<string, unknown>>).map((ing) => ({
+      ...ing,
+      id: typeof ing.id === 'string' && ing.id.length > 0 ? ing.id : crypto.randomUUID(),
+    }));
+  }
 
   // Haiku returned an explicit partial
   if (parsed && typeof parsed === 'object' && (parsed as { partial?: boolean }).partial) {
