@@ -13,7 +13,7 @@ const MAX_SCRAPE_CHARS = 20_000;
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 3;
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; SpoonAndSketchBot/1.0; +https://spoonsketch.app)';
+  'Mozilla/5.0 (compatible; SpoonsketchBot/1.0; +https://spoonsketch.app)';
 
 const EXTRACTION_SYSTEM_PROMPT = `You are a recipe extraction assistant. The input is either scraped text from a recipe webpage OR an image of a recipe (a screenshot, photo, scanned cookbook page, etc.). Extract exactly this JSON shape and nothing else:
 

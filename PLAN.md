@@ -176,7 +176,7 @@ Free tier is genuinely useful; premium unlocks the best parts.
 |---|---|---|
 | Cookbooks | 3 | Unlimited |
 | Recipes | 30 | Unlimited |
-| Built-in stickers | All 16 | All current + future packs |
+| Built-in stickers | Essentials pack only (~28 after Phase 8.5A) | All 4 packs (~76 stickers) + future packs |
 | PDF export | Watermarked | No watermark |
 | Print orders | 1/month | Unlimited |
 | AI auto-sticker | 5 uses/month | Unlimited |
@@ -210,7 +210,7 @@ Onboarding (7 steps) · Home · Library (shelf + index) · Import Recipe · Crea
 **Features:**
 - Email magic link + Apple Sign In auth
 - Recipe CRUD (manual + URL import + screenshot import + Telegram bot)
-- 16 built-in SVG stickers
+- 16 built-in PNG stickers (Phase 8.5A grows this to ~76 across 4 packs)
 - Canvas editor: stickers, washi tape, text, photos, templates
 - Freehand drawing: layers, blend modes, Apple Pencil pressure
 - "Make me Sketch" auto-decoration
@@ -1226,7 +1226,7 @@ const STICKER_AI_KEYWORDS = {
 Deployed on Railway (Node.js service, always-on).
 
 ```
-User sends link/screenshot to @SpoonAndSketchBot
+User sends link/screenshot to @spoonsketch_bot
 → Bot receives webhook (Telegraf)
 → Creates telegram_jobs row (status: pending)
 → Pushes job to BullMQ queue
@@ -1397,12 +1397,27 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 6 | Book builder | Week 10–11 | ✅ Done | All page types, drag reorder, cookbook CRUD, swipe edit/delete, recipe page → editor → back |
 | 7 | AI: auto-sticker + recipe import | Week 12 | ⬜ Not started | "Make me Sketch" places ≥3 relevant stickers, link import extracts recipe |
 | 8 | Telegram bot | Week 13 | ⬜ Not started | Send link to bot → recipe appears in app within 30s |
+| 8.5 | Photos, frames & watercolor | Week 13.5 | ⬜ Not started | User uploads 1 photo per recipe; placeable on canvas with 1 of 8 frames; premium users convert to watercolor via OpenAI; 4 sticker packs (~76 stickers); see `.claude/plans/wise-spinning-creek.md` |
 | 9 | PDF export + print order | Week 14–15 | ⬜ Not started | Generate scrapbook PDF, clean PDF, Lulu order placed and tracked |
 | 10 | Cook mode + polish | Week 16 | ⬜ Not started | Cook mode with screen-on, step checklist, all 4 palettes applied throughout |
 | 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
 
 Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
+
+---
+
+## Phase 8.5 — Photos, Frames & Watercolor
+
+Detailed plan: `.claude/plans/wise-spinning-creek.md`. Five sub-phases, ~46h total:
+
+- **A — Sticker expansion** (~6h): 16 → ~76 PNGs across 4 packs (Essentials free + Baking / Herbs / Holiday premium), generated via a `gpt-image-1` dev script. Premium packs gated server-side in `auto-sticker` Edge Function.
+- **B — Recipe photo upload** (~8h): new private `recipe-photos` Storage bucket; `user_images.recipe_id` + `user_images.role` columns; new "Photo" tab in editor's bottom tray (upload / replace / remove).
+- **C — Photo on canvas + frames** (~14h): `CanvasEl` discriminated-union refactor (sticker | photo); 8 hand-drawn SVG frames in `framesRegistry.ts`; Skia photo rendering with the same gesture set as stickers.
+- **D — Watercolor via OpenAI** (~10h): new Edge Function `watercolor-image` calling `gpt-image-1`'s `images.edits`; premium-only with a 10/month cap; both original + painted user_images persist; canvas exposes an in-place toggle.
+- **E — PDF export + docs + tests** (~8h): photos + frames inlined in `expo-print` HTML via base64; living docs (`FEATURES.md`, `BACKEND.md`, `MANUAL_TESTS.md`) caught up.
+
+Sequencing: A standalone (content + UI gate). B → C → D is a hard chain. E closes the loop. Critical files: `src/lib/canvasStore.ts`, `src/lib/stickerRegistry.ts`, `supabase/functions/auto-sticker/index.ts`, `supabase/functions/_shared/{ai,tier}.ts`. Out of scope: persisting canvas elements to Supabase (stays Zustand+MMKV); shared/family canvases; >1 photo per recipe.
 
 ---
 

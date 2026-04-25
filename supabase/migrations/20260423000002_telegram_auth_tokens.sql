@@ -3,7 +3,7 @@
 -- Flow:
 -- 1. App generates a row here when the user taps "Connect Telegram", returns
 --    `token` to the client.
--- 2. Client opens `tg://resolve?domain=SpoonAndSketchBot&start=<token>`.
+-- 2. Client opens `tg://resolve?domain=spoonsketch_bot&start=<token>`.
 -- 3. Bot service receives `/start <token>`, calls the `telegram-auth` Edge
 --    Function with `X-Spoon-Bot-Secret` header + the token.
 -- 4. Edge Function looks up the token, marks it consumed, and inserts a

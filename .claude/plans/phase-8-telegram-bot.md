@@ -1,4 +1,4 @@
-# Plan — Phase 8: Telegram bot ("send recipe to @SpoonAndSketchBot")
+# Plan — Phase 8: Telegram bot ("send recipe to @spoonsketch_bot")
 
 **Owner:** Angy
 **Target phase (master tracker):** Phase 8 — "Telegram bot"
@@ -11,7 +11,7 @@ Turn Telegram into the frictionless recipe-capture channel for Spoon & Sketch.
 
 User flow the app must enable:
 
-> User is browsing recipes on their phone, copies a URL or screenshots a page → opens chat with `@SpoonAndSketchBot` → pastes / drops the image → 5–15 seconds later, a recipe appears in their Library on the app, no tapping back and forth.
+> User is browsing recipes on their phone, copies a URL or screenshots a page → opens chat with `@spoonsketch_bot` → pastes / drops the image → 5–15 seconds later, a recipe appears in their Library on the app, no tapping back and forth.
 
 Within the app, user flow:
 
@@ -33,7 +33,7 @@ Plus:
 
 | ✅ In this plan | ⏸ Deferred |
 |---|---|
-| `@SpoonAndSketchBot` Telegram bot (Telegraf on Railway) | WhatsApp bot (separate plan — see footer) |
+| `@spoonsketch_bot` Telegram bot (Telegraf on Railway) | WhatsApp bot (separate plan — see footer) |
 | Single-user bot auth via one-time token | Group chat support |
 | Text messages with URLs → url_extract pipeline | Voice messages, video, forwarded messages |
 | Photo messages → image_extract pipeline | Multi-photo album handling (just use first photo) |
@@ -53,7 +53,7 @@ Plus:
 - There's no `supabase/functions/telegram-auth/` yet.
 - There's no `telegram-bot/` directory yet. Phase 8 creates a new Node.js service in this repo under `telegram-bot/` (simpler than a separate repo for MVP).
 - The client has no "Connect Telegram" UI. Me tab is still a placeholder.
-- `@SpoonAndSketchBot` does not yet exist on Telegram (needs BotFather setup).
+- `@spoonsketch_bot` does not yet exist on Telegram (needs BotFather setup).
 
 ## Sub-phase breakdown
 
@@ -190,7 +190,7 @@ Client:
   - Current connection state via a `useTelegramConnection()` hook that queries `telegram_connections` for the current user.
   - If not connected: **Connect Telegram** ClayButton. Tapping it:
     1. Generates a row in `telegram_auth_tokens` via PostgREST.
-    2. Opens `tg://resolve?domain=SpoonAndSketchBot&start=<token>` via Linking.openURL. Fallback: show the `https://t.me/SpoonAndSketchBot?start=<token>` URL + a copy-to-clipboard button for devices without Telegram installed.
+    2. Opens `tg://resolve?domain=spoonsketch_bot&start=<token>` via Linking.openURL. Fallback: show the `https://t.me/spoonsketch_bot?start=<token>` URL + a copy-to-clipboard button for devices without Telegram installed.
   - If connected: shows "✓ Connected as @username · last synced <relative time>" + **Disconnect** button (deletes the `telegram_connections` row).
 - `src/api/telegramAuth.ts` — `generateTelegramToken()`, `disconnectTelegram()`.
 - `src/hooks/useTelegramConnection.ts` — query + realtime subscription for the row (auto-updates UI when the bot inserts the connection).
@@ -289,7 +289,7 @@ Edited:
 ## Open questions (flag before coding)
 
 1. **Bot talks to Haiku via the Edge Function, or directly?** Leaning toward **via the Edge Function** (single source of prompt truth, single quota counter, single place to rotate keys). Needs the `X-Spoon-Bot-Secret` header trick (extract-recipe accepts a "bot auth" mode that trusts a `user_id` in the body instead of the JWT). Alternative: bot duplicates the Haiku call, Edge Function stays user-only. The shared-secret path is ~30 more lines in extract-recipe but keeps the prompt authoritative. Decision needed before 8.2.
-2. **Bot username.** `@SpoonAndSketchBot` vs `@SpoonSketchBot` vs `@spoonsketch_bot`. Telegram doesn't allow spaces / ampersands. Check availability on BotFather first.
+2. **Bot username.** `@spoonsketch_bot` vs `@SpoonSketchBot` vs `@spoonsketch_bot`. Telegram doesn't allow spaces / ampersands. Check availability on BotFather first.
 3. **Multi-photo album (a user forwards a carousel of 4 screenshots):** just take the first photo? or enqueue all four? v1: first photo only. Document the limitation in the bot reply: "Send screenshots one at a time for now."
 4. **Recipe link in reply vs. auto-open:** we reply with a markdown link (`[Open in app →](spoonsketch://...)`). That's a tap. Auto-opening deep links from Telegram isn't possible (user must tap). No action needed, just call it out in UX copy.
 5. **Bot gives up after how many failures in a row?** No auto-unlink on errors — admin-handled for now. If a user's chat is flooded with failures, they can disconnect + reconnect themselves.
