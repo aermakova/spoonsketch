@@ -5,7 +5,7 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/fonts';
 import { useThemeStore } from '../../lib/store';
 
-export type ImportTabKey = 'paste' | 'type' | 'photo' | 'file';
+export type ImportTabKey = 'paste' | 'type' | 'photo' | 'file' | 'json';
 
 interface TabDef {
   key: ImportTabKey;
@@ -17,8 +17,9 @@ interface TabDef {
 const TABS: TabDef[] = [
   { key: 'paste', label: 'Paste Link', icon: 'paperclip' },
   { key: 'type', label: 'Type', icon: 'edit-2' },
-  { key: 'photo', label: 'Photo', icon: 'camera', disabled: true },
-  { key: 'file', label: 'File', icon: 'file-text', disabled: true },
+  { key: 'photo', label: 'Photo', icon: 'camera' },
+  { key: 'file', label: 'File', icon: 'file-text' },
+  { key: 'json', label: 'JSON', icon: 'code' },
 ];
 
 interface Props {

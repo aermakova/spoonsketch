@@ -78,6 +78,38 @@ async function invokeExtract(body: Record<string, unknown>): Promise<ExtractedRe
   return data as ExtractedRecipe;
 }
 
+export interface JsonImportFailure {
+  index: number;
+  reason: string;
+}
+export interface JsonImportResult {
+  inserted: number;
+  failed: JsonImportFailure[];
+}
+
+/**
+ * Bulk-import recipes from user-pasted JSON. Goes through
+ * `import-recipes-json` Edge Function which sanitizes every byte
+ * server-side. Returns a per-recipe failure list so we can show
+ * "Imported 4 of 5 — 1 skipped: missing title".
+ */
+export async function importRecipesFromJson(
+  recipes: unknown[],
+): Promise<JsonImportResult> {
+  const { data, error } = await supabase.functions.invoke<
+    JsonImportResult | EdgeErrorBody
+  >('import-recipes-json', { body: { recipes } });
+
+  if (error) {
+    const errBody = await readEdgeErrorBody(error);
+    throw mapEdgeError(errBody);
+  }
+  if (!data || typeof (data as JsonImportResult).inserted !== 'number') {
+    throw new AiError('Empty response from import-recipes-json', 'unknown');
+  }
+  return data as JsonImportResult;
+}
+
 async function readEdgeErrorBody(err: unknown): Promise<EdgeErrorBody> {
   try {
     const maybeCtx = (err as { context?: { json?: () => Promise<unknown> } })

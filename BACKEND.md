@@ -550,6 +550,50 @@ Extracts a recipe from a URL, screenshots, a PDF, or pasted text using Claude Ha
 
 **Auth:** function deployed with `verify_jwt = false` (see `supabase/config.toml`); function code accepts either a user JWT (PostgREST `requireUser`) OR `X-Spoon-Bot-Secret` header (bot mode with `user_id` in body).
 
+#### `POST /functions/v1/import-recipes-json`
+
+Bulk-imports user-pasted recipe JSON without going through Haiku. The user runs `JSON_IMPORT_PROMPT` (in `src/lib/jsonImportPrompt.ts`) through their own ChatGPT / Claude / Gemini against a multi-recipe PDF, then pastes the resulting JSON array back into the JSON tab.
+
+**Request:**
+```json
+{
+  "recipes": [
+    {
+      "title": "Tomato soup",
+      "description": "...",
+      "servings": 4,
+      "prep_minutes": 10,
+      "cook_minutes": 30,
+      "ingredients": [
+        { "name": "tomatoes", "amount": "800", "unit": "g", "group": null }
+      ],
+      "instructions": [{ "step": 1, "text": "..." }],
+      "tags": ["soup", "italian"],
+      "source_url": "https://..."
+    }
+  ]
+}
+```
+
+**Limits:**
+- Body size pre-parse: 500KB (DoS guard).
+- `recipes.length`: 1-20.
+- Per recipe: title 200 chars, description 2000, ingredient/instruction 50 each, max 5 tags.
+- `source_url`: must parse + https + non-private host. `javascript:`, `data:`, `file:` rejected.
+
+**Trust boundary:** every byte goes through `_shared/recipeSanitize.ts` — HTML stripped, fields outside the allowlist (`cover_image_url`, `is_favorite`, `cookbook_id`, `id`, `user_id`, etc.) silently dropped, `source_type` FORCED to `'json_import'`. The user's auth context's `user_id` is what lands on each row, never client input.
+
+**Response (200):**
+```json
+{ "inserted": 18, "failed": [{ "index": 5, "reason": "title_required" }, { "index": 11, "reason": "invalid_source_url" }] }
+```
+
+**Failure reason codes:** `not_an_object`, `title_required`, `ingredients_required`, `too_many_ingredients`, `too_many_instructions`, `invalid_source_url`. Top-level errors (`payload_too_large`, `too_many_recipes`, `bad_request`, `monthly_limit_reached`, `rate_limited`) return 4xx with the standard error envelope.
+
+**Auth:** JWT only (`requireUser`). Function deployed with `verify_jwt = false` because the gateway only accepts the legacy `eyJ...` JWT format and our project uses the modern `sb_publishable_*` format which doesn't satisfy it; function code's own `auth.getUser(jwt)` accepts both.
+
+**Quota:** counts as 1 `json_import` per call regardless of how many recipes are in the array. Free = 5/month. Premium = unlimited.
+
 **Response (200):**
 ```json
 {

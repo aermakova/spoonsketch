@@ -12,6 +12,70 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## JSON bulk import tab (landed 2026-04-25)
+
+Prereqs:
+- Signed-in user. Free-tier `json_import` quota not exhausted.
+- `import-recipes-json` Edge Function deployed.
+- Migration `20260425000003_json_import.sql` applied (extends `recipes.source_type` and `ai_jobs.job_type`).
+
+### 1. Copy prompt UX
+- Add tab → Import a Recipe → **JSON** tab.
+- Tap **Copy prompt**. ✅ Expect: button label flips to "Copied ✓" for ~1.8s.
+- Verify clipboard: paste anywhere → matches `JSON_IMPORT_PROMPT` from `src/lib/jsonImportPrompt.ts`.
+- Tap **Show prompt** → ✅ collapsible reveals the prompt verbatim. Tap again → hides.
+
+### 2. Happy path — 3 valid recipes
+- Paste a hand-crafted JSON array of 3 recipes (each with title, ingredients, instructions). ✅ Live badge: "3 recipes detected".
+- Tap **Import All** → spinner → ✅ alert "Imported 3 recipes — Open Library to see them." → tap OK → modal closes.
+- ✅ Library shows the 3 new rows (Realtime + cache invalidation).
+
+### 3. Truncation — 25 recipes
+- Paste an array with 25 entries. ✅ Live badge: "20 of 25 recipes — server will keep first 20".
+- Import → ✅ "Imported 20 recipes" — last 5 are dropped (server enforces cap).
+
+### 4. Partial success — invalid recipe in middle
+- Paste 4 valid + 1 missing-title recipe at index 2. ✅ "Imported 4 of 5 — 1 skipped: title_required" in the alert body.
+
+### 5. XSS / HTML strip
+- Paste `[{ "title": "<script>alert(1)</script>Tomato", "ingredients": [{"name": "tomato"}] }]`.
+- ✅ Alert "Imported 1 recipe". Open the recipe → title reads `alert(1)Tomato` (HTML stripped, raw JS kept as text — not executed).
+
+### 6. Forbidden field stripping
+- Paste `[{ "title": "X", "ingredients": [{"name": "y"}], "is_favorite": true, "cover_image_url": "https://evil/x.jpg", "cookbook_id": "fake-uuid" }]`.
+- ✅ Recipe imports. Open it → no cover image, not favourite. SQL: `select is_favorite, cover_image_url, cookbook_id from recipes where title='X'` returns `false / null / null`.
+
+### 7. URL validation
+- Paste `[{ "title": "X", "ingredients": [{"name":"y"}], "source_url": "javascript:alert(1)" }]`.
+- ✅ Alert "Imported 0 recipes — 1 skipped: invalid_source_url". Nothing in DB.
+- Replace with `"source_url": "http://example.com/x"` → also rejected (non-https).
+- Replace with `"source_url": "https://example.com/x"` → ✅ imports.
+
+### 8. Invalid JSON
+- Paste `{not json}`. ✅ Live badge: red "Invalid JSON: …".
+- Import button stays disabled.
+
+### 9. Markdown fence tolerance
+- Paste `\`\`\`json\n[{ "title": "X", "ingredients": [{"name":"y"}] }]\n\`\`\``.
+- ✅ Live badge "1 recipe detected" (parser strips fences).
+- Import → ✅ "Imported 1 recipe".
+
+### 10. Quota cap
+- Burn 5 `json_import` calls in the same UTC month.
+- 6th attempt → ✅ Replaces Import button with cap card "You've used 5 / 5 JSON imports this month" + Upgrade.
+
+### 11. Body size cap
+- Paste a synthetic JSON > 500KB. ✅ Top-level error from server: `payload_too_large` → inline error.
+
+### 12. .json file pick
+- Tap **Choose .json file** → pick a 3-recipe `.json` file. ✅ Textarea fills with the file contents; live badge updates.
+
+### 13. Realtime
+- Open Library tab in another instance / leave it open before importing.
+- Run scenario 2 → ✅ recipes animate into the library list within ~5s of the alert dismissal.
+
+---
+
 ## Photo + File import tabs (landed 2026-04-25)
 
 Prereqs:

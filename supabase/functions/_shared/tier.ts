@@ -8,6 +8,10 @@ export const FREE_MONTHLY_LIMITS: Record<AiJobType, number> = {
   image_extract: 20,
   pdf_extract: 20,
   auto_sticker: 5,
+  // json_import has zero Haiku cost (user pays their own ChatGPT/Claude),
+  // but we cap blast radius for spam abuse. 5/month × 20 recipes = up to
+  // 100 free recipes/month via this path.
+  json_import: 5,
 };
 
 // Minimum seconds between consecutive calls from the same user to the same

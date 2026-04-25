@@ -1396,7 +1396,7 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 4.5c | Draggable recipe blocks | — | ✅ Done | All 6 templates use absolute-positioned BlockElements; blocks are drag/rotate/scale/delete-able; positions persist per recipe; "Arrange Blocks" toggle + Reset in Layout tab; template change requires confirmation if overrides exist |
 | 5 | Drawing + layers | Week 8–9 | ✅ Done | Freehand drawing, eraser with layer isolation, 3 layers, blend modes, undo/redo |
 | 6 | Book builder | Week 10–11 | ✅ Done | All page types, drag reorder, cookbook CRUD, swipe edit/delete, recipe page → editor → back |
-| 7 | AI: auto-sticker + recipe import | Week 12 | 🔄 In progress | "Make me Sketch" places ≥3 relevant stickers ✅; link import ✅; Photo + File tabs ✅ (2026-04-25) — all 4 Import tabs live |
+| 7 | AI: auto-sticker + recipe import | Week 12 | 🔄 In progress | "Make me Sketch" places ≥3 relevant stickers ✅; link import ✅; Photo + File tabs ✅; JSON bulk-import tab ✅ (2026-04-25) — all 5 Import tabs live |
 | 8 | Telegram bot | Week 13 | ⬜ Not started | Send link to bot → recipe appears in app within 30s |
 | 8.5 | Photos, frames & watercolor | Week 13.5 | ⬜ Not started | User uploads 1 photo per recipe; placeable on canvas with 1 of 8 frames; premium users convert to watercolor via OpenAI; 4 sticker packs (~76 stickers); see `.claude/plans/wise-spinning-creek.md` |
 | 9 | PDF export + print order | Week 14–15 | ⬜ Not started | Generate scrapbook PDF, clean PDF, Lulu order placed and tracked |

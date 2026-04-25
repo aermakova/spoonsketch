@@ -30,3 +30,10 @@ verify_jwt = false
 
 [functions.extract-recipe]
 verify_jwt = false
+
+# JSON-import is JWT-only (no bot path), but the gateway only accepts the
+# legacy `eyJ...` JWT format and our project uses the new `sb_publishable_*`
+# format which doesn't satisfy it. Disabling here so the function's own
+# `requireUser` (which DOES accept the modern format) gets to run.
+[functions.import-recipes-json]
+verify_jwt = false

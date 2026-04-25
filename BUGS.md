@@ -30,10 +30,21 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-022 | **High** | ✅ Fixed | Telegram bot / Edge Function auth | Bot calls to `telegram-auth` and `extract-recipe` blocked at Supabase gateway with `UNAUTHORIZED_NO_AUTH_HEADER` — function code never ran. Connect Telegram replied "Hmm, couldn't connect that." every time. |
 | BUG-023 | Medium | ✅ Fixed | AI extract / data shape | AI-extracted ingredients had no `id` field — `PageTemplates.tsx:286` rendered `<TouchableOpacity key={ing.id}>` with all keys `undefined`, triggering React duplicate-key warning. Tap-to-edit on ingredients was also broken (used `ing.id` as the edit target). |
 | BUG-024 | **High** | ✅ Fixed | AI extract / token budget | `max_tokens: 1024` truncated Haiku's JSON response on Cyrillic recipes (Russian/Ukrainian use ~3x the tokens of English) and on multi-image albums. Truncated JSON → `json_parse_failed` → bot replied "Got a partial read" with empty ingredients/instructions. |
+| BUG-025 | **High** | ✅ Fixed | AI extract / multi-recipe pages | URL imports from pages containing several recipe variations merged ALL recipes into one extraction with combined ingredient lists — "Milk, Eggs, Flour" appearing three times with different amounts/groups. User-visible result: "ingredients pasted 3 times." |
 
 ---
 
-## BUG-024 — Haiku output truncated, parsed as partial
+## BUG-025 — Multi-recipe sources merged into one bloated extraction
+
+- **Found:** 2026-04-25 (URL import from `rud.ua/.../milk-pancakes-71/`).
+- **Severity:** **High** — any URL or PDF source listing multiple recipe variations on a single page came back as one Frankenstein recipe with 2-3x the ingredients (each ingredient repeated per variant). Practically unusable; user has to manually delete two-thirds of the data.
+- **Repro:** Paste Link tab → `https://rud.ua/consumer/recipe/desertu/milk-pancakes-71/` → Import. ✅ Expected: one recipe (the primary "Простий рецепт"). Actual: one recipe titled "Млинці на молоці" with 20 ingredients spanning all three variations on the page (`group` field correctly identifies the variant; UI shows them all stacked).
+- **Root cause:** The system prompt at `extract-recipe/index.ts:18-37` had no rule about multi-recipe sources. Haiku saw three recipes, dutifully extracted all three, and emitted them as a flat ingredient list with `group` set per source recipe. PDF mode had a per-mode rule ("extract only the first/most prominent") but URL and Photo modes didn't.
+- **Fix:** Universal system-prompt rule: *"If the source contains MULTIPLE DISTINCT RECIPES (e.g., a webpage listing several variations like Classic / Yeast / Thin; a cookbook page with two recipes; a roundup article), extract ONLY the PRIMARY/FIRST recipe. Do not merge ingredients or steps from different recipes into a single output."* Tightens behavior across URL, Photo, AND PDF modes consistently. The PDF-specific user prompt rule is now redundant but kept as a hint.
+- **Commit:** _(this commit)_
+- **Test:** new `MANUAL_TESTS.md` scenario — re-import the Ukrainian rud.ua URL (or any roundup like NYT Cooking's "5 Ways To Cook X") → exactly one recipe extracted with the page's primary title; ingredients are NOT duplicated; `group` field is null or names sub-sections of one recipe (not different recipes). Future polish (segmentation): "import all 3 recipes" as a Premium feature, paralleling the bot's deferred Phase 2 plan.
+
+ — Haiku output truncated, parsed as partial
 
 - **Found:** 2026-04-25 (phone test, 2-photo Ukrainian recipe album).
 - **Severity:** **High** — every Cyrillic recipe and most multi-image albums returned `partial: true` with empty content. User sees "Got a partial read" and a useless empty recipe row in the library. Effectively breaks i18n + Phase 1 multi-image for non-English users.

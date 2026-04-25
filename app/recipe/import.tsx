@@ -6,6 +6,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -39,7 +40,13 @@ import {
   type FileTabInlineError,
   type FileTabCapped,
 } from '../../src/components/import/FileTab';
+import {
+  JsonTab,
+  type JsonTabInlineError,
+  type JsonTabCapped,
+} from '../../src/components/import/JsonTab';
 import type { ExtractedRecipe } from '../../src/types/ai';
+import type { JsonImportResult } from '../../src/api/ai';
 
 const VALID_TABS: ImportTabKey[] = ['paste', 'type', 'photo', 'file'];
 
@@ -89,6 +96,12 @@ function ImportRecipeScreen() {
     useState<FileTabInlineError | null>(null);
   const [fileCapped, setFileCapped] = useState<FileTabCapped | null>(null);
 
+  // JSON tab state.
+  const [jsonText, setJsonText] = useState('');
+  const [jsonInlineError, setJsonInlineError] =
+    useState<JsonTabInlineError | null>(null);
+  const [jsonCapped, setJsonCapped] = useState<JsonTabCapped | null>(null);
+
   function handleClose() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -98,6 +111,24 @@ function ImportRecipeScreen() {
     setTypeForm(typeFormFromExtracted(recipe));
     setImportedFromDomain(safeHostname(recipe.source_url));
     setActiveTab('type');
+  }
+
+  function handleJsonImported(result: JsonImportResult) {
+    // Bulk imports go straight to library — no Type-tab review.
+    // The Library refreshes via TanStack invalidation in the mutation hook
+    // and Realtime fires INSERT events for each new row.
+    const failedNote =
+      result.failed.length > 0
+        ? `\n${result.failed.length} skipped: ${result.failed
+            .slice(0, 3)
+            .map((f) => f.reason)
+            .join(', ')}${result.failed.length > 3 ? '…' : ''}`
+        : '';
+    Alert.alert(
+      `Imported ${result.inserted} ${result.inserted === 1 ? 'recipe' : 'recipes'}`,
+      result.inserted > 0 ? `Open Library to see them.${failedNote}` : `No recipes imported.${failedNote}`,
+      [{ text: 'OK', onPress: handleClose }],
+    );
   }
 
   function handleUpgradePress() {
@@ -174,6 +205,18 @@ function ImportRecipeScreen() {
               capped={fileCapped}
               onCappedChange={setFileCapped}
               onImported={handleImported}
+              onUpgradePress={handleUpgradePress}
+            />
+          ) : null}
+          {activeTab === 'json' ? (
+            <JsonTab
+              jsonText={jsonText}
+              onJsonTextChange={setJsonText}
+              inlineError={jsonInlineError}
+              onInlineErrorChange={setJsonInlineError}
+              capped={jsonCapped}
+              onCappedChange={setJsonCapped}
+              onImported={handleJsonImported}
               onUpgradePress={handleUpgradePress}
             />
           ) : null}

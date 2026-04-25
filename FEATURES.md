@@ -350,11 +350,12 @@ Each cookbook renders as a shelf-like row with its palette accent.
 
 - **Route:** `/recipe/import` (presented modally; optional `?tab=paste|type|photo|file` param to deep-link a tab).
 - **Header:** `×` close on the left, centred "Import a Recipe" title. Closing always returns to the previous screen (or Home if the stack is empty).
-- **Tab bar** under the header, 4 tabs with Feather icons:
+- **Tab bar** under the header, 5 tabs with Feather icons:
   1. **Paste Link** (`paperclip`) — active by default, functional since Phase 7.1
   2. **Type** (`edit-2`) — manual entry; functional (the former "Recipe create" screen lives here)
   3. **Photo** (`camera`) — pick up to 10 screenshots from gallery or camera, multi-image extraction (landed 2026-04-25)
   4. **File** (`file-text`) — pick a PDF (≤ 10MB) or `.txt` (≤ 100KB) and extract via Anthropic document API (landed 2026-04-25)
+  5. **JSON** (`code`) — bulk import up to 20 recipes from user-pasted JSON (produced by their own ChatGPT/Claude/Gemini against a multi-recipe PDF) — no Haiku call on our side (landed 2026-04-25)
 - **Legacy route:** `/recipe/create` redirects to `/recipe/import?tab=type` for any lingering links or deep-links that predate Phase 7.
 
 ### 8.2 Tab — Paste Link
@@ -415,16 +416,41 @@ When the user arrives here via a Paste Link import, all fields are pre-populated
   - "File is too large (max 10MB / 100KB)." — local validation before upload.
   - Server-side errors (quota, AI unavailable, etc.) reuse the same UX as Paste Link.
 
-### 8.6 Actions
+### 8.6 Tab — JSON
+
+Bulk-import path. Reuses the user's own ChatGPT / Claude.ai / Gemini access to extract many recipes from a multi-recipe PDF, then ingests the JSON output without hitting our Haiku.
+
+- **Stage 1 — Prompt**: heading "Bulk import from a PDF" + a 4-step instruction card. Big **Copy prompt** ClayButton (uses `expo-clipboard`); button label flips to "Copied ✓" for ~1.8s on tap. Collapsible "Show prompt" reveals the verbatim prompt in monospace (transparency).
+- **Stage 2 — Paste**: monospace `TextInput` for pasting the AI's JSON output. Secondary "Choose .json file" link uses `expo-document-picker` (filters to `application/json` + `text/plain`); reads inline via `expo-file-system`. Live preview badge under the textarea: "5 recipes detected" / "Invalid JSON: …" / "21 recipes — server will keep first 20".
+- **Stage 3 — Import**: **Import All** primary button (disabled until preview shows ≥1 valid recipe). Calls `import-recipes-json` Edge Function which:
+  1. Authenticates via JWT (`requireUser`).
+  2. Caps body size at 500KB pre-parse.
+  3. Validates top-level array, length 1-20.
+  4. Sanitizes every recipe through `recipeSanitize.ts` (HTML-strip, length caps, URL whitelist, forbidden-field drop).
+  5. Bulk inserts via `recipes.insert([...])` with `user_id` from auth context.
+  6. Returns `{ inserted, failed: [{ index, reason }] }` for partial-success UX.
+- **On success** (any inserted): `Alert` "Imported N recipes" with "Open Library to see them" + skipped reasons (first 3) → tap OK closes the modal. Library updates via `useRecipesRealtime` + TanStack invalidation.
+- **Threat-model essentials**: source_type forced to `'json_import'`, `cover_image_url` / `is_favorite` / `cookbook_id` / IDs all silently dropped, source_url must be `https://` + non-private host, all text fields HTML-stripped + length-capped (title 200, description 2000, ingredient name 200, instruction text 2000, max 50 ingredients/instructions, max 5 tags). RLS scopes inserts to the user's own data as the last gate.
+- **Errors**:
+  - `Invalid JSON` — couldn't parse what was pasted.
+  - `Top-level value must be a JSON array.`
+  - `Imported X of Y — N skipped` — partial success, with reason codes (`title_required`, `ingredients_required`, `invalid_source_url`, `too_many_ingredients`, `too_many_instructions`, `not_an_object`).
+  - `monthly_limit_reached` — replaces Import button with cap card.
+  - `payload_too_large` — JSON exceeds 500KB.
+
+### 8.7 Actions
 
 | Action | Confirmation | Effect |
 |---|---|---|
 | Close (× in header) | — | Dismisses the modal, returns to the previous screen |
 | Import Recipe (Paste Link / Photo / File) | — | Calls `extract-recipe` Edge Function with the appropriate input shape (`url`, `image_urls[]`, `pdf_url`, or `text_content`); on success pre-fills Type tab |
+| Copy prompt (JSON tab) | — | Copies `JSON_IMPORT_PROMPT` to clipboard; button flips to "Copied ✓" briefly |
+| Choose .json file (JSON tab) | — | Opens document picker, reads file contents into the textarea |
+| Import All (JSON tab) | — | Calls `import-recipes-json` Edge Function with the parsed array; on any successful inserts, shows summary alert and dismisses modal — recipes show in Library via Realtime |
 | Save (Type tab) | — | Creates the recipe; dismisses modal; routes to new Recipe detail. Guarded against double-submit. |
 | Upgrade (paywall card) | — | Opens `/upgrade` modal (currently a placeholder screen) |
 
-### 8.7 Realtime / Permissions / Limits
+### 8.8 Realtime / Permissions / Limits
 
 - **Realtime:** —
 - **Permissions:** signed-in users only; in-app Photo + File uploads require a per-user RLS policy on `telegram-screenshots` bucket (`auth.uid()` matches the first path segment) — added 2026-04-25.
@@ -432,6 +458,7 @@ When the user arrives here via a Paste Link import, all fields are pre-populated
   - URL imports + pasted text: 20 / month (`url_extract`)
   - Photo (image_urls): 20 / month (`image_extract`)
   - PDF (pdf_url): 20 / month (`pdf_extract`)
+  - JSON bulk import: 5 / month (`json_import`) — 1 import = up to 20 recipes, so up to 100 recipes/month via this path
   - Each cap is independent. Premium = unlimited. See Appendix A.
 
 ---

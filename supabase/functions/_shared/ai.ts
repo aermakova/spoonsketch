@@ -7,7 +7,12 @@ export const anthropic = new Anthropic({
 
 export const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
-export type AiJobType = 'url_extract' | 'image_extract' | 'pdf_extract' | 'auto_sticker';
+export type AiJobType =
+  | 'url_extract'
+  | 'image_extract'
+  | 'pdf_extract'
+  | 'auto_sticker'
+  | 'json_import';
 export type AiJobStatus = 'done' | 'failed';
 
 export interface LogAiJobParams {
