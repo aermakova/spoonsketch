@@ -793,6 +793,9 @@ Acceptance criteria:
 ---
 
 ### 00 · Onboarding (first launch only)
+
+> **🔴 LAUNCH BLOCKER — not yet implemented.** First-launch carousel + sign-up is required before TestFlight / App Store submission. The 7-step structure below is an engineering placeholder; **final copy + visuals come from the marketing team** (4-6 killer-feature screens before "Get Started", then setup + sign-up). Engineering work after marketing delivers: carousel layout, MMKV `onboarding_complete` flag, Apple Sign In on the final step, deep-link bypass for already-authenticated users.
+
 **Route:** `/onboarding` — shown once, skipped after completion stored in MMKV
 
 Onboarding is 5 steps. No account required until step 5 — let users see the value first.
@@ -1402,6 +1405,7 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 9 | PDF export + print order | Week 14–15 | ⬜ Not started | Generate scrapbook PDF, clean PDF, Lulu order placed and tracked |
 | 10 | Cook mode + polish | Week 16 | ⬜ Not started | Cook mode with screen-on, step checklist, all 4 palettes applied throughout |
 | 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
+| 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
 
 Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
