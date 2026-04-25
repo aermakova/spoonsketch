@@ -18,15 +18,14 @@ interface Props {
 }
 
 // When you're ready to wire real PNGs, populate this map:
-// const SPRIG_SOURCES: Record<string, ImageSourcePropType> = {
-//   'sprig-1': require('../../../assets/sprigs/sprig-1.png'),
-//   'sprig-2': require('../../../assets/sprigs/sprig-2.png'),
-//   'sprig-3': require('../../../assets/sprigs/sprig-3.png'),
-//   'sprig-4': require('../../../assets/sprigs/sprig-4.png'),
-//   'sprig-5': require('../../../assets/sprigs/sprig-5.png'),
-//   'sprig-6': require('../../../assets/sprigs/sprig-6.png'),
-// };
-const SPRIG_SOURCES: Record<string, ImageSourcePropType> = {};
+const SPRIG_SOURCES: Record<string, ImageSourcePropType> = {
+  'sprig-1': require('../../../assets/sprigs/sprig-1.png'),
+  'sprig-2': require('../../../assets/sprigs/sprig-2.png'),
+  'sprig-3': require('../../../assets/sprigs/sprig-3.png'),
+  'sprig-4': require('../../../assets/sprigs/sprig-4.png'),
+  'sprig-5': require('../../../assets/sprigs/sprig-5.png'),
+  'sprig-6': require('../../../assets/sprigs/sprig-6.png'),
+};
 
 // Rotating placeholder glyphs so each sprigKey is visually distinct in
 // Phase 1. Order matches the 6 keys.
