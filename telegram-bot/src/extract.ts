@@ -38,6 +38,9 @@ export async function callExtractRecipe(input: ExtractInput): Promise<ExtractRes
   if (input.url) body.url = input.url;
   if (input.imageUrl) body.image_url = input.imageUrl;
 
+  // Function is deployed with verify_jwt=false (the gateway's JWT check is
+  // skipped); auth is via X-Spoon-Bot-Secret + body user_id, enforced inside
+  // the Edge Function code.
   const res = await fetch(config.extractRecipeFunctionUrl, {
     method: 'POST',
     headers: {

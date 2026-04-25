@@ -8,6 +8,8 @@ import { signOut } from '../../src/api/auth';
 import {
   generateTelegramToken,
   disconnectTelegram,
+  BOT_USERNAME,
+  BOT_CHAT_URL,
   type TelegramTokenResult,
 } from '../../src/api/telegramAuth';
 import { useTelegramConnection } from '../../src/hooks/useTelegramConnection';
@@ -28,13 +30,14 @@ function MeScreen() {
     mutationFn: generateTelegramToken,
     onSuccess: async (result) => {
       setPendingToken(result);
-      const can = await Linking.canOpenURL(result.deepLink);
-      if (can) {
-        await Linking.openURL(result.deepLink);
-      } else {
-        // Telegram not installed — surface the fallback https link instead
+      // https://t.me/... routes to the Telegram app via OS Universal Links
+      // when installed, falls back to web otherwise. Avoids tg:// which
+      // requires LSApplicationQueriesSchemes (not honored in Expo Go).
+      try {
+        await Linking.openURL(result.fallbackUrl);
+      } catch (e: any) {
         Alert.alert(
-          'Telegram not installed',
+          'Could not open Telegram',
           'Open this link in any browser:\n\n' + result.fallbackUrl,
           [{ text: 'OK' }],
         );
@@ -104,6 +107,14 @@ function MeScreen() {
             <Text style={styles.cardSub}>
               Send a recipe link or screenshot to your bot — it'll appear here.
             </Text>
+            <ClayButton
+              label={`Open @${BOT_USERNAME}`}
+              onPress={() => {
+                void Linking.openURL(BOT_CHAT_URL).catch((e: any) =>
+                  Alert.alert('Could not open Telegram', e?.message ?? 'Unknown error'),
+                );
+              }}
+            />
             <ClayButton
               label="Disconnect"
               variant="secondary"

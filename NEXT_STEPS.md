@@ -21,14 +21,15 @@ Pick this up whenever. Everything here is what the user (Angy) needs to do perso
 | Phase 8.3 | Connect Telegram UI in Me tab |
 | Phase 8.4 | Realtime subscription on `recipes` |
 | Shelves redesign | Phase 1 — books-on-wooden-shelves grid, long-press action sheet |
-| 21 bug fixes | BUG-001 → BUG-021 all ✅ Fixed (see BUGS.md) |
+| Phase 8.2 (bot running locally) | Bot started end-to-end — Connect Telegram + recipe URL import work on device |
+| 22 bug fixes | BUG-001 → BUG-022 all ✅ Fixed (see BUGS.md) |
 
 ### In progress 🟡
 
 | Area | Where it's at | What's blocking |
 |---|---|---|
-| Phase 8.2 (bot deploy) | Code shipped, **bot is not running anywhere** | Angy to run `npm run dev` locally OR set up Railway + Upstash |
-| Phase 8 polish | Not started | Blocked on device-testing the bot (needs 8.2 deploy) |
+| Phase 8 polish (8.5) | Connect + URL import working; screenshot import + bot copy pass + doc closeout still pending | Walk through MANUAL_TESTS Phase 8 scenarios, log any issues as new bugs |
+| Phase 8 production (Railway + Upstash) | Local bot proven; needs always-on host | Sign up Upstash + Railway, paste env, deploy |
 
 ### Next up ⏳
 

@@ -33,6 +33,7 @@ export function createBot(): Telegraf {
     }
 
     // Hand the token to telegram-auth Edge Function — it does the work.
+    // Function is deployed with verify_jwt=false; auth is via X-Spoon-Bot-Secret.
     const res = await fetch(`${config.supabaseUrl}/functions/v1/telegram-auth`, {
       method: 'POST',
       headers: {

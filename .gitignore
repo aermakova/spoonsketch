@@ -46,3 +46,6 @@ yarn-error.*
 supabase/.branches/
 supabase/.temp/
 supabase/.env.local
+
+# claude code runtime
+.claude/*.lock

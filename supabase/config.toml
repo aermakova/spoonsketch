@@ -15,10 +15,18 @@ port = 54322
 enabled = true
 port = 54323
 
-# Newer CLI expects per-function settings (map keyed by function name) — a
-# top-level `[functions] verify_jwt = bool` block fails to parse. The default
-# for deployed functions is `verify_jwt = true`, so we don't need to set it
-# unless we want to override per function. Local-only override pattern:
+# Per-function gateway overrides. Default is `verify_jwt = true` (gateway
+# rejects requests without `Authorization: Bearer <jwt>` before the function
+# runs). Modern Supabase API keys (`sb_publishable_*` / `sb_secret_*`) are
+# NOT JWTs and don't satisfy the gateway, so the bot can't auth that way.
 #
-#   [functions.<name>]
-#   verify_jwt = false   # for testing without a JWT during `supabase functions serve <name>`
+# These two functions are called by the Telegram bot service with
+# `X-Spoon-Bot-Secret`. Their function code self-authenticates; the gateway
+# is redundant (and blocks the call). Disabling verify_jwt routes the
+# request straight to the function, which then enforces the bot secret.
+
+[functions.telegram-auth]
+verify_jwt = false
+
+[functions.extract-recipe]
+verify_jwt = false

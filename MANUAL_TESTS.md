@@ -12,6 +12,66 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Phase 8 — Telegram bot connect + recipe import (landed pending)
+
+Prereqs:
+- Bot env (`telegram-bot/.env`) filled: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_SHARED_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. `REDIS_URL` left blank (in-process fallback).
+- Bot running locally: `cd telegram-bot && npm run dev` → expect `[queue] in-process worker ready (no Redis)`.
+- `telegram-auth` and `extract-recipe` deployed with `--no-verify-jwt` (per `supabase/config.toml`).
+- Signed-in user, `users.tier='free'` is fine.
+
+### 1. Connect happy path
+- App → Me tab → tap **Connect Telegram**
+- ✅ Expect: Telegram app opens to `@spoonsketch_bot` with `/start <token>` pre-filled in the input
+- Tap **Start**
+- ✅ Expect: bot replies `Connected, @yourhandle! Send me a recipe link…` within ~2 seconds
+- Return to app → Me tab
+- ✅ Expect: card now shows `✓ Connected as @yourhandle` + a primary `Open @spoonsketch_bot` button + secondary `Disconnect` button (no `Connect Telegram` button)
+- Supabase: `select * from telegram_connections where user_id = '<your-uid>'` returns one row with the right `telegram_id` + `username`.
+
+### 2. Open-bot button when already connected
+- Me tab (already connected) → tap **Open @spoonsketch_bot**
+- ✅ Expect: Telegram opens to the bot chat (no `/start` prefilled — just the chat history)
+
+### 3. Recipe URL → library (validates extract-recipe gateway fix)
+- DM the bot: `https://www.bbcgoodfood.com/recipes/tomato-soup`
+- ✅ Expect: bot replies `Got it! Extracting your recipe…` immediately
+- ✅ Expect: ~10 s later, bot replies `Saved! *Tomato soup* — [Open in app →](spoonsketch://recipe/<id>)`
+- App library (Realtime): the new recipe card animates in within ~5 s without user pulling-to-refresh.
+- Tap the bot's `Open in app →` link → app opens directly on the new recipe.
+
+### 4. Disconnect → reconnect
+- Me tab → **Disconnect** → confirm
+- ✅ Expect: card flips back to the empty state with the `Connect Telegram` button
+- Repeat scenario 1 → ✅ row in `telegram_connections` is upserted (same row, new `connected_at`).
+
+### 5. Negative — wrong bot secret (gateway / function defense check)
+- Stop the bot (Ctrl-C). Curl directly:
+  ```bash
+  curl -s -X POST https://uvxkipafnzclvxtlhfqi.supabase.co/functions/v1/telegram-auth \
+    -H 'X-Spoon-Bot-Secret: wrong' -H 'Content-Type: application/json' \
+    -d '{"token":"x","telegram_id":1}'
+  ```
+- ✅ Expect: `{"error":"unauthorized","message":"Invalid bot secret"}` with HTTP 401 (function-level reject, not gateway)
+- Curl without any auth headers at all:
+  ```bash
+  curl -s -X POST https://uvxkipafnzclvxtlhfqi.supabase.co/functions/v1/telegram-auth \
+    -H 'Content-Type: application/json' -d '{"token":"x","telegram_id":1}'
+  ```
+- ✅ Expect: same 401 from the function (gateway is bypassed by `verify_jwt=false` but the function still rejects).
+
+### 6. Bot stale token (token already consumed)
+- Tap Connect Telegram, generate token A. Tap Start in Telegram (consumes A → connected). Disconnect from app.
+- Tap Start in Telegram **again with the same /start link** (Telegram remembers the deep link).
+- ✅ Expect: bot replies `That code was already used. If you need to reconnect, generate a fresh one in the app.`
+
+### 7. Bot expired token (>10 minutes)
+- Tap Connect Telegram → **don't** open Telegram for >10 minutes
+- After 10 minutes, open Telegram and tap Start
+- ✅ Expect: bot replies `That code expired — go back to the app and tap Connect Telegram again.`
+
+---
+
 ## Phase 7.1 — AI recipe import from URL (landed pending)
 
 Prereqs:

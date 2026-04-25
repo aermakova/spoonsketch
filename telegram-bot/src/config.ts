@@ -1,6 +1,10 @@
 // Centralised env validation. Fail fast at boot if any required var is
 // missing — better than discovering it on the first user message.
 
+// Loads telegram-bot/.env in dev. No-ops on Railway where env vars come
+// from the platform's UI rather than a file on disk.
+import 'dotenv/config';
+
 interface Config {
   telegramBotToken: string;
   botSharedSecret: string;

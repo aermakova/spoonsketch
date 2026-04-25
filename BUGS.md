@@ -27,10 +27,21 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-019 | **High** | ✅ Fixed | Export / PDF | PDF used wrong fonts, broken sticker images, missing pill backgrounds, missing step badges, white page bg — preview vs PDF looked like different documents |
 | BUG-020 | Medium | ✅ Fixed | Editor / Arrange | Font-size bump didn't grow text-heavy blocks (description / pills / headings) — text overflowed and got covered by next sibling. Only `method-list` worked because its default h was big enough to hide the bug. |
 | BUG-021 | Medium | ✅ Fixed | Export / PDF | PDF body fonts (ingredients-list, method-list, pills) hardcoded to Nunito instead of the recipe's `preset.section` font (Caveat by default). Title hardcoded to Fraunces instead of `preset.title`. |
+| BUG-022 | **High** | ✅ Fixed | Telegram bot / Edge Function auth | Bot calls to `telegram-auth` and `extract-recipe` blocked at Supabase gateway with `UNAUTHORIZED_NO_AUTH_HEADER` — function code never ran. Connect Telegram replied "Hmm, couldn't connect that." every time. |
 
 ---
 
-## BUG-021 — PDF didn't honour the recipe's font preset for body text
+## BUG-022 — Bot calls to Edge Functions blocked by Supabase gateway
+
+- **Found:** 2026-04-25 (first attempt to run the bot end-to-end after Phase 8.2)
+- **Severity:** **High** — Connect Telegram + recipe-link import via the bot were both fully broken. Phase 8 unusable.
+- **Repro:** Bot running locally with all four env vars set. From phone: Me tab → Connect Telegram → Telegram opens → tap Start. ✅ Expected: "Connected, @yourhandle!". Actual: "Hmm, couldn't connect that. Try again from the app." Bot log (after temporary diagnostic): `[bot] telegram-auth non-200: 401 {"code":"UNAUTHORIZED_NO_AUTH_HEADER"}`.
+- **Root cause:** Supabase's Edge Function gateway enforces `verify_jwt = true` by default. It rejects any request without an `Authorization: Bearer <jwt>` header *before the function code runs*. The bot only sends `X-Spoon-Bot-Secret` (the function-level auth scheme documented in Phase 8.1). The Phase 8 plan never accounted for the gateway in front of the function. Compounding factor: this Supabase project was created with new-format API keys (`sb_publishable_*`, `sb_secret_*`) which are NOT JWTs and don't satisfy the gateway either, so "send the anon key as Bearer" doesn't work as a workaround.
+- **Fix:** `supabase/config.toml` adds per-function `verify_jwt = false` for `telegram-auth` and `extract-recipe`. Both functions are redeployed with `--no-verify-jwt`. Gateway now routes the request straight to the function; the function self-authenticates via `X-Spoon-Bot-Secret` (as designed in Phase 8.1). Defense surface unchanged for app-client calls — `requireUser` in the function still parses and validates the user's JWT independently of the gateway.
+- **Commit:** _(this commit)_
+- **Test:** new Phase 8 connect-flow scenario in `MANUAL_TESTS.md`. Negative checks: with valid bot secret + nonsense token → function returns `404 token_not_found` (function-level error, not gateway). With wrong bot secret → `401 Invalid bot secret` (function-level).
+
+
 - **Found:** 2026-04-23 (phone test, follow-up to BUG-019 fixes)
 - **Severity:** Medium — title + ingredients list + method list rendered in the wrong font family in the PDF compared to the in-app Scrapbook preview. Description + section headings happened to match because the default `caveat` preset's section font (Caveat) coincided with the hardcoded HTML CSS (also Caveat).
 - **Repro:** Open any recipe with the default `caveat` font preset → Scrapbook → Export PDF. Compare the ingredients list / method list font in the PDF vs the editor preview. Editor: handwritten Caveat. PDF (before fix): sans-serif Nunito.

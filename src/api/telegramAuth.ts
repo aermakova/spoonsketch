@@ -17,7 +17,11 @@ export interface TelegramTokenResult {
   fallbackUrl: string;    // https://t.me/... — works without app installed
 }
 
-const BOT_USERNAME = process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'spoonsketch_bot';
+export const BOT_USERNAME = process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'spoonsketch_bot';
+// https://t.me/<bot> opens the bot chat via Universal Links when Telegram
+// is installed; falls back to a web page otherwise. Used by the Me-tab
+// "Open in Telegram" action when the user is already connected.
+export const BOT_CHAT_URL = `https://t.me/${BOT_USERNAME}`;
 const TOKEN_TTL_MS = 10 * 60 * 1000;
 
 export async function generateTelegramToken(): Promise<TelegramTokenResult> {

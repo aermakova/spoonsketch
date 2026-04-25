@@ -787,6 +787,8 @@ await supabaseAdmin
 
 Exchanges Telegram auth token for a connection.
 
+**Auth model:** the Telegram bot service authenticates via the `X-Spoon-Bot-Secret` header (matches `TELEGRAM_BOT_SHARED_SECRET` in Supabase secrets + `telegram-bot/.env`). The function is deployed with **`verify_jwt = false`** in `supabase/config.toml` so Supabase's gateway routes the request straight to the function without requiring a Bearer JWT — modern Supabase API keys (`sb_publishable_*` / `sb_secret_*`) are not JWTs and would not satisfy the gateway anyway. Same setup applies to `extract-recipe` for its bot-mode branch.
+
 **Request:**
 ```json
 { "token": "one-time-token-from-bot", "telegram_id": 123456789, "username": "anhelina" }
