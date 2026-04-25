@@ -60,6 +60,12 @@ Prereqs:
 - ✅ Live badge "1 recipe detected" (parser strips fences).
 - Import → ✅ "Imported 1 recipe".
 
+### 9a. Smart-quote tolerance (BUG-026)
+- Copy a JSON response from ChatGPT's chat UI (which auto-curlifies the quotes).
+- Paste into the textarea — the visible quotes look like `"…"` (typographic) rather than `"…"` (straight).
+- ✅ Live badge "N recipes detected" — parser normalizes curly quotes to straight before JSON.parse.
+- Import → ✅ recipes land in Library.
+
 ### 10. Quota cap
 - Burn 5 `json_import` calls in the same UTC month.
 - 6th attempt → ✅ Replaces Import button with cap card "You've used 5 / 5 JSON imports this month" + Upgrade.

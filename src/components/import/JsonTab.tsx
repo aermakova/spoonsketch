@@ -265,11 +265,8 @@ type ParsedPreview =
 
 function previewJson(text: string): ParsedPreview {
   if (!text || text.trim().length === 0) return { empty: true };
-  let stripped = text.trim();
-  // Tolerate accidental markdown fences if the AI wrapped the response.
-  if (stripped.startsWith('```')) {
-    stripped = stripped.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
-  }
+  const stripped = normalizeJsonText(text);
+  if (stripped.length === 0) return { empty: true };
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripped);
@@ -290,6 +287,34 @@ function previewJson(text: string): ParsedPreview {
     originalCount: parsed.length,
     truncated: parsed.length > MAX_RECIPES,
   };
+}
+
+/**
+ * Pre-parse normalization that fixes the most common AI-output warts:
+ * - Curly / "smart" quotes (U+201C / U+201D / U+2018 / U+2019) replaced
+ *   with ASCII " and ' so JSON.parse accepts them. ChatGPT in particular
+ *   smart-quotes its responses when the user copies out of the chat UI.
+ * - Markdown code fences trimmed if the AI wrapped its output in ```json.
+ * - BOM and zero-width chars stripped.
+ *
+ * Note: the curly-quote replace is global, so a literal U+201C inside a
+ * recipe string also gets converted — acceptable trade-off; recipe text
+ * almost never contains typographic quotes deliberately.
+ */
+function normalizeJsonText(text: string): string {
+  let s = text;
+  // Strip BOM and zero-width spaces.
+  s = s.replace(/^﻿/, '').replace(/[​-‍﻿]/g, '');
+  // Smart quotes → straight.
+  s = s
+    .replace(/[“”„‟″‶]/g, '"')
+    .replace(/[‘’‚‛′‵]/g, "'");
+  s = s.trim();
+  // Tolerate markdown code fences if the AI wrapped the response.
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  }
+  return s;
 }
 
 const styles = StyleSheet.create({

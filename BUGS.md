@@ -31,10 +31,21 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 | BUG-023 | Medium | ✅ Fixed | AI extract / data shape | AI-extracted ingredients had no `id` field — `PageTemplates.tsx:286` rendered `<TouchableOpacity key={ing.id}>` with all keys `undefined`, triggering React duplicate-key warning. Tap-to-edit on ingredients was also broken (used `ing.id` as the edit target). |
 | BUG-024 | **High** | ✅ Fixed | AI extract / token budget | `max_tokens: 1024` truncated Haiku's JSON response on Cyrillic recipes (Russian/Ukrainian use ~3x the tokens of English) and on multi-image albums. Truncated JSON → `json_parse_failed` → bot replied "Got a partial read" with empty ingredients/instructions. |
 | BUG-025 | **High** | ✅ Fixed | AI extract / multi-recipe pages | URL imports from pages containing several recipe variations merged ALL recipes into one extraction with combined ingredient lists — "Milk, Eggs, Flour" appearing three times with different amounts/groups. User-visible result: "ingredients pasted 3 times." |
+| BUG-026 | Medium | ✅ Fixed | Import / JSON tab | Pasted JSON from ChatGPT was rejected with "Invalid JSON: unexpected token" because ChatGPT's chat UI auto-converted ASCII `"` to typographic `"` / `"` (U+201C / U+201D). `JSON.parse` only accepts straight quotes. |
 
 ---
 
-## BUG-025 — Multi-recipe sources merged into one bloated extraction
+## BUG-026 — JSON tab rejects pasted output with smart quotes
+
+- **Found:** 2026-04-25 (real device test, pasting Russian cold-soup JSON from ChatGPT).
+- **Severity:** Medium — affects every user who copies JSON out of the ChatGPT web UI (which is most users; ChatGPT applies typographic auto-correct in its chat renderer regardless of whether the AI emitted straight quotes). The error message ("Invalid JSON: unexpected token") was correct but unhelpful.
+- **Repro:** JSON tab → paste any AI response that contains `"…"` instead of `"…"` (visible by eye; copy from ChatGPT's chat bubble does this automatically) → live preview shows red "Invalid JSON: …" → Import button stays disabled.
+- **Root cause:** `previewJson` in `src/components/import/JsonTab.tsx` called `JSON.parse(stripped)` directly on the user's paste. `JSON.parse` is strict about quote codepoints — only U+0022 (`"`) is accepted. ChatGPT's chat renderer converts `"` to `"` (U+201C) / `"` (U+201D) and `'` to `'` (U+2019) via the same smart-quote pass it applies to plain text.
+- **Fix:** new `normalizeJsonText(text)` helper runs before `JSON.parse`. Replaces `" " „ ‟ ″ ‶` with `"`, `' ' ‚ ‛ ′ ‵` with `'`, also strips BOM + zero-width spaces, and folds in the existing markdown-fence trim. Global replace, so a literal U+201C inside a recipe string would also get converted — acceptable trade-off (recipe text rarely contains typographic quotes deliberately, and breaking that edge case is better than rejecting every ChatGPT paste).
+- **Commit:** _(this commit)_
+- **Test:** new `MANUAL_TESTS.md` scenario — paste JSON containing curly quotes (e.g. copy ChatGPT response straight from the chat) → live preview shows "N recipes detected" → import succeeds. Also: paste a string containing `«mom's special»` (legitimate French/typographic quotes inside a recipe title) → import succeeds; the inner quotes get normalized to straight (cosmetic loss, acceptable).
+
+ — Multi-recipe sources merged into one bloated extraction
 
 - **Found:** 2026-04-25 (URL import from `rud.ua/.../milk-pancakes-71/`).
 - **Severity:** **High** — any URL or PDF source listing multiple recipe variations on a single page came back as one Frankenstein recipe with 2-3x the ingredients (each ingredient repeated per variant). Practically unusable; user has to manually delete two-thirds of the data.
