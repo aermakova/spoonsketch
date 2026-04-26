@@ -4,7 +4,9 @@ import * as Clipboard from 'expo-clipboard';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClayButton } from '../../src/components/ui/ClayButton';
 import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
-import { signOut, deleteAccount } from '../../src/api/auth';
+import { signOut, deleteAccount, exportUserData } from '../../src/api/auth';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import {
   generateTelegramToken,
   disconnectTelegram,
@@ -158,8 +160,59 @@ function MeScreen() {
 
       <ClayButton label="Sign out" variant="secondary" loading={busy} onPress={handleSignOut} />
 
+      <ExportDataLink />
       <DeleteAccountSection />
     </ScrollView>
+  );
+}
+
+function ExportDataLink() {
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const data = await exportUserData();
+      // Write to documentDirectory + share sheet handoff.
+      const filename = `spoonsketch-export-${Date.now()}.json`;
+      const uri = `${FileSystem.documentDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(uri, JSON.stringify(data, null, 2));
+      const sharingOk = await Sharing.isAvailableAsync();
+      if (sharingOk) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export your Spoon & Sketch data',
+          UTI: 'public.json',
+        });
+      } else {
+        Alert.alert(
+          'Saved',
+          `Export written to: ${uri}\n\nSharing isn't available on this device — open Files to find it.`,
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Export failed', e?.message ?? 'Please try again later.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.exportRow}
+      onPress={handleExport}
+      disabled={exporting}
+      hitSlop={6}
+    >
+      <Text style={styles.exportText}>
+        {exporting ? 'Preparing your data…' : 'Export my data'}
+      </Text>
+      <Text style={styles.exportHint}>
+        Saves all your recipes, cookbooks, and account data as a JSON file you can save or email
+        to yourself. Limited to once per 24 hours.
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -439,6 +492,27 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   modalBtn: { flex: 1 },
+  exportRow: {
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.paper,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+  },
+  exportText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.terracotta,
+    marginBottom: 4,
+  },
+  exportHint: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    lineHeight: 17,
+  },
 });
 
 export default withErrorBoundary(MeScreen, 'Profile crashed');

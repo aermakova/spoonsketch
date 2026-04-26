@@ -836,22 +836,23 @@ Acceptance criteria:
 
 ### 19 · Data Export (GDPR / right-to-portability)
 
-> **🔴 LAUNCH BLOCKER for EU launch — not yet implemented.** GDPR Art. 20 right to data portability. Also a strong trust signal in any market.
+> **✅ Landed 2026-04-25.** GDPR Art. 20 right to data portability satisfied via in-app export. V1 hands off the JSON via the system share sheet (Files / iCloud Drive / email) instead of mailing a signed URL — simpler than coordinating SMTP infrastructure for the launch bar.
 
-**Route:** Settings → "Export my data" button (§15 Profile & Settings)
+**Route:** Settings → "Export my data" link (§15 Profile & Settings)
 
 Flow:
-- Tap "Export my data" → confirmation: "We'll email you a JSON file with all your recipes, cookbooks, and account data. This may take up to 5 minutes."
-- Edge Function `export-user-data` packages: `users` row (excluding push tokens), all `cookbooks`, all `recipes` (with ingredients/instructions/tags as JSON), all `print_orders`, `telegram_connections` (handle only), `ai_jobs` summary counts. Excludes: signed URLs (expired), service-internal IDs.
-- Output: signed URL to a JSON file in Storage (24-hour TTL), emailed to the user via Supabase Auth's email infrastructure (or transactional email provider).
-- Rate-limited to 1 export per 24 hours per user.
+- Tap "Export my data" → in-flight state ("Preparing your data…").
+- Edge Function `export-user-data` packages: `users` row (excluding push tokens), all `cookbooks`, all `recipes` (with ingredients/instructions/tags), all `print_orders`, `telegram_connections` (handle only), `ai_jobs_summary` counts. Excludes: push_token, oauth tokens, moderation_events (compliance audit), user_consents audit log (current state on user row), ai_jobs payloads (image bytes / scraped HTML), signed URLs (would expire).
+- Response is the JSON content directly (no Storage round-trip).
+- Client writes to `expo-file-system` documentDirectory and opens the iOS share sheet via `expo-sharing`. User saves to Files / iCloud Drive / emails to themselves.
+- Rate-limited to 1 export per 24 hours per user via `users.last_data_export_at` column. 429 with `retry_after_ms` if attempted sooner.
 
 Acceptance criteria:
-- [ ] Export job runs server-side (no PII in client logs)
-- [ ] JSON output validates against a documented schema (publish in `BACKEND.md` §"Data export shape")
-- [ ] Sensitive fields excluded (push token, OAuth tokens, raw service-role-only columns)
-- [ ] Email arrives within 5 minutes for a typical user (~50 recipes)
-- [ ] Repeat-export attempts within 24 h return a "still processing / please wait" message, not a duplicate run
+- [x] Export job runs server-side (no PII in client logs)
+- [x] JSON output documented in `BACKEND.md` §"Data export shape"
+- [x] Sensitive fields excluded (push token, oauth tokens, audit logs, ai_jobs payloads, signed URLs)
+- [x] Repeat-export attempts within 24 h return 429 `rate_limited`, not a duplicate run
+- [ ] Email delivery — deferred. Share sheet handoff covers v1; SMTP-based delivery is a follow-up if needed.
 
 ---
 
@@ -1090,7 +1091,7 @@ Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P
 |---|---|---|
 | 10 | EU Representative appointed; address in Privacy Policy | §C7 |
 | 11 | EU cookie/analytics consent banner; reject-all parity | §C7 |
-| 12 | Data subject rights portal — privacy@ + in-app export + delete | §C3 + §15 + §19 + §20 |
+| 12 | Data subject rights portal — privacy@ + in-app export + delete ✅ (export + delete) | §C3 + §15 + §19 + §20 |
 | 13 | DPAs signed with all vendors | §C4 |
 | 14 | California ARL auto-renewal disclosure copy | §C6 + §16 |
 | 15 | COPPA age gate at registration | §C6 + Onboarding §00 |

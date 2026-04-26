@@ -153,3 +153,28 @@ export async function deleteAccount(): Promise<void> {
   // RootLayout's auth listener to navigate to /login.
   await supabase.auth.signOut().catch(() => { /* session is already gone */ });
 }
+
+/**
+ * GDPR Art. 20 data portability. Fetches the export from the
+ * `export-user-data` Edge Function and returns it as a JS object the
+ * caller can serialize / share / save. The function rate-limits to
+ * one export per 24h per user; the 429 response code with
+ * `rate_limited` bubbles up as an `ApiError`.
+ */
+export async function exportUserData(): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.functions.invoke<
+    Record<string, unknown> | { error: string; message?: string }
+  >('export-user-data', { body: {} });
+  if (error) {
+    let body: { error?: string; message?: string } = {};
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+      if (ctx?.json) body = (await ctx.json()) as typeof body;
+    } catch { /* noop */ }
+    throw new ApiError(body.message ?? error.message, body.error ?? 'export_failed');
+  }
+  if (!data) {
+    throw new ApiError('Export returned no data', 'export_failed');
+  }
+  return data as Record<string, unknown>;
+}

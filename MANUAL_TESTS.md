@@ -12,6 +12,39 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Data export (GDPR Art. 20, landed 2026-04-25)
+
+Prereqs:
+- `export-user-data` Edge Function deployed.
+- Migration `20260425000007_data_export_throttle.sql` applied.
+- Test account with at least 1 cookbook + 2 recipes seeded.
+
+### 1. Happy path
+- Sign in → Me → scroll to bottom → tap **Export my data**.
+- ✅ Expect: link text flips to "Preparing your data…" for ~1-3s → iOS share sheet opens with `spoonsketch-export-<timestamp>.json`.
+- Pick "Save to Files" → file lands in iCloud Drive or local Files. Open it → valid JSON.
+
+### 2. Schema sanity
+- Inspect the JSON: `schema_version=1`, `notes.excluded_for_privacy` lists the 6 redacted areas, `user` has `consent_*` fields, `cookbooks` and `recipes` arrays present, `ai_jobs_summary` has counts per job_type.
+- Verify SENSITIVE fields are NOT in the file: search for `push_token` (should be absent), `model_response` (absent), `input_data` (absent — only summary counts).
+
+### 3. Rate limit
+- Immediately tap **Export my data** again.
+- ✅ Expect: error alert "Data exports are limited to one per 24 hours. Try again in about N hours."
+- SQL check: `select last_data_export_at from users where id='<uid>'` → should match the first export's timestamp.
+
+### 4. No data leak across users
+- Create a second test account, seed it with different recipes.
+- Sign in to account A → export → save the JSON.
+- Sign in to account B → export → save the JSON.
+- ✅ Expect: each export contains only that user's recipes / cookbooks / orders. No cross-user contamination.
+
+### 5. Negative tests
+- Curl without auth → 401.
+- Force last_data_export_at to a recent timestamp via SQL, then call → 429 with `retry_after_ms` payload.
+
+---
+
 ## Account deletion (landed 2026-04-25)
 
 Prereqs:

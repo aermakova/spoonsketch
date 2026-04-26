@@ -668,6 +668,82 @@ Every user-scoped table has `user_id … references public.users on delete casca
 
 **Auth:** function deployed with `verify_jwt = false` (same gateway-format issue as the rest); function code uses `requireUser` which accepts both JWT formats.
 
+#### `POST /functions/v1/export-user-data`
+
+GDPR Art. 20 data portability + Ukraine PDP equivalent. Returns the user's full data set as a single JSON document for the client to save / share.
+
+**Auth:** JWT only (`requireUser`).
+
+**Rate limit:** 1 export per 24h per user via `users.last_data_export_at`. 429 with `retry_after_ms` if attempted sooner.
+
+**Response (200) — Data export shape:**
+
+```json
+{
+  "schema_version": 1,
+  "exported_at": "2026-04-25T19:30:00Z",
+  "notes": {
+    "excluded_for_privacy": [
+      "push_token",
+      "oauth_tokens",
+      "moderation_events (compliance audit, not portable)",
+      "user_consents audit log (current state included on user row)",
+      "ai_jobs payloads (image bytes / scraped HTML)",
+      "storage signed URLs (would expire before you read this)"
+    ],
+    "schema_doc": "See BACKEND.md §\"Data export shape\""
+  },
+  "user": {
+    "id": "uuid",
+    "email": "string",
+    "username": "string | null",
+    "avatar_url": "string | null",
+    "tier": "free | premium",
+    "palette": "terracotta | sage | blush | cobalt",
+    "paper_texture": "low | medium | high",
+    "language": "en | uk",
+    "consent_tos": true,
+    "consent_ai": true,
+    "consent_print": false,
+    "consent_marketing": false,
+    "consent_pp_version": "string",
+    "recipes_count": 12,
+    "cookbooks_count": 2,
+    "created_at": "timestamp"
+  },
+  "cookbooks": [
+    { "id": "...", "title": "...", "...": "all cookbook columns" }
+  ],
+  "recipes": [
+    { "id": "...", "title": "...", "ingredients": [...], "instructions": [...], "tags": [...], "...": "all recipe columns" }
+  ],
+  "print_orders": [
+    { "id": "...", "cookbook_id": "...", "recipe_ids": [...], "style": "...", "paper_size": "...", "page_count": "...", "status": "...", "watermarked": "...", "created_at": "...", "expires_at": "...", "error_message": "..." }
+  ],
+  "telegram_connection": {
+    "telegram_id": 123456789,
+    "username": "anhelina",
+    "connected_at": "timestamp"
+  } | null,
+  "ai_jobs_summary": {
+    "url_extract": { "done": 5, "failed": 1, "total": 6 },
+    "image_extract": { "done": 12, "failed": 0, "total": 12 },
+    "pdf_extract": { "done": 2, "failed": 0, "total": 2 },
+    "auto_sticker": { "done": 8, "failed": 0, "total": 8 },
+    "json_import": { "done": 1, "failed": 0, "total": 1 }
+  }
+}
+```
+
+**Why no signed URLs / images bundled:** the export is "data the user can take with them" — recipe text / metadata is portable; their photos are theirs to download separately if needed. Including them would explode the payload size and require Storage round-trips. Deferred to v2 if requested.
+
+**Response (429):**
+```json
+{ "error": "rate_limited", "message": "Data exports are limited to one per 24 hours. Try again in about 18 hours.", "retry_after_ms": 64800000, "last_export_at": "..." }
+```
+
+**Auth:** function deployed with `verify_jwt = false` (gateway-format consistency); function code uses `requireUser` which accepts both JWT formats.
+
 **Response (200):**
 ```json
 {

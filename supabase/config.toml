@@ -46,3 +46,7 @@ verify_jwt = false
 # delete-account is JWT-only but same gateway-format issue as the rest.
 [functions.delete-account]
 verify_jwt = false
+
+# export-user-data ditto.
+[functions.export-user-data]
+verify_jwt = false
