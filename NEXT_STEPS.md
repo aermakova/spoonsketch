@@ -162,6 +162,47 @@ Turn off your local Mac bot (`Cmd-C` in the terminal). The Railway bot takes ove
 
 ---
 
+## 3.5. Sign in with Apple — finish setup (Apple Developer + Supabase, ~30 min)
+
+Code shipped 2026-04-25 — `src/api/auth.ts` `signInWithApple()` + button on `/login`. Two external setup steps required before it works:
+
+### 3.5a. Apple Developer portal
+
+1. Go to https://developer.apple.com/account → **Certificates, Identifiers & Profiles**.
+2. **App IDs** → find or create `com.spoonsketch.app` → enable **Sign In with Apple** capability → Save.
+3. **Identifiers → Services IDs** → "+" → create a new Service ID (e.g. `com.spoonsketch.app.signinservice`). Description: "Spoon & Sketch Sign in with Apple". Identifier: pick something distinct from the App ID (Apple won't let them match).
+4. After creating, click into the Service ID → check **Sign In with Apple** → Configure → Primary App ID = `com.spoonsketch.app` → in **Return URLs** add `https://uvxkipafnzclvxtlhfqi.supabase.co/auth/v1/callback` → Save → Continue → Save.
+5. **Keys** → "+" → name "Spoon & Sketch SIWA Key" → check **Sign In with Apple** → Configure → Primary App ID = `com.spoonsketch.app` → Save → Continue → Register → **Download** the `.p8` file (only chance — keep it). Note the **Key ID** shown on screen.
+6. Note your **Team ID** (top-right of any Developer page).
+
+You now have: Service ID (`com.spoonsketch.app.signinservice`), Team ID (10-char), Key ID (10-char), `AuthKey_<KeyID>.p8` file.
+
+### 3.5b. Supabase Dashboard
+
+1. https://supabase.com/dashboard/project/uvxkipafnzclvxtlhfqi → **Authentication → Providers → Apple**.
+2. Toggle **Enabled**.
+3. **Client ID** = your Service ID (e.g. `com.spoonsketch.app.signinservice`).
+4. **Secret Key (for OAuth)**: paste the full contents of the `.p8` file — including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines.
+5. **Team ID**: paste.
+6. **Key ID**: paste.
+7. **Save**.
+
+### 3.5c. Test
+
+Apple Sign In **does not work in Expo Go** — `expo-apple-authentication` is a native module that requires the Apple capability baked into the build. To test:
+
+- **Quick path**: build a custom dev client via EAS: `eas build --profile development --platform ios`. Install on device via TestFlight or Ad Hoc. Then `npx expo start --dev-client` instead of plain Expo Go.
+- **Skip-test path**: leave the wiring committed and verify after first TestFlight build (which has the entitlement automatically).
+
+Until you do either, the login screen detects `AppleAuthentication.isAvailableAsync()` returns `false` in Expo Go and **hides the button** — email + password is the only path. So nothing's broken, the button just won't appear until you ship a real iOS build.
+
+### 3.5d. Compliance check (per PLAN.md §C8)
+
+- ✅ Apple Guideline 4.8 (Sign in with Apple required if any social login). Email magic link counts; we ship Apple alongside.
+- ⚠️ Settings → Disconnect Apple ID flow not yet built — only matters if you use the FULL_NAME / EMAIL claims; we already request both. Track for v1.1.
+
+---
+
 ## 4. Smaller loose ends (lower priority)
 
 These aren't blockers but are noted in various docs:
@@ -169,7 +210,7 @@ These aren't blockers but are noted in various docs:
 - **Shelves Phase 2** — asset-gated. Drop your sprig PNGs + wood PNG into `assets/sprigs/` and `assets/shelves/`, then uncomment the source map in `src/components/shelves/Sprig.tsx` + `WoodShelf.tsx`. Then flip the plan's Phase 2 to in-progress + add the DB migration for `cover_color` / `cover_sprig`.
 - **Tab bar icon swap** — emojis → `@expo/vector-icons` Feather set. ~15 min cosmetic polish.
 - **BUG-010** — paper pattern in PDF export. Deferred since Phase F server renderer; documented on the ticket.
-- **MVP integrations still missing** — RevenueCat, Apple/Google/magic-link sign-in, push notifications, MMKV, PostHog, Sentry, i18n, password reset. None blocking the north-star test but all promised in `PLAN.md`.
+- **MVP integrations still missing** — RevenueCat, Google sign-in, magic-link sign-in, push notifications, MMKV, PostHog, Sentry, i18n, password reset. (Apple Sign In code landed 2026-04-25; awaits external setup per §3.5 above.) None blocking the north-star test but all promised in `PLAN.md`.
 
 ---
 

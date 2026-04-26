@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, TouchableOpacity, ScrollView,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { ClayButton } from '../../src/components/ui/ClayButton';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
 import { Sticker } from '../../src/components/stickers/Sticker';
-import { signIn, signUp } from '../../src/api/auth';
+import { signIn, signInWithApple, signUp, ApiError } from '../../src/api/auth';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
@@ -18,6 +19,31 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  // Apple Sign In is iOS-only AND requires iOS 13+. Older devices
+  // (rare in 2026 but possible) fall back to email/password.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
+
+  async function handleAppleSignIn() {
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      // Auth state change listener (set up in app/_layout.tsx) takes
+      // it from here — no manual nav.
+    } catch (e: any) {
+      if (e instanceof ApiError && e.code === 'cancelled') return; // user dismissed
+      Alert.alert('Apple sign in failed', e?.message ?? 'Please try again.');
+    } finally {
+      setAppleLoading(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!email.trim() || !password) return;
@@ -110,9 +136,30 @@ export default function LoginScreen() {
             label={mode === 'signin' ? 'Sign in' : 'Create account'}
             onPress={handleSubmit}
             loading={loading}
-            disabled={!email.trim() || !password}
+            disabled={!email.trim() || !password || appleLoading}
             style={styles.button}
           />
+
+          {appleAvailable ? (
+            <>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  mode === 'signin'
+                    ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                    : AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                }
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={handleAppleSignIn}
+              />
+            </>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </PaperGrain>
@@ -188,5 +235,27 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     marginTop: 8,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.line,
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  appleButton: {
+    width: '100%',
+    height: 48,
   },
 });
