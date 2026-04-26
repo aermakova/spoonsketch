@@ -1732,11 +1732,12 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 6 | Book builder | Week 10–11 | ✅ Done | All page types, drag reorder, cookbook CRUD, swipe edit/delete, recipe page → editor → back |
 | 7 | AI: auto-sticker + recipe import | Week 12 | ✅ **Done (2026-04-25)** | All 5 Import tabs live: Paste Link · Type · Photo (≤10 imgs) · File (PDF + .txt) · JSON (bulk, ≤20 recipes/import) · Make me Sketch (auto-sticker). `extract-recipe` Edge Function accepts `url` / `image_urls[]` / `pdf_url` / `text_content` modes. Multi-recipe URL detection landed in BUG-025; Cyrillic max_tokens fix in BUG-024. |
 | 8 | Telegram bot | Week 13 | 🔄 **In progress (code shipped)** | Bot runs end-to-end on device (commit `d2f61a6`): URL imports, photo imports (single + media_group batch), `moderate-image` CSAM gate, Realtime push to library. Connect Telegram UI live in Me tab. **Pending:** production deployment (Railway + Upstash, ~30 min, $5/mo) — see `NEXT_STEPS.md` §3. Until then bot lives on dev laptop only. |
-| 8.5 | Photos, frames & watercolor | Week 13.5 | ⬜ Not started | User uploads 1 photo per recipe; placeable on canvas with 1 of 8 frames; premium users convert to watercolor via OpenAI; 4 sticker packs (~76 stickers). 5 sub-phases (~46h total) summarized inline below. |
+| 8.5 | Photos, frames & watercolor | Week 13.5 | 🟡 **In progress (A — UI shipped, assets pending)** | Sub-phase A (sticker packs) UI infrastructure landed 2026-04-26: Stash tab (renamed from Elements), pack cards + lock badges, pack-detail screen + recipe picker → editor handoff, editor sticker tray pack tabs, tier-aware auto-sticker prompt (free=Essentials only / premium=all 76), `useUserTier()` hook, sticker max-scale cap for print quality. **Pending for A**: 60 PNG assets via `scripts/generate-stickers.ts` (offline `gpt-image-1` script — needs OpenAI key + ~$2.40, ~5 min). B/C/D/E (photos / frames / watercolor / PDF catch-up) not started. |
 | 9 | PDF export + print order | Week 14–15 | ⬜ Not started | Generate scrapbook PDF, clean PDF, Lulu order placed and tracked |
 | 10 | Cook mode + polish | Week 16 | ⬜ Not started | Cook mode with screen-on, step checklist, all 4 palettes applied throughout |
-| 10.5 | Editor UX polish | Week 16 | 🟡 **In progress (2/4)** | Done: Help overlay (`HelpSheet.tsx`, 2026-04-22), Edit recipe from Clean view (`/recipe/edit/[id]`, 2026-04-25). Pending: custom colour picker (~16 colours + wheel), Apple Pencil pressure (`e.pressure` → `StrokePoint.pressure`). |
-| 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
+| 10.5 | Editor UX polish | Week 16 | 🟡 **In progress (3/5)** | Done: Help overlay (`HelpSheet.tsx`, 2026-04-22), Edit recipe from Clean view (`/recipe/edit/[id]`, 2026-04-25), 10.5c canvas pinch-zoom + pan + double-tap reset + zoom pill (`CanvasPageZoom.tsx`, 2026-04-26). Pending: custom colour picker (~16 colours + wheel), Apple Pencil pressure (`e.pressure` → `StrokePoint.pressure`). |
+| 10.7 | Onboarding flow (5 killer-feature screens + Get Started + sign-up) | — | 🟡 **In progress (carousel shipped, GIFs pending)** | 5-screen carousel landed 2026-04-26: Splash → Bring your recipes → Beautiful with one tap → Add the note they'll read first → A real book in their hands (Hardcover/Softcover toggle). MMKV `onboarding_complete` flag wired in `app/_layout.tsx` AuthGate. Pending: Angy uploads 5 GIFs to `assets/onboarding/` — slots are wired with placeholder cards that auto-swap once `<HeroSlot source={require(…)}>` lines are added. Apple Sign In integration on final step → existing `/login` (intent + palette setup picker deferred to v1.1). |
+| 10.7c | Email change surface (§20) | — | ✅ Done (2026-04-26) | `EmailChangeSection` in Me tab opens a modal; `changeEmail()` in `src/api/auth.ts` calls `supabase.auth.updateUser({ email })` which sends a confirmation link to the new address (current email stays active until user clicks). |
 | 10.8 | Account management surfaces (order history, subscription manage, GDPR export, email change) | — | 🟡 **In progress (2/4)** | Four account surfaces specced — done: (b) ✅ §19 GDPR data export (2026-04-25 share-sheet handoff), (c) ✅ §15 in-app account deletion (2026-04-25, full cascade). Pending: (a) §17 Order history list, (d) §18 Manage subscription + Restore Purchases (gated on RevenueCat), §20 Email change. **§17 + §18 + §20 still required before App Store submission.** |
 | 10.9 | Compliance & legal (Ukraine + USA + EU + Apple Store) | — | 🟡 **In progress (engineering done; legal/admin pending)** | Engineering pieces ✅ (2026-04-25): §C2 granular consent UI + server gate, §C8 Sign in with Apple code (awaits Apple Dev portal + Supabase config per NEXT_STEPS §3.5), §C9 CSAM photo moderation via `moderate-image`, §15 in-app deletion, §19 data export. Still pending **legal/admin**: §C1 lawyer-drafted PP+ToS (EN+UK), §C7 EU Rep contract + cookie consent banner UI, §C4 vendor DPAs sign-off, §C5 CCPA/COPPA/California-ARL copy + Stripe Tax wire, §C5 App Store Connect privacy labels + age rating, §C9 RoPA + 72h breach runbook + Stripe Tax + Report Content button. Full P0/P1/P2/P3 checklist in §C-sections + bottom-of-section table. Source: `.claude/research/legal-compliance-research.md`. |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
@@ -1780,14 +1781,61 @@ Items intentionally skipped during Phase 5 to keep scope tight. Implement before
 - Apple Pencil pressure: wire `e.pressure` from the gesture event into `StrokePoint.pressure` for natural thinning (currently simulated at 0.5)
 - ✅ **Edit recipe from Clean view** — landed 2026-04-25. Pencil icon `✎` in the Clean nav opens `/recipe/edit/<id>`. Form lives in `src/components/recipe/RecipeFormFields.tsx` (shared between create + edit); helpers in `src/lib/recipeForm.ts`. Note: structured ingredients (amount/unit/group) are flattened to plain text on save — round-tripping loses some structure but preserves visible content. Future polish: structured ingredient editor with separate amount/unit fields.
 
+### Phase 10.5c — Canvas pinch-zoom + pan + reset (~3h, not started)
+
+**The problem.** The page renders at a fixed size (A4 ratio, fits screen width) with no way to zoom in. Placing stickers precisely on small details is hard; freehand drawing fine details with Apple Pencil is harder; reading a busy canvas full of stickers strains the eye.
+
+**The fix.** Add a 2-finger pinch + pan gesture to the page container in the Recipe editor (`app/editor/[recipeId].tsx`). Page zooms 1.0×–3.0×; pan only matters above 1.0×; double-tap on empty paper resets to 1.0× + recentered.
+
+**Gesture priority (the tricky part).** Both stickers and the page now want pinch. The rule:
+- 2 fingers landing on a selected sticker → existing sticker scale (CanvasElement.tsx pinch).
+- 2 fingers landing on empty paper or an unselected sticker → page zoom.
+- Implementation: wrap the page container in a `Gesture.Race(pagePinch, ...)` — sticker pinch wins iff its element is selected at gesture-start (via `manualActivation` + a `Tap` precondition, or by tracking `selectedId` in a shared value the gesture reads at `onStart`).
+
+**What to ship:**
+- New gesture wrapper (likely `src/components/canvas/CanvasPageZoom.tsx`) holding shared values for `pageScale`, `pageX`, `pageY`. Applies a `transform: [{ scale }, { translateX }, { translateY }]` to the page container.
+- Caps: `PAGE_MIN_SCALE = 1.0`, `PAGE_MAX_SCALE = 3.0`. Don't let users zoom out smaller than fit-to-screen — confusing without a clear use case.
+- Pan bounds: clamped so the page can't be panned off-screen (subtract the visible window from the scaled page size).
+- Double-tap on empty paper → animate back to `scale=1, x=0, y=0` over ~250ms.
+- Optional: small "100% / 220%" pill in the top-right of the editor that fades in when zoomed > 1.0× and tap-to-reset.
+- Saved snapshots (Skia thumbnail at Done) ALWAYS render at scale=1 — zoom is a viewing/editing aid only, not a persistent state.
+
+**Out of scope:** Apple Pencil pressure (separate Phase 10.5 item); zoom-aware sticker tray (sticker drop coordinates need `pageScale^-1` if dropped while zoomed — figure out at implementation time).
+
+**Verification:** pinch zoom in → sticker stays attached at the right page-relative coords; pan around at 2× → can't push page off-screen; double-tap → smooth animate back to 100%; pinch a selected sticker → still scales the sticker (not the page); pinch on empty paper → scales page only.
+
 ---
 
-## Current state — handoff notes (updated 2026-04-25)
+## Current state — handoff notes (updated 2026-04-26)
 
 > **New Claude instance: read this before touching any code.**
 > This section is the authoritative record of what was built and what is blocked.
 
 ### What is done
+
+**Phase 10.7 + 8.5A + 10.5c — onboarding, sticker packs UI, canvas zoom (added 2026-04-26):**
+
+Single-session queued work shipped end-to-end:
+
+- **Onboarding carousel** (`app/(auth)/onboarding.tsx` + `src/components/onboarding/{OnboardingCarousel,SplashScreen,ImportScreen,SketchScreen,DedicationScreen,PrintedBookScreen,HeroSlot}.tsx`) — 5-page horizontal `ScrollView pagingEnabled` with progress dots, MMKV `onboarding_complete` flag (`src/lib/onboardingFlag.ts`), AuthGate updated to route first-launch users here. Hardcover/Softcover toggle on screen 5 is visual-only for now; will pre-fill the print order in Phase 9. Hero visuals use `HeroSlot` placeholder cards — swap to `source={require('../../../assets/onboarding/0N-*.gif')}` once GIFs land.
+- **Stash tab** (renamed from Elements; `app/(tabs)/stash.tsx` + `src/components/stash/{StashScreen,PackCard,PackDetailScreen}.tsx`) — header + 3 sections (sticker packs / favorites placeholder / photos placeholder), 4 pack cards (Essentials free, Baking/Herbs/Holiday premium with 🔒 for free users), pack-detail grid + sticker preview sheet + recipe picker bottom sheet that hands off to the editor with `?dropSticker=<key>` query param.
+- **Editor sticker tray refactor** (`src/components/canvas/StickerTray.tsx`) — 4 pack tabs above the tile row, lock badge on premium tabs for free users, taps on locked tabs route to `/upgrade`.
+- **Tier-aware auto-sticker** (`supabase/functions/auto-sticker/index.ts`) — free vs premium guidance blocks; `getUserTier()` reads at request time; post-parse filter drops any keys not in the user's allowed set. Free users now physically can't get premium suggestions even if Haiku hallucinates them.
+- **`useUserTier()` hook** (`src/hooks/useUserTier.ts`) + `fetchUserTier()` in `src/api/auth.ts` — TanStack Query, 5-min stale time, returns `'free'` as fail-safe default.
+- **Pack registry** (`src/lib/stickerRegistry.ts`) — extended with `PACK_METADATA` (always present) so Stash renders all 4 packs even before premium PNGs exist. When PNGs land, just add three more arrays to `STICKER_PACKS` + auto-sticker's `PREMIUM_STICKER_KEYS` matches the registry.
+- **Canvas page zoom (Phase 10.5c)** (`src/components/canvas/CanvasPageZoom.tsx`) — pinch + pan + bounds clamp, scale ∈ [1.0, 3.0], double-tap on empty paper resets to 100%, zoom pill at top-right of editor (only visible when zoomed). Gesture priority: page-pinch disabled when a sticker is selected (so 2-finger pinches scale the sticker), in Draw mode, or in Block-edit mode.
+- **Sticker scale cap** (`src/lib/canvasStore.ts` `STICKER_MAX_SCALE = 3.0`) — print-quality bound. 512px source PNG stays crisp at Lulu 300 DPI up to ~1.7" sticker on the page. Future Phase 8.5C photo elements will define their own higher cap (1024px source).
+- **Tab bar Feather icons** (`app/(tabs)/_layout.tsx`) — emojis swapped for `home / book-open / grid / user`. Cleaner look.
+- **Email change surface (§20 / Phase 10.7c)** (`src/components/me/EmailChangeSection.tsx` + `changeEmail()` in `auto.ts`) — Me-tab row "Email · {current} · Change". Modal with new-email input. Calls `supabase.auth.updateUser({ email })` which sends a confirmation link; current email stays until user clicks.
+- **Generation script** (`scripts/{generate-stickers,generate-sticker-sample,stickers-manifest}.ts`) — offline `gpt-image-1` runner producing 60 transparent 512×512 PNGs into `assets/stickers/<pack>/`. Sample script writes one to `scripts/samples/` for style validation. Dev deps added: `openai`, `sharp`, `tsx`. 60-entry manifest with `STYLE_PREFIX` + per-sticker prompts; ID sets are unique-checked at import.
+
+**Pending Angy actions to fully unlock 8.5A and 10.7:**
+1. Iterate on `STYLE_PREFIX` in `scripts/stickers-manifest.ts`, run the sample script until the painterly look is right.
+2. Run the full generator (`OPENAI_API_KEY=… npx tsx scripts/generate-stickers.ts`, ~$2.40).
+3. Add 3 new arrays (`BAKING_STICKERS` / `HERBS_STICKERS` / `HOLIDAY_STICKERS`) to `src/lib/stickerRegistry.ts` mirroring `CORE_STICKERS` + uncomment the 3 commented `STICKER_PACKS` entries.
+4. Drop 5 onboarding GIFs into `assets/onboarding/` and replace each `<HeroSlot ... caption="...">` line with `<HeroSlot ... source={require('../../../assets/onboarding/0N-*.gif')}>`.
+
+---
 
 **Phase 10.9 engineering — compliance scaffolding (added 2026-04-25):**
 

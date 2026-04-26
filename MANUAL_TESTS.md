@@ -970,3 +970,100 @@ _To fill in once F lands. Placeholder scenarios:_
 - Text ↔ line alignment doesn't drift across pages.
 - Run Lulu PDF validator (or at minimum: A4 size + embedded fonts + no RGB-only issues).
 - Submit a test print order for one recipe.
+
+---
+
+## Onboarding carousel (Phase 10.7, landed 2026-04-26)
+
+Reset for testing: `AsyncStorage.removeItem('spoonsketch:onboarding_complete')` (or delete + reinstall the app).
+
+### 1. First-launch routes to onboarding
+- ✅ Fresh install (or after clearing the flag) lands on `/(auth)/onboarding`, NOT `/(auth)/login`.
+- ✅ The 5 carousel screens swipe left/right in order: Splash → Bring your recipes → Make me Sketch → Dedication → Printed book.
+- ✅ Tapping the primary CTA on each non-final screen advances by one page.
+- ✅ Progress dots only render from screen 2 onward; splash is dot-free.
+
+### 2. "I already have an account" link
+- ✅ Tapping the secondary link on Splash flips the flag and routes to `/(auth)/login`.
+- ✅ After signing in, app lands on home; subsequent launches skip onboarding entirely.
+
+### 3. "Get started" finishes onboarding
+- ✅ Last screen Hardcover/Softcover toggle visually selects either. (Persistence is deferred — does not yet pre-fill anywhere.)
+- ✅ "Get started" flips `onboarding_complete` and routes to `/(auth)/login`.
+- ✅ Returning to the app after sign-up does NOT re-show onboarding, ever.
+
+### 4. AuthGate edge cases
+- ✅ Already-signed-in user with the flag missing should NOT see onboarding.
+- ✅ Signed-out user with the flag set lands on login (no onboarding flicker).
+
+---
+
+## Stash tab + sticker packs (Phase 8.5A, landed 2026-04-26)
+
+### 1. Tab rename + reachability
+- ✅ Tab bar shows "Stash" (basket emoji) instead of "Elements".
+- ✅ Tap → header "Your stash", subtitle "Stickers, photos, and the things you come back to."
+- ✅ Three sections render: **Sticker packs**, **Your favorites** (placeholder card), **Your photos** (placeholder card).
+
+### 2. Pack cards (free user)
+- ✅ 4 pack cards visible: Essentials (no lock badge), Baking + Herbs & Garnish + Holiday & Seasonal (each shows lock icon).
+- ✅ Essentials card preview shows 4 real sticker thumbnails (tomato / lemon / wheat / heart).
+- ✅ Premium cards show empty thumb area today (PNGs not yet generated) — populates automatically once `STICKER_PACKS` is filled in.
+- ✅ Footer line shows "{count} stickers · Free|Premium".
+
+### 3. Pack card tap behavior
+- ✅ Tap Essentials → routes to `/stash/pack/core`, full sticker grid renders, all 16 visible.
+- ✅ Tap any locked premium pack as a free user → routes to `/upgrade` modal.
+- ✅ For a premium user (set `users.tier='premium'` via Supabase Studio), tapping a premium pack opens the pack-detail screen normally with no lock overlay.
+
+### 4. Pack-detail flow → editor handoff
+- ✅ On `/stash/pack/core`, tap any sticker tile → bottom sheet appears with the sticker at 140px and its label.
+- ✅ Tap "Use in a recipe →" → recipe picker bottom sheet opens with the user's recipe list.
+- ✅ Tap a recipe → editor opens at `/editor/<id>?dropSticker=<key>` with the sticker auto-dropped near the canvas centre.
+- ✅ Backing out and returning does NOT drop the sticker again (the param is stripped after first drop).
+- ✅ With zero recipes: picker shows "You don't have any recipes yet" empty state.
+
+### 5. Editor sticker tray pack tabs
+- ✅ Open any recipe → Decorate → Stickers mode → 4 pack tabs visible above the tile row (Essentials / Baking / Herbs / Holiday).
+- ✅ Active tab highlighted; inactive dim. Lock icon next to premium tabs for free users.
+- ✅ Tap free pack tab → tray switches to that pack's stickers.
+- ✅ Tap locked pack tab as a free user → routes to `/upgrade`. Active tab does NOT change.
+- ✅ Tap locked tab as a premium user → tab switches normally.
+
+### 6. Make-me-Sketch tier branch
+- ✅ Free user on a baking-themed recipe: "Make me Sketch" returns 3-5 stickers, all from Essentials. None of `rolling-pin`, `cupcake`, etc. appear.
+- ✅ Premium user on the same recipe: results may include `rolling-pin`, `cupcake`, or other Baking/Herbs/Holiday picks alongside Essentials.
+- ✅ If a premium key lands in a free response (Haiku hallucination), it's filtered out by `parseStickerPicks()`.
+
+---
+
+## Canvas page zoom (Phase 10.5c, landed 2026-04-26)
+
+### 1. Pinch-zoom on empty paper
+- ✅ Open editor with no sticker selected → 2-finger pinch on the page → page scales 1.0× → 3.0× smoothly.
+- ✅ Pinch in further than 3.0× → no rubber-band; clean stop at 3.0×.
+- ✅ Zoom indicator pill (top-right) appears when scale > 100% and updates after pinch end (e.g. "180%").
+- ✅ At scale = 100% the pill is hidden.
+
+### 2. Pan when zoomed
+- ✅ At zoom > 100%, single-finger drag pans the page within the bounds.
+- ✅ Cannot pan the page off-screen — bounds clamp prevents exposing background.
+- ✅ At zoom = 100%, single-finger pan does nothing.
+
+### 3. Double-tap reset
+- ✅ While zoomed, double-tap on empty paper → page animates back to 100% over ~220ms, recentered.
+- ✅ Pill disappears when scale returns to 100%.
+
+### 4. Gesture priority — sticker vs page
+- ✅ Tap an existing sticker to select it → its handles appear → 2-finger pinch scales the STICKER, not the page.
+- ✅ Tap empty paper to deselect → page-pinch re-enables.
+- ✅ Switching to Draw mode disables page-pinch.
+- ✅ Block-edit mode (Layout → Arrange Blocks) also disables page-pinch.
+
+### 5. Persistence — zoom is editor-only
+- ✅ Zoom in to 200%, tap Done → return to recipe detail → re-enter editor → page is at 100% (no zoom carried over).
+- ✅ Saved Skia thumbnail (Scrapbook view + PDF export) renders at scale = 1.
+
+### 6. Sticker scale cap (print-quality companion)
+- ✅ Pinch a selected sticker beyond 3.0× → clean cap at `STICKER_MAX_SCALE = 3.0`.
+- ✅ Pinch a selected sticker below 0.3× → clean cap at `STICKER_MIN_SCALE = 0.3`.

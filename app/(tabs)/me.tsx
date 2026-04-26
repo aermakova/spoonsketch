@@ -18,6 +18,7 @@ import { useTelegramConnection } from '../../src/hooks/useTelegramConnection';
 import { useConsents, useSetConsent } from '../../src/hooks/useConsents';
 import { useTrackingConsent } from '../../src/lib/trackingConsent';
 import { useSubmitGuard } from '../../src/lib/useSubmitGuard';
+import { EmailChangeSection } from '../../src/components/me/EmailChangeSection';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
@@ -158,6 +159,9 @@ function MeScreen() {
       </View>
 
       <View style={{ height: 24 }} />
+
+      {/* Account fields */}
+      <EmailChangeSection />
 
       <ClayButton label="Sign out" variant="secondary" loading={busy} onPress={handleSignOut} />
 
