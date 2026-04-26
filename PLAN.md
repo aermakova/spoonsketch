@@ -906,7 +906,7 @@ Acceptance criteria:
 
 ### C2 · Granular consent + marketing opt-in
 
-> **🔴 LAUNCH BLOCKER for Ukrainian users.** Bundling consent into a single "I agree to ToS" checkbox is non-compliant under Ukraine's data protection law and ePrivacy.
+> **✅ Engineering landed 2026-04-25.** Privacy Policy + ToS (§C1) still pending — once those documents exist, bump `CURRENT_PP_VERSION` in `src/api/consent.ts` and existing users get re-prompted on next sign-in.
 
 Sign-up flow (Onboarding §00 step 7) gains 4 separate, **unchecked** checkboxes:
 1. **Required**: "I agree to the Terms of Service and Privacy Policy" (cannot proceed without)
@@ -1096,7 +1096,7 @@ Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P
 | 15 | COPPA age gate at registration | §C6 + Onboarding §00 |
 | 16 | CSAM photo scanning on every upload ✅ | §C9 |
 | 17 | Terms of Service published — EU 14-day waiver, auto-renewal, UGC license | §C1 + §C7 |
-| 18 | Ukraine: Privacy Policy in Ukrainian + per-purpose consent checkboxes | §C1 + §C2 |
+| 18 | Ukraine: Privacy Policy in Ukrainian + per-purpose consent checkboxes ✅ engineering | §C1 + §C2 |
 | 19 | RoPA internal document | §C9 |
 
 ### P2 — Required before significant scale

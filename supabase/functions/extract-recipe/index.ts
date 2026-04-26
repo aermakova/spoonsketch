@@ -7,6 +7,7 @@ import {
   getQuota,
 } from '../_shared/tier.ts';
 import { anthropic, HAIKU_MODEL, logAiJob } from '../_shared/ai.ts';
+import { requireAiConsent } from '../_shared/consent.ts';
 
 const MAX_SCRAPE_BYTES = 200_000;
 const MAX_SCRAPE_CHARS = 20_000;
@@ -202,6 +203,12 @@ Deno.serve(async (req) => {
     if (!v.ok) return jsonError(400, 'invalid_url', v.reason);
     validatedTarget = v.url;
   }
+
+  // AI consent gate (PLAN.md §C2). Bot-mode auth still needs this —
+  // bot users are real Spoon & Sketch users with the same consent
+  // state as if they used the app directly.
+  const consentReject = await requireAiConsent(ctx.supabaseAdmin, ctx.userId);
+  if (consentReject) return consentReject;
 
   // Rate limit: single user hammering the endpoint (per job type)
   const rate = await checkRateLimit(ctx.supabaseAdmin, ctx.userId, jobType);

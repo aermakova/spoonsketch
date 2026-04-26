@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Linking, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, Linking, ActivityIndicator, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClayButton } from '../../src/components/ui/ClayButton';
@@ -13,6 +13,7 @@ import {
   type TelegramTokenResult,
 } from '../../src/api/telegramAuth';
 import { useTelegramConnection } from '../../src/hooks/useTelegramConnection';
+import { useConsents, useSetConsent } from '../../src/hooks/useConsents';
 import { useSubmitGuard } from '../../src/lib/useSubmitGuard';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -87,8 +88,11 @@ function MeScreen() {
   }
 
   return (
-    <View style={styles.root}>
+    <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
       <Text style={styles.heading}>Me</Text>
+
+      {/* Privacy card */}
+      <PrivacyCard />
 
       {/* Telegram card */}
       <View style={styles.card}>
@@ -150,15 +154,95 @@ function MeScreen() {
         )}
       </View>
 
-      <View style={{ flex: 1 }} />
+      <View style={{ height: 24 }} />
 
       <ClayButton label="Sign out" variant="secondary" loading={busy} onPress={handleSignOut} />
+    </ScrollView>
+  );
+}
+
+function PrivacyCard() {
+  const { data: consents, isLoading } = useConsents();
+  const setConsentMutation = useSetConsent();
+
+  if (isLoading || !consents) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🔐 Privacy</Text>
+        <ActivityIndicator color={colors.terracotta} />
+      </View>
+    );
+  }
+
+  function toggle(kind: 'ai' | 'print' | 'marketing', value: boolean) {
+    setConsentMutation.mutate({ kind, granted: value });
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>🔐 Privacy</Text>
+      <Text style={styles.cardSub}>
+        Granular controls over how Spoon &amp; Sketch processes your data. Changes take effect immediately.
+      </Text>
+
+      <ConsentToggle
+        label="AI processing"
+        body="Send recipe text, photos, and PDFs to AI services (Anthropic, OpenAI) for extraction and stickers. Off = Paste Link / Photo / File / Make-me-Sketch / Watercolor are disabled. JSON tab still works."
+        value={consents.ai}
+        onValueChange={(v) => toggle('ai', v)}
+        disabled={setConsentMutation.isPending}
+      />
+      <ConsentToggle
+        label="Print orders"
+        body="Use your mailing address to fulfil printed-book orders (sent to Lulu xPress)."
+        value={consents.print}
+        onValueChange={(v) => toggle('print', v)}
+        disabled={setConsentMutation.isPending}
+      />
+      <ConsentToggle
+        label="Marketing"
+        body="Product updates and tips by email or push. Order status emails always send regardless."
+        value={consents.marketing}
+        onValueChange={(v) => toggle('marketing', v)}
+        disabled={setConsentMutation.isPending}
+      />
+
+      <Text style={styles.consentMeta}>
+        ToS / Privacy Policy version{' '}
+        <Text style={styles.consentMetaStrong}>{consents.ppVersion ?? 'unset'}</Text>. To revoke
+        ToS, delete your account.
+      </Text>
+    </View>
+  );
+}
+
+interface ConsentToggleProps {
+  label: string;
+  body: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  disabled?: boolean;
+}
+
+function ConsentToggle({ label, body, value, onValueChange, disabled }: ConsentToggleProps) {
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.toggleText}>
+        <Text style={styles.toggleLabel}>{label}</Text>
+        <Text style={styles.toggleBody}>{body}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+        trackColor={{ false: colors.line, true: colors.terracotta }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20, paddingTop: 60, paddingBottom: 32, gap: 20 },
+  root: { backgroundColor: colors.bg, paddingHorizontal: 20, paddingTop: 60, paddingBottom: 32, gap: 20 },
   heading: { fontFamily: fonts.display, fontSize: 28, color: colors.ink },
   card: {
     backgroundColor: colors.paper,
@@ -186,6 +270,18 @@ const styles = StyleSheet.create({
   },
   fallbackUrl: { fontFamily: fonts.body, fontSize: 12, color: colors.ink, flex: 1 },
   copyHint: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.terracotta },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  toggleText: { flex: 1 },
+  toggleLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink, marginBottom: 2 },
+  toggleBody: { fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft, lineHeight: 17 },
+  consentMeta: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
+  consentMetaStrong: { fontFamily: fonts.bodyMedium, color: colors.inkSoft },
 });
 
 export default withErrorBoundary(MeScreen, 'Profile crashed');

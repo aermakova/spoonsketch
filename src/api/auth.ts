@@ -1,6 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { supabase } from './client';
+import { CURRENT_PP_VERSION } from './consent';
 
 export class ApiError extends Error {
   constructor(message: string, public code?: string) {
@@ -9,8 +10,39 @@ export class ApiError extends Error {
   }
 }
 
-export async function signUp(email: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signUp({ email, password });
+/**
+ * Captured at sign-up. ToS+PP is implicit `true` (sign-up form
+ * disables submit until the box is checked); AI / print / marketing
+ * are user-controlled. The metadata travels through Supabase Auth's
+ * `raw_user_meta_data` and is unpacked by the `handle_new_user`
+ * Postgres trigger into the user row + audit log in one transaction.
+ */
+export interface SignUpConsents {
+  ai: boolean;
+  print: boolean;
+  marketing: boolean;
+}
+
+export async function signUp(
+  email: string,
+  password: string,
+  consents: SignUpConsents,
+): Promise<void> {
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        consents: {
+          tos: true,
+          ai: consents.ai,
+          print: consents.print,
+          marketing: consents.marketing,
+        },
+        pp_version: CURRENT_PP_VERSION,
+      },
+    },
+  });
   if (error) throw new ApiError(error.message, error.code);
 }
 

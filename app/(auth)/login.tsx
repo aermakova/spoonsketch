@@ -11,6 +11,70 @@ import { signIn, signInWithApple, signUp, ApiError } from '../../src/api/auth';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
+interface ConsentRowProps {
+  value: boolean;
+  onChange: (next: boolean) => void;
+  label: React.ReactNode;
+  required?: boolean;
+}
+
+function ConsentRow({ value, onChange, label, required }: ConsentRowProps) {
+  return (
+    <TouchableOpacity
+      style={consentStyles.row}
+      onPress={() => onChange(!value)}
+      activeOpacity={0.7}
+    >
+      <View style={[consentStyles.box, value && consentStyles.boxChecked]}>
+        {value ? <Text style={consentStyles.check}>✓</Text> : null}
+      </View>
+      <View style={consentStyles.labelWrap}>
+        {label}
+        {required ? <Text style={consentStyles.required}> · required</Text> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const consentStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  box: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.inkSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  boxChecked: {
+    backgroundColor: colors.terracotta,
+    borderColor: colors.terracotta,
+  },
+  check: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  labelWrap: {
+    flex: 1,
+  },
+  required: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    color: colors.inkFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+});
+
 type Mode = 'signin' | 'signup';
 
 export default function LoginScreen() {
@@ -21,6 +85,12 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  // Granular consents — required for Ukraine + EU sign-up. ToS+PP is the
+  // gate; AI / print / marketing are optional opt-ins.
+  const [consentTos, setConsentTos] = useState(false);
+  const [consentAi, setConsentAi] = useState(false);
+  const [consentPrint, setConsentPrint] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
 
   // Apple Sign In is iOS-only AND requires iOS 13+. Older devices
   // (rare in 2026 but possible) fall back to email/password.
@@ -61,11 +131,24 @@ export default function LoginScreen() {
       if (mode === 'signin') {
         await signIn(email.trim().toLowerCase(), password);
       } else {
-        await signUp(email.trim().toLowerCase(), password);
+        if (!consentTos) {
+          Alert.alert('Required', 'Please agree to the Terms and Privacy Policy to create an account.');
+          return;
+        }
+        await signUp(email.trim().toLowerCase(), password, {
+          ai: consentAi,
+          print: consentPrint,
+          marketing: consentMarketing,
+        });
         Alert.alert('Account created!', 'Check your email to confirm your account, then sign in.');
         setMode('signin');
         setPassword('');
         setConfirmPassword('');
+        // Clear consents — next sign-up starts fresh.
+        setConsentTos(false);
+        setConsentAi(false);
+        setConsentPrint(false);
+        setConsentMarketing(false);
       }
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -132,11 +215,62 @@ export default function LoginScreen() {
             />
           )}
 
+          {mode === 'signup' && (
+            <View style={styles.consents}>
+              <ConsentRow
+                value={consentTos}
+                onChange={setConsentTos}
+                required
+                label={
+                  <Text style={styles.consentLabel}>
+                    I agree to the <Text style={styles.consentLink}>Terms of Service</Text> and{' '}
+                    <Text style={styles.consentLink}>Privacy Policy</Text>.
+                  </Text>
+                }
+              />
+              <ConsentRow
+                value={consentAi}
+                onChange={setConsentAi}
+                label={
+                  <Text style={styles.consentLabel}>
+                    Use AI to read my recipes and generate stickers (Anthropic, OpenAI). Optional —
+                    you can change this in Settings.
+                  </Text>
+                }
+              />
+              <ConsentRow
+                value={consentPrint}
+                onChange={setConsentPrint}
+                label={
+                  <Text style={styles.consentLabel}>
+                    Use my mailing address to fulfil printed-book orders. Only matters when you
+                    place an order.
+                  </Text>
+                }
+              />
+              <ConsentRow
+                value={consentMarketing}
+                onChange={setConsentMarketing}
+                label={
+                  <Text style={styles.consentLabel}>
+                    Send me product updates and tips by email or push. Order status emails always
+                    send regardless.
+                  </Text>
+                }
+              />
+            </View>
+          )}
+
           <ClayButton
             label={mode === 'signin' ? 'Sign in' : 'Create account'}
             onPress={handleSubmit}
             loading={loading}
-            disabled={!email.trim() || !password || appleLoading}
+            disabled={
+              !email.trim() ||
+              !password ||
+              appleLoading ||
+              (mode === 'signup' && !consentTos)
+            }
             style={styles.button}
           />
 
@@ -257,5 +391,20 @@ const styles = StyleSheet.create({
   appleButton: {
     width: '100%',
     height: 48,
+  },
+  consents: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  consentLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 18,
+  },
+  consentLink: {
+    fontFamily: fonts.bodyMedium,
+    color: colors.terracotta,
+    textDecorationLine: 'underline',
   },
 });

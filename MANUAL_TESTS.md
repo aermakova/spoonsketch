@@ -12,6 +12,51 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Granular consent (landed 2026-04-25)
+
+Prereqs:
+- `users.consent_*` columns + `user_consents` audit table + RPC migration applied (5 + 6 of 2026-04-25).
+- `extract-recipe` and `auto-sticker` redeployed with consent gate.
+
+### 1. Sign-up form — required ToS gate
+- New session → /login → tab to Create account.
+- ✅ Expect: 4 consent rows below the password fields. ToS row says "required". Submit button is disabled until ToS is checked.
+- Fill email + password + confirm; leave ToS unchecked → button stays disabled.
+- Check ToS → button enables.
+
+### 2. Sign-up form — optional consents flow through
+- Check ToS only; leave AI / print / marketing unchecked. Tap **Create account** → confirmation alert.
+- Verify in Supabase: `select consent_tos, consent_ai, consent_print, consent_marketing, consent_pp_version from users where email='<new-account>'` → tos=true, others=false, pp_version='2026-04-25-pre-launch'.
+- `select kind, granted from user_consents where user_id='<uid>' order by kind` → 4 rows: tos=true, ai/print/marketing=false.
+
+### 3. Settings → Privacy panel
+- Sign in to a fresh account → Me tab.
+- ✅ Expect: 🔐 Privacy card with three toggles (AI, Print, Marketing). ToS NOT shown (must delete account to revoke).
+- Toggle AI on → mutation runs → toast/no-error → row in user_consents inserts.
+- Toggle AI off → another row in user_consents.
+- SQL: `select kind, granted, granted_at from user_consents where user_id='<uid>' order by granted_at desc` → see history.
+
+### 4. AI off → import banner shown
+- With AI consent OFF, open Add → Import a Recipe.
+- ✅ Expect: terracotta-bordered banner above the tabs: "AI processing is paused for your account — Paste Link, Photo, and File need it. Use Type or JSON instead, or enable AI in Me → Privacy."
+- Tab to Type or JSON → banner disappears.
+
+### 5. AI off → server gate fires
+- With AI consent OFF, attempt Paste Link → Import.
+- ✅ Expect: error "AI features are turned off for your account. Enable them in Settings → Privacy." Recipe NOT created.
+- Same for Photo tab + File tab + Make-me-Sketch button.
+
+### 6. AI on → everything works again
+- Toggle AI back ON.
+- Retry the Paste Link import → succeeds.
+
+### 7. Bot path also gated
+- With AI consent OFF, send a recipe URL to the Telegram bot.
+- ✅ Expect: bot replies with the same friendly "AI is off" message (mapped from server's 403 consent_required).
+- (Bot uses the same `extract-recipe` function with the same gate.)
+
+---
+
 ## Image moderation gate (landed 2026-04-25)
 
 Prereqs:

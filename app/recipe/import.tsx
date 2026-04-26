@@ -45,6 +45,7 @@ import {
   type JsonTabInlineError,
   type JsonTabCapped,
 } from '../../src/components/import/JsonTab';
+import { useConsents } from '../../src/hooks/useConsents';
 import type { ExtractedRecipe } from '../../src/types/ai';
 import type { JsonImportResult } from '../../src/api/ai';
 
@@ -102,6 +103,9 @@ function ImportRecipeScreen() {
     useState<JsonTabInlineError | null>(null);
   const [jsonCapped, setJsonCapped] = useState<JsonTabCapped | null>(null);
 
+  const { data: consents } = useConsents();
+  const aiOff = consents?.ai === false;
+
   function handleClose() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -156,6 +160,16 @@ function ImportRecipeScreen() {
         </View>
 
         <ImportTabs active={activeTab} onChange={setActiveTab} />
+
+        {aiOff && activeTab !== 'type' && activeTab !== 'json' ? (
+          <View style={styles.aiOffBanner}>
+            <Text style={styles.aiOffText}>
+              AI processing is paused for your account — Paste Link, Photo, and File need it. Use{' '}
+              <Text style={styles.aiOffStrong}>Type</Text> or{' '}
+              <Text style={styles.aiOffStrong}>JSON</Text> instead, or enable AI in Me → Privacy.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           {activeTab === 'paste' ? (
@@ -249,6 +263,26 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  aiOffBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.bg2,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.terracotta,
+  },
+  aiOffText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    lineHeight: 17,
+  },
+  aiOffStrong: {
+    fontFamily: fonts.bodyBold,
+    color: colors.ink,
   },
 });
 

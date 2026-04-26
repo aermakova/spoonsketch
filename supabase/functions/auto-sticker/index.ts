@@ -7,6 +7,7 @@ import {
   getQuota,
 } from '../_shared/tier.ts';
 import { anthropic, HAIKU_MODEL, logAiJob } from '../_shared/ai.ts';
+import { requireAiConsent } from '../_shared/consent.ts';
 
 const VALID_STICKER_KEYS = [
   'tomato', 'lemon', 'garlic', 'basil', 'whisk', 'spoon',
@@ -66,6 +67,10 @@ Deno.serve(async (req) => {
   if (!recipeId) {
     return jsonError(400, 'bad_request', 'recipe_id is required');
   }
+
+  // AI consent gate (PLAN.md §C2)
+  const consentReject = await requireAiConsent(ctx.supabaseAdmin, ctx.userId);
+  if (consentReject) return consentReject;
 
   // Rate limit + quota
   const rate = await checkRateLimit(ctx.supabaseAdmin, ctx.userId, 'auto_sticker');
