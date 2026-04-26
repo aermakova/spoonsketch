@@ -636,6 +636,38 @@ Image moderation gate. Called by every photo uploader (Photo tab, Telegram bot p
 
 **Out of scope v1:** PDFs (rely on Anthropic's own document moderation in extract-recipe), retroactive scanning of existing storage objects.
 
+#### `POST /functions/v1/delete-account`
+
+Hard-deletes the authenticated user. Required by Apple Guideline 5.1.1(v) (in-app account deletion), GDPR Art. 17 (right to erasure), and Ukraine PDP Law (deletion right).
+
+**Auth:** JWT only (`requireUser`).
+
+**Sequence:**
+1. List + remove every storage object under `telegram-screenshots/<user_id>/` (best-effort; failure logs but doesn't abort).
+2. `supabase.auth.admin.deleteUser(user_id)` — removes the auth.users row.
+3. DB cascade fires automatically: `public.users` → cookbooks → recipes → recipe_canvases → canvas_elements / drawing_layers / drawing_strokes / book_pages / pdf_exports / user_images / ai_jobs / telegram_connections / telegram_jobs / telegram_auth_tokens / moderation_events / user_consents / print_orders.
+
+Every user-scoped table has `user_id … references public.users on delete cascade` (audited across all migrations).
+
+**Vendor cleanup (manual / out of scope for the function):**
+- **Anthropic** — zero-retention by default (org-wide ZDR opt-in). Nothing to delete on their side.
+- **OpenAI** — per DPA, deletion request via support if any user data was sent. Recipe-image generation isn't live yet, so no current data to clean.
+- **Telegram** — bot connection is server-deleted via the cascade; Telegram itself owns the user's handle/ID, not us.
+- **Lulu** — print-order shipping addresses are owned by Lulu after submission; their retention is governed by their DPA.
+- **PostHog / Sentry** — anonymized after the auth.users row is gone (no `users` table to join against). Ad-hoc DELETE request via dashboard if needed.
+
+**Response (200):**
+```json
+{ "ok": true }
+```
+
+**Response (500):**
+```json
+{ "error": "delete_failed", "message": "Could not delete your account. Please try again or contact support." }
+```
+
+**Auth:** function deployed with `verify_jwt = false` (same gateway-format issue as the rest); function code uses `requireUser` which accepts both JWT formats.
+
 **Response (200):**
 ```json
 {

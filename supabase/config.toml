@@ -42,3 +42,7 @@ verify_jwt = false
 # Same gateway-bypass reason as extract-recipe.
 [functions.moderate-image]
 verify_jwt = false
+
+# delete-account is JWT-only but same gateway-format issue as the rest.
+[functions.delete-account]
+verify_jwt = false

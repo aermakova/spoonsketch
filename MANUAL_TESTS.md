@@ -12,6 +12,41 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Account deletion (landed 2026-04-25)
+
+Prereqs:
+- `delete-account` Edge Function deployed.
+- Test account with seeded data (a recipe or two, ideally a Telegram connection).
+
+### 1. Confirmation gate
+- Sign in → Me → scroll to bottom → tap "Delete my account".
+- ✅ Expect: Modal appears with destructive copy + a TEXT input.
+- Type `delete` (lowercase) → "Delete forever" button stays disabled.
+- Type `DELETE` (uppercase) → button enables.
+- Tap **Cancel** → modal dismisses, no action taken. Reopen → input is reset.
+
+### 2. Successful deletion
+- Open modal → type DELETE → tap "Delete forever".
+- ✅ Expect: button shows "Deleting…" → ~2-5s → app routes back to /login screen.
+- Try to sign in with the same email → ✅ Expect: "Invalid login credentials" or similar — the auth.users row is gone.
+- SQL check (with service role): `select * from public.users where id='<the-uid>'` → 0 rows.
+- SQL check: `select count(*) from public.recipes where user_id='<the-uid>'` → 0.
+- SQL check: `select count(*) from public.user_consents where user_id='<the-uid>'` → 0 (cascade).
+- Storage check: `select * from storage.objects where name like '<uid>/%' and bucket_id='telegram-screenshots'` → 0.
+
+### 3. Cascade coverage
+- Before deletion, seed: 1 cookbook, 2 recipes, 1 telegram_connection, 1 ai_jobs row, 1 moderation_events row, 1 user_consents row, 1 print_orders row.
+- After deletion → SQL: each of those tables returns 0 rows for the deleted user.
+
+### 4. Storage cleanup
+- Before deletion, upload a photo via Photo tab so a file exists at `telegram-screenshots/<uid>/<uuid>.jpg`.
+- After deletion → Supabase Storage dashboard shows the user's folder is empty/gone.
+
+### 5. Edge Function deploy validation
+- With JWT auth: `curl https://<project>.supabase.co/functions/v1/delete-account -X POST` (no auth) → 401 from `requireUser`.
+
+---
+
 ## Granular consent (landed 2026-04-25)
 
 Prereqs:

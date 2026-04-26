@@ -121,3 +121,35 @@ function bytesToHex(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
   return out;
 }
+
+/**
+ * Hard-delete the user's account. Calls the `delete-account` Edge
+ * Function which cascade-removes every user-scoped row + storage
+ * object server-side. Then signs out locally so the auth state
+ * listener routes the user back to /login.
+ *
+ * Apple Guideline 5.1.1(v) requires this to be in-app + immediate +
+ * full delete (not deactivate). The caller is responsible for
+ * confirming the user really wants to delete (typing "DELETE" per
+ * PLAN.md §15 acceptance criteria).
+ */
+export async function deleteAccount(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<
+    { ok: true } | { error: string; message?: string }
+  >('delete-account', { body: {} });
+  if (error) {
+    let body: { error?: string; message?: string } = {};
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+      if (ctx?.json) body = (await ctx.json()) as typeof body;
+    } catch { /* noop */ }
+    throw new ApiError(body.message ?? error.message, body.error ?? 'delete_failed');
+  }
+  if (!data || !('ok' in data)) {
+    throw new ApiError('Account deletion returned no result', 'delete_failed');
+  }
+  // Server already nuked the auth.users row; this just clears the
+  // local session token from expo-secure-store and triggers the
+  // RootLayout's auth listener to navigate to /login.
+  await supabase.auth.signOut().catch(() => { /* session is already gone */ });
+}

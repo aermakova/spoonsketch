@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Linking, ActivityIndicator, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Alert, Linking, ActivityIndicator, TouchableOpacity, Switch, ScrollView, Modal, TextInput } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClayButton } from '../../src/components/ui/ClayButton';
 import { withErrorBoundary } from '../../src/components/ui/ErrorBoundary';
-import { signOut } from '../../src/api/auth';
+import { signOut, deleteAccount } from '../../src/api/auth';
 import {
   generateTelegramToken,
   disconnectTelegram,
@@ -157,7 +157,96 @@ function MeScreen() {
       <View style={{ height: 24 }} />
 
       <ClayButton label="Sign out" variant="secondary" loading={busy} onPress={handleSignOut} />
+
+      <DeleteAccountSection />
     </ScrollView>
+  );
+}
+
+function DeleteAccountSection() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (confirmText !== 'DELETE') return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      // Auth listener in app/_layout.tsx routes to /login on signout.
+    } catch (e: any) {
+      setDeleting(false);
+      Alert.alert(
+        'Could not delete account',
+        e?.message ?? 'Please try again or contact support.',
+      );
+    }
+  }
+
+  function handleClose() {
+    if (deleting) return;
+    setModalOpen(false);
+    setConfirmText('');
+  }
+
+  return (
+    <>
+      <View style={styles.dangerZone}>
+        <Text style={styles.dangerHeading}>Danger zone</Text>
+        <TouchableOpacity onPress={() => setModalOpen(true)} hitSlop={6}>
+          <Text style={styles.dangerLink}>Delete my account</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={modalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClose}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Delete account?</Text>
+            <Text style={styles.modalBody}>
+              This will permanently remove your account, all your recipes, cookbooks, drawings,
+              uploaded photos, print orders, and every other piece of data tied to you. We cannot
+              undo this.
+            </Text>
+            <Text style={styles.modalBody}>
+              Type{' '}
+              <Text style={styles.modalEmphasis}>DELETE</Text>{' '}
+              below to confirm.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={confirmText}
+              onChangeText={setConfirmText}
+              placeholder="DELETE"
+              placeholderTextColor={colors.inkFaint}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!deleting}
+            />
+            <View style={styles.modalRow}>
+              <ClayButton
+                label="Cancel"
+                variant="secondary"
+                onPress={handleClose}
+                disabled={deleting}
+                style={styles.modalBtn}
+              />
+              <ClayButton
+                label={deleting ? 'Deleting…' : 'Delete forever'}
+                onPress={handleDelete}
+                disabled={confirmText !== 'DELETE' || deleting}
+                loading={deleting}
+                style={styles.modalBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -282,6 +371,74 @@ const styles = StyleSheet.create({
   toggleBody: { fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft, lineHeight: 17 },
   consentMeta: { fontFamily: fonts.body, fontSize: 11, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
   consentMetaStrong: { fontFamily: fonts.bodyMedium, color: colors.inkSoft },
+  dangerZone: {
+    marginTop: 32,
+    paddingTop: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+    alignItems: 'center',
+  },
+  dangerHeading: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    color: colors.inkFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  dangerLink: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: '#c44141',
+    textDecorationLine: 'underline',
+    paddingVertical: 6,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: colors.paper,
+    borderRadius: 16,
+    padding: 22,
+    gap: 12,
+  },
+  modalTitle: {
+    fontFamily: fonts.displayBold,
+    fontSize: 18,
+    color: colors.ink,
+  },
+  modalBody: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.inkSoft,
+    lineHeight: 20,
+  },
+  modalEmphasis: {
+    fontFamily: fonts.bodyBold,
+    color: '#c44141',
+  },
+  modalInput: {
+    backgroundColor: colors.bg,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.ink,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  modalBtn: { flex: 1 },
 });
 
 export default withErrorBoundary(MeScreen, 'Profile crashed');

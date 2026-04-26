@@ -744,7 +744,7 @@ Content:
 Acceptance criteria:
 - [ ] Palette change applies immediately across all screens (via zustand theme store)
 - [ ] Telegram connect/disconnect works from this screen
-- [ ] "Delete account" requires typing "DELETE" to confirm, then cascade-deletes all user data via Supabase RLS
+- [x] "Delete account" requires typing "DELETE" to confirm, then cascade-deletes all user data via Supabase RLS — landed 2026-04-25 via `delete-account` Edge Function. Sequence: storage bucket cleanup (telegram-screenshots/<uid>/*) → `auth.admin.deleteUser(uid)` → DB cascade handles every user-scoped table. Manual vendor cleanup notes in BACKEND.md.
 - [ ] Sign out clears session from expo-secure-store
 
 ---
@@ -1075,7 +1075,7 @@ Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P
 | # | Item | Where in plan |
 |---|---|---|
 | 1 | Sign in with Apple alongside other login | §C8, Onboarding §00 step 7 |
-| 2 | In-app account deletion — full data delete | §15 |
+| 2 | In-app account deletion — full data delete ✅ | §15 |
 | 3 | Restore Purchases on paywall + Settings | §18 |
 | 4 | Privacy Policy at stable URL, in App Store Connect listing | §C1 |
 | 5 | App Store Connect Privacy Nutrition Labels accurate | §C8 |
