@@ -16,6 +16,7 @@ import {
 } from '../../src/api/telegramAuth';
 import { useTelegramConnection } from '../../src/hooks/useTelegramConnection';
 import { useConsents, useSetConsent } from '../../src/hooks/useConsents';
+import { useTrackingConsent } from '../../src/lib/trackingConsent';
 import { useSubmitGuard } from '../../src/lib/useSubmitGuard';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -306,6 +307,9 @@ function DeleteAccountSection() {
 function PrivacyCard() {
   const { data: consents, isLoading } = useConsents();
   const setConsentMutation = useSetConsent();
+  const trackingStatus = useTrackingConsent((s) => s.status);
+  const acceptTracking = useTrackingConsent((s) => s.accept);
+  const rejectTracking = useTrackingConsent((s) => s.reject);
 
   if (isLoading || !consents) {
     return (
@@ -347,6 +351,12 @@ function PrivacyCard() {
         value={consents.marketing}
         onValueChange={(v) => toggle('marketing', v)}
         disabled={setConsentMutation.isPending}
+      />
+      <ConsentToggle
+        label="Analytics"
+        body="Anonymous product-usage data (screens opened, features tapped) — no recipe content. Crash reports always send regardless. This is a device-level choice; changes apply immediately."
+        value={trackingStatus === 'accepted'}
+        onValueChange={(v) => (v ? acceptTracking() : rejectTracking())}
       />
 
       <Text style={styles.consentMeta}>

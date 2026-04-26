@@ -1015,7 +1015,7 @@ Acceptance criteria:
 - **GDPR Art. 6 lawful basis** per category: account=Contract, print=Contract, AI=Contract+Consent, marketing=Consent, analytics=Legitimate Interests (with LIA) OR Consent. Documented in RoPA (§C9).
 - **GDPR Art. 13 disclosures** at point of collection — covered by Privacy Policy §C1.
 - **GDPR Arts. 15–22 data subject rights** — access (§19 export), rectification (§15 + §20), erasure (§15 delete), restriction (privacy@), portability (§19), objection (privacy@), no-automated-decision (AI is user-reviewed, not binding — document in PP).
-- **ePrivacy cookie/analytics consent banner** — EU users see CMP banner at first launch with **reject-all parity to accept-all** (per CJEU *Planet49* + national DPA guidance). Reject button equally prominent; no pre-ticked boxes; gate PostHog initialization on consent. Sentry as legitimate-interests / strictly-necessary security.
+- **ePrivacy cookie/analytics consent banner** ✅ landed 2026-04-25 — first-launch bottom-sheet modal shown to ALL users (over-compliance avoids the geo-detection rabbit hole). Reject + Accept buttons equal prominence per CJEU *Planet49*. State persists per-device via Zustand+MMKV; choice mirrored to Settings → Privacy → Analytics toggle so users can change later (GDPR Art. 7(3)). PostHog initialization will be gated on `useTrackingConsent.status === 'accepted'` once installed; Sentry treated as legitimate-interests / strictly-necessary security so isn't gated.
 - **GDPR Art. 27 EU Representative** — required because we have no EU establishment. Use DataRep / VeraSafe / Prighter (~€500–€2,000/year). Contact in Privacy Policy.
 - **GDPR Art. 33 — 72-hour breach notification** — designate lead DPA (Germany or Ireland). Incident response runbook + Supabase access logging.
 - **GDPR Art. 46 transfer mechanisms** — DPAs + SCCs with all US vendors (§C4). Anthropic + OpenAI auto-incorporated; rest manual. Prefer EU regions for PostHog + Sentry.
@@ -1090,7 +1090,7 @@ Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P
 | # | Item | Where in plan |
 |---|---|---|
 | 10 | EU Representative appointed; address in Privacy Policy | §C7 |
-| 11 | EU cookie/analytics consent banner; reject-all parity | §C7 |
+| 11 | EU cookie/analytics consent banner; reject-all parity ✅ | §C7 |
 | 12 | Data subject rights portal — privacy@ + in-app export + delete ✅ (export + delete) | §C3 + §15 + §19 + §20 |
 | 13 | DPAs signed with all vendors | §C4 |
 | 14 | California ARL auto-renewal disclosure copy | §C6 + §16 |

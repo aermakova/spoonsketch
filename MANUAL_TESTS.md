@@ -12,6 +12,38 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Cookie / analytics consent banner (ePrivacy, landed 2026-04-25)
+
+Prereqs:
+- Fresh install of the app (clear MMKV) so Zustand persisted state is empty.
+
+### 1. First-launch banner
+- Open the app for the first time.
+- ✅ Expect: bottom-sheet modal "A quick privacy choice" with two equally-sized buttons: **Reject** (left, neutral grey) and **Accept analytics** (right, terracotta). Body explains analytics vs crash reports.
+- Banner is dismissable ONLY by tapping a button (no backdrop tap, no swipe-to-dismiss).
+
+### 2. Choice persists
+- Tap **Reject** → banner dismisses.
+- Force-quit the app and relaunch.
+- ✅ Expect: banner does NOT reappear.
+
+### 3. Settings reflects current choice
+- Me → Privacy card → Analytics toggle.
+- ✅ Expect: toggle reflects current state (Off if Reject was tapped, On if Accept).
+
+### 4. Toggle from Settings
+- Tap the Analytics toggle.
+- ✅ Expect: state flips immediately. No banner reappears.
+
+### 5. Reject + Accept have equal visual weight
+- Eyeball the modal. Reject button must NOT be smaller, less colored, or less prominent than Accept (CJEU *Planet49* requirement).
+
+### 6. Banner is below auth nav
+- Sign out → /login screen renders → banner is still on top if not yet decided.
+- (Banner shows regardless of auth state because tracking is device-level, not user-level.)
+
+---
+
 ## Data export (GDPR Art. 20, landed 2026-04-25)
 
 Prereqs:

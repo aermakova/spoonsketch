@@ -20,6 +20,7 @@ import { AmaticSC_400Regular, AmaticSC_700Bold } from '@expo-google-fonts/amatic
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from '../src/theme/colors';
 import { useAuth } from '../src/hooks/useAuth';
+import { TrackingConsentBanner } from '../src/components/TrackingConsentBanner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +88,11 @@ export default function RootLayout() {
           />
           <Stack.Screen name="upgrade" options={{ presentation: 'modal' }} />
         </Stack>
+        {/* Cookie consent — must render BEFORE any non-essential tracker
+            initializes. Currently no tracker SDK is wired (PostHog deferred);
+            having the banner ready means consent state already exists when
+            we add one. */}
+        <TrackingConsentBanner />
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
