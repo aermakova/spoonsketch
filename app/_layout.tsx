@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { colors } from '../src/theme/colors';
 import { useAuth } from '../src/hooks/useAuth';
 import { TrackingConsentBanner } from '../src/components/TrackingConsentBanner';
+import { isOnboardingComplete } from '../src/lib/onboardingFlag';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,16 +40,35 @@ function AuthGate() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // undefined = still reading; true/false = resolved
+  const [onboardingDone, setOnboardingDone] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    if (loading) return;
+    isOnboardingComplete().then(setOnboardingDone);
+  }, []);
+
+  useEffect(() => {
+    if (loading || onboardingDone === undefined) return;
     const inAuth = segments[0] === '(auth)';
-    if (!session && !inAuth) {
-      router.replace('/(auth)/login');
-    } else if (session && inAuth) {
-      router.replace('/');
+    // segments tuple is loose — index 1 may not exist; cast string|undefined.
+    const onOnboarding = inAuth && (segments as string[])[1] === 'onboarding';
+
+    if (!session) {
+      // Not signed in. First-time visitors land on onboarding; returning ones go straight to login.
+      if (!onboardingDone && !onOnboarding) {
+        router.replace('/(auth)/onboarding');
+      } else if (onboardingDone && !inAuth) {
+        router.replace('/(auth)/login');
+      } else if (onboardingDone && onOnboarding) {
+        // Edge case: user finished onboarding mid-render but hasn't navigated yet.
+        router.replace('/(auth)/login');
+      }
+      return;
     }
-  }, [session, loading, segments]);
+
+    // Signed in — never show onboarding or login.
+    if (inAuth) router.replace('/');
+  }, [session, loading, segments, onboardingDone]);
 
   return null;
 }
