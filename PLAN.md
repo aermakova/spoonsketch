@@ -988,11 +988,137 @@ Acceptance criteria:
 - [ ] Push opt-in does not solicit marketing pushes without explicit consent
 - [ ] ATT prompt shown ONLY if a tracking SDK is detected (verify with Xcode privacy report)
 
-### C6 · Watch list — Draft Law No. 8153 (Ukraine)
+### C6 · USA — CCPA / CPRA / COPPA / state privacy / sales tax
 
-Ukrainian Parliament adopted as basis November 2024. If passed before launch, our app will need a **local Ukrainian representative** (similar to GDPR Art. 27 EU Representative). Re-evaluate this section quarterly until the law passes or is shelved.
+> **🔴 LAUNCH BLOCKER for US.** Triggers if any user from California, Virginia, Connecticut, Texas, Colorado, etc. signs up.
 
-Implementation hint: services like `gdprlocal.com`, `prighter.com`, or local Ukrainian privacy-services firms offer "EU/UK Rep" packages — same shape will likely emerge for Ukraine. Budget: ~€100-300/month if we end up needing one.
+- **CCPA / CPRA (Cal. Civ. Code §§ 1798.100 et seq.)** — Privacy Policy (§C1) must include a "California Privacy Rights" section listing: PI categories collected, purposes, third-party recipients, all consumer rights (know / delete / correct / opt-out of sale-or-sharing / limit sensitive PI use). Even though we don't sell data, state "Do Not Sell or Share" affirmatively. Honor rights requests within 45 days (one 45-day extension permitted with notice).
+- **COPPA (15 U.S.C. §§ 6501–6506)** — age gate at registration: DOB field or "I am 13 or older" confirmation. Privacy Policy: "We do not knowingly collect data from children under 13." Lives in Onboarding §00 step 7.
+- **California ARL (Bus. & Prof. Code §§ 17600–17606, AB 2863 amendments)** — auto-renewal disclosure copy IMMEDIATELY before the Subscribe button (not in ToS): "You will be charged [price] every [period]. Your subscription renews automatically until cancelled. Cancel anytime in Settings → Subscription." + separate affirmative checkbox for the auto-renewal. Lives in §16 Plans & Pricing.
+- **VCDPA (Va. Code §§ 59.1-575) / CTDPA (PA 22-15) / others** — a CCPA-compliant Privacy Policy mostly covers them. Add "State Privacy Rights" multi-state section. Use IAPP State Privacy Law tracker for new enactments.
+- **Sales tax on print orders** — economic nexus per *South Dakota v. Wayfair* (~$100K revenue or 200 transactions per state). Books taxable in most states. Stripe Tax integration handles collection; confirm with Lulu whether they collect on their end.
+- **ATT (App Tracking Transparency)** — audit PostHog SDK. If first-party only (no IDFA, no cross-app tracking), set `NSUserTrackingUsageDescription` but don't call `requestTrackingAuthorization`. If any tracking SDK is present, show the prompt.
+- **FTC Click-to-Cancel** (vacated July 2025) — the rule is dead but FTC enforcement under ROSCA + Section 5 still active. Design subscription UX as if it were in force: cancellation no harder than signup, accurate disclosure copy, no dark patterns. Match.com / Chegg / Cleo AI / Amazon enforcement actions establish the de facto standard.
+
+Acceptance criteria:
+- [ ] Privacy Policy has a "California Privacy Rights" + multi-state section
+- [ ] COPPA age gate at signup
+- [ ] California ARL disclosure copy adjacent to Subscribe button
+- [ ] Stripe Tax wired for US print-order checkout
+- [ ] Cancellation flow at Settings → Subscription is one-tap (§18)
+
+### C7 · EU — GDPR / ePrivacy / EU Rep / DSA / EAA / CRD
+
+> **🔴 LAUNCH BLOCKER for EU.** Triggers if any EU resident signs up.
+
+- **GDPR Art. 6 lawful basis** per category: account=Contract, print=Contract, AI=Contract+Consent, marketing=Consent, analytics=Legitimate Interests (with LIA) OR Consent. Documented in RoPA (§C9).
+- **GDPR Art. 13 disclosures** at point of collection — covered by Privacy Policy §C1.
+- **GDPR Arts. 15–22 data subject rights** — access (§19 export), rectification (§15 + §20), erasure (§15 delete), restriction (privacy@), portability (§19), objection (privacy@), no-automated-decision (AI is user-reviewed, not binding — document in PP).
+- **ePrivacy cookie/analytics consent banner** — EU users see CMP banner at first launch with **reject-all parity to accept-all** (per CJEU *Planet49* + national DPA guidance). Reject button equally prominent; no pre-ticked boxes; gate PostHog initialization on consent. Sentry as legitimate-interests / strictly-necessary security.
+- **GDPR Art. 27 EU Representative** — required because we have no EU establishment. Use DataRep / VeraSafe / Prighter (~€500–€2,000/year). Contact in Privacy Policy.
+- **GDPR Art. 33 — 72-hour breach notification** — designate lead DPA (Germany or Ireland). Incident response runbook + Supabase access logging.
+- **GDPR Art. 46 transfer mechanisms** — DPAs + SCCs with all US vendors (§C4). Anthropic + OpenAI auto-incorporated; rest manual. Prefer EU regions for PostHog + Sentry.
+- **DSA Art. 16 notice-and-action** — micro-enterprise exemption: <10 employees AND <€2M turnover. Above threshold: in-app "Report content" button + uploader notification. At launch we're exempt; build the Report button for Apple Guideline 1.2 anyway (P2 in §C8).
+- **EU Consumer Rights Directive — 14-day withdrawal waiver (Dir. 2011/83/EU Art. 16(c))** — printed cookbook is "personalized" → exempt. Explicit ToS clause: *"Your printed cookbook is a custom, personalized product made to your specifications. In accordance with Art. 16(c) of EU Directive 2011/83, the 14-day right of withdrawal does not apply to this order. Defective or incorrectly printed items will be replaced free of charge."*
+- **EU Accessibility Act (Dir. 2019/882)** — effective June 28, 2025. Same micro-enterprise exemption as DSA. Above threshold: WCAG 2.1 Level AA + Accessibility Statement. At launch document micro-enterprise status; as we grow: VoiceOver/TalkBack labels, 4.5:1 contrast, text scaling.
+
+Acceptance criteria:
+- [ ] EU Representative contracted; address in Privacy Policy
+- [ ] CMP cookie banner deployed; PostHog gated on consent
+- [ ] ToS contains the 14-day-waiver clause for printed cookbooks
+- [ ] Incident response runbook documented; lead DPA chosen
+
+### C8 · Apple App Store — submission gates
+
+> **🔴 LAUNCH BLOCKER.** App Store submission will be rejected without these.
+
+Most surfaces specced elsewhere; this section is the consolidated checklist:
+
+- **Sign in with Apple** (Guideline 4.8) — required because we offer email magic-link / Google. Implement in Onboarding §00 step 7 via `expo-apple-authentication` + Supabase Apple OAuth.
+- **Restore Purchases** (Guideline 3.1.1) — on paywall + Settings (§18).
+- **In-app account deletion** (Guideline 5.1.1(v)) — full delete, not deactivate; also send deletion to Anthropic/OpenAI per DPA. Lives in §15.
+- **Privacy Nutrition Labels** in App Store Connect — accurate map of categories collected.
+- **Privacy Policy URL** on the listing — same URL as §C1.
+- **Subscription disclosure copy** near Subscribe button (Guideline 3.1.2(a)) — see §C6 + §16.
+- **Print orders use Stripe, not IAP** (Guideline 3.1.1) — physical goods are exempt from IAP. Document in App Review Notes.
+- **Age rating: 12+** — UGC = Yes (photos, recipes).
+- **UGC moderation** (Guideline 1.2) — "Report a problem" button on recipe detail + CSAM scanning on photo upload (§C10).
+- **Push consent** (Guideline 4.5.4) — request only when contextually relevant; marketing pushes need separate opt-in (covered by §C2 box 4).
+- **ATT** — only if a tracking SDK is detected; verify PostHog config (§C6).
+- **App Store Connect metadata** ready: 6.5" iPhone screenshots, 12.9" iPad if supported, optional preview video (15-30s on-device), description (4000), keywords (100), promo text (170, changeable), support URL, privacy URL, marketing URL.
+- **Demo account credentials** in App Review Notes — required for any account-gated app. Use a dedicated review account with realistic seeded data.
+
+Acceptance criteria: tracked under §15 / §16 / §18 / §19 / §C1 / §C5 / §C9.
+
+### C9 · Cross-cutting — RoPA, breach response, CSAM, watch lists
+
+- **Records of Processing Activities (RoPA, GDPR Art. 30)** — internal spreadsheet/Notion doc documenting every processing activity: purpose, legal basis, data categories, data subjects, recipients, retention, international transfers, security measures. Update on every new feature/vendor. Not published; available to regulators on request.
+- **Incident response runbook (GDPR Art. 33)** — 72-hour breach notification process: who decides, who notifies, what template, who's the lead DPA. Supabase access logging + Sentry alerts as the inputs.
+- **CSAM photo scanning** — Apple Guideline 1.2 + 18 U.S.C. § 2258A NCMEC reporting. On every photo upload to `telegram-screenshots` (or any Storage bucket), run Amazon Rekognition Moderation Labels OR Google Cloud Vision SafeSearch via an Edge Function BEFORE the file is stored. Auto-delete CSAM/explicit. Log flagged. Report to NCMEC if CSAM discovered.
+- **Stripe Tax** for US sales tax — wire into print-order checkout once first US user signs up.
+- **In-app "Report content" button** — visible on recipe detail. Apple Guideline 1.2 + DSA-readiness.
+- **EAA WCAG 2.1 AA audit** — defer until we cross EU micro-enterprise threshold; document status now.
+- **Watch list:**
+  - Ukrainian **Draft Law No. 8153** (GDPR-harmonization) — adopted-as-basis Nov 2024, pending second reading. If passed: appoint local Ukrainian representative.
+  - **State privacy laws** in the US — IAPP State Privacy Law tracker; new enactments quarterly.
+  - **FTC Click-to-Cancel** — currently vacated; if re-introduced, our flow already complies.
+  - **TIA for Anthropic + OpenAI** — Transfer Impact Assessment documenting US FISA 702 risk + mitigations (SCCs, minimal data, pseudonymization). Best practice; not required for small app.
+
+---
+
+## Compliance — Pre-TestFlight Priority Checklist
+
+Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P0 = submission-blocking; P1 = launch-blocking; P2 = pre-scale; P3 = best practice.
+
+### P0 — Without these, App Store submission fails or app is removed
+
+| # | Item | Where in plan |
+|---|---|---|
+| 1 | Sign in with Apple alongside other login | §C8, Onboarding §00 step 7 |
+| 2 | In-app account deletion — full data delete | §15 |
+| 3 | Restore Purchases on paywall + Settings | §18 |
+| 4 | Privacy Policy at stable URL, in App Store Connect listing | §C1 |
+| 5 | App Store Connect Privacy Nutrition Labels accurate | §C8 |
+| 6 | Subscription disclosure adjacent to Subscribe button | §16 + §C6 |
+| 7 | Age rating questionnaire — UGC = Yes | §C8 |
+| 8 | Demo account credentials in App Review Notes | §C8 |
+| 9 | Print orders confirmed as physical goods in App Review Notes | §C8 |
+
+### P1 — Legal launch-blockers; enforcement risk if missing
+
+| # | Item | Where in plan |
+|---|---|---|
+| 10 | EU Representative appointed; address in Privacy Policy | §C7 |
+| 11 | EU cookie/analytics consent banner; reject-all parity | §C7 |
+| 12 | Data subject rights portal — privacy@ + in-app export + delete | §C3 + §15 + §19 + §20 |
+| 13 | DPAs signed with all vendors | §C4 |
+| 14 | California ARL auto-renewal disclosure copy | §C6 + §16 |
+| 15 | COPPA age gate at registration | §C6 + Onboarding §00 |
+| 16 | CSAM photo scanning on every upload | §C9 |
+| 17 | Terms of Service published — EU 14-day waiver, auto-renewal, UGC license | §C1 + §C7 |
+| 18 | Ukraine: Privacy Policy in Ukrainian + per-purpose consent checkboxes | §C1 + §C2 |
+| 19 | RoPA internal document | §C9 |
+
+### P2 — Required before significant scale
+
+| # | Item | Where in plan |
+|---|---|---|
+| 20 | ATT prompt decision after PostHog SDK audit | §C6 + §C8 |
+| 21 | Stripe Tax for US print-order checkout | §C9 |
+| 22 | In-app "Report content" button | §C7 + §C8 + §C9 |
+| 23 | EAA WCAG 2.1 AA audit (when crossing micro-enterprise threshold) | §C9 |
+| 24 | Ukrainian Ombudsman DPA notification | §C3 |
+| 25 | Incident response runbook (72-hour breach) | §C9 |
+
+### P3 — Best practice / growth-stage
+
+| # | Item | Where in plan |
+|---|---|---|
+| 26 | Monitor Ukrainian Draft Law No. 8153 | §C9 watch list |
+| 27 | Transfer Impact Assessments for Anthropic + OpenAI | §C9 |
+| 28 | State privacy law monitoring (VCDPA, CTDPA, IAPP tracker) | §C6 + §C9 |
+| 29 | Subscription price increase flow tested in StoreKit 2 sandbox | §16 |
+| 30 | Biometric privacy (BIPA, CUBI) before face/photo image effects in US | §C9 |
 
 ---
 
@@ -1611,7 +1737,7 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
 | 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
 | 10.8 | Account management surfaces (order history, subscription manage, GDPR export, email change) | — | 🔴 **Launch blocker — not started** | Four account surfaces missing from the plan: (a) **Order history** `/me/orders` listing all `print_orders` rows with status + tracking; (b) **Manage subscription** `/me/subscription` showing current plan, renewal date, cancel button + **Restore Purchases** (Apple Store requires this for any IAP); (c) **GDPR data export** "Download my recipes + cookbooks as JSON" — required for EU users; (d) **Email change / recovery** flow — magic-link auth has no passwords but users still lose access to their email. Spec'd in §17, §18, §19, §20 below. **All four needed before App Store submission.** |
-| 10.9 | Compliance & legal (Ukraine launch) | — | 🔴 **Launch blocker — not started** | Privacy Policy + ToS (English + Ukrainian per language law), granular consent at sign-up (account / print / AI / marketing), AI-processing disclosure, vendor DPAs, marketing opt-in, App Store Connect privacy labels + age rating, Ombudsman filing if user-photo processing qualifies. Spec'd in §C1-§C5 below. **Cannot accept Ukrainian users until §C1+§C2 land. Cannot submit to App Store until §C5 lands.** |
+| 10.9 | Compliance & legal (Ukraine + USA + EU + Apple Store) | — | 🔴 **Launch blocker — not started** | Cross-jurisdiction pre-launch checklist: legal docs (PP + ToS, EN + UK), granular consent (UA/EU), AI-processing disclosure, vendor DPAs, EU Representative + cookie consent banner, CCPA + COPPA + California ARL + Stripe Tax, App Store submission gates (Sign-in-with-Apple, Restore Purchases, in-app deletion, privacy nutrition labels, age rating), CSAM photo scanning, RoPA, breach runbook. Full breakdown in §C1-§C9 below + the consolidated P0/P1/P2/P3 priority checklist. Source: legal research at `.claude/research/legal-compliance-research.md`. **All P0 + P1 items required before TestFlight submission.** |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
 
 Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
