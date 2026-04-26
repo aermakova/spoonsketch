@@ -37,3 +37,8 @@ verify_jwt = false
 # `requireUser` (which DOES accept the modern format) gets to run.
 [functions.import-recipes-json]
 verify_jwt = false
+
+# moderate-image is dual-mode (bot via X-Spoon-Bot-Secret OR app via JWT).
+# Same gateway-bypass reason as extract-recipe.
+[functions.moderate-image]
+verify_jwt = false

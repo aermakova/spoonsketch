@@ -1054,7 +1054,7 @@ Acceptance criteria: tracked under §15 / §16 / §18 / §19 / §C1 / §C5 / §C
 
 - **Records of Processing Activities (RoPA, GDPR Art. 30)** — internal spreadsheet/Notion doc documenting every processing activity: purpose, legal basis, data categories, data subjects, recipients, retention, international transfers, security measures. Update on every new feature/vendor. Not published; available to regulators on request.
 - **Incident response runbook (GDPR Art. 33)** — 72-hour breach notification process: who decides, who notifies, what template, who's the lead DPA. Supabase access logging + Sentry alerts as the inputs.
-- **CSAM photo scanning** — Apple Guideline 1.2 + 18 U.S.C. § 2258A NCMEC reporting. On every photo upload to `telegram-screenshots` (or any Storage bucket), run Amazon Rekognition Moderation Labels OR Google Cloud Vision SafeSearch via an Edge Function BEFORE the file is stored. Auto-delete CSAM/explicit. Log flagged. Report to NCMEC if CSAM discovered.
+- **CSAM photo scanning** ✅ **landed 2026-04-25** — Apple Guideline 1.2 + 18 U.S.C. § 2258A NCMEC reporting. Wired via `moderate-image` Edge Function called after every photo upload (Photo tab via `src/api/storage.ts`, Telegram bot via `telegram-bot/src/bot.ts`). Detection backend: Claude Haiku 4.5 vision (not specialized CSAM detection like Microsoft PhotoDNA / Thorn Safer — that's the post-launch upgrade — but satisfies "a method for filtering objectionable material"). Fail-closed semantics: any scan error or non-safe verdict deletes the storage object before any signed URL is generated. Audit trail in `moderation_events` table (service-role only, RLS-locked). NCMEC review queue: rows with `reason='csam_suspect'`. PDFs out of scope v1.
 - **Stripe Tax** for US sales tax — wire into print-order checkout once first US user signs up.
 - **In-app "Report content" button** — visible on recipe detail. Apple Guideline 1.2 + DSA-readiness.
 - **EAA WCAG 2.1 AA audit** — defer until we cross EU micro-enterprise threshold; document status now.
@@ -1094,7 +1094,7 @@ Mirrors the priority order in `.claude/research/legal-compliance-research.md`. P
 | 13 | DPAs signed with all vendors | §C4 |
 | 14 | California ARL auto-renewal disclosure copy | §C6 + §16 |
 | 15 | COPPA age gate at registration | §C6 + Onboarding §00 |
-| 16 | CSAM photo scanning on every upload | §C9 |
+| 16 | CSAM photo scanning on every upload ✅ | §C9 |
 | 17 | Terms of Service published — EU 14-day waiver, auto-renewal, UGC license | §C1 + §C7 |
 | 18 | Ukraine: Privacy Policy in Ukrainian + per-purpose consent checkboxes | §C1 + §C2 |
 | 19 | RoPA internal document | §C9 |

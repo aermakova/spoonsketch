@@ -594,6 +594,48 @@ Bulk-imports user-pasted recipe JSON without going through Haiku. The user runs 
 
 **Quota:** counts as 1 `json_import` per call regardless of how many recipes are in the array. Free = 5/month. Premium = unlimited.
 
+#### `POST /functions/v1/moderate-image`
+
+Image moderation gate. Called by every photo uploader (Photo tab, Telegram bot photo handler) AFTER `storage.upload` but BEFORE any signed URL is consumed downstream. Required by Apple App Store Review Guideline 1.2 (UGC moderation must filter objectionable material) and as the audit-trail surface for 18 U.S.C. § 2258A NCMEC reporting if CSAM is ever discovered.
+
+**Auth:**
+- Bot mode: `X-Spoon-Bot-Secret` header + `user_id` in body.
+- App mode: standard JWT via `requireUser`.
+
+**Request:**
+```json
+{ "bucket": "telegram-screenshots", "path": "<user_id>/<uuid>.jpg" }
+// Bot mode adds:
+{ "bucket": "...", "path": "...", "user_id": "<uuid>" }
+```
+
+**Path-ownership check:** the `path` MUST start with `<userId>/` — defense in depth alongside the bucket's RLS policy. Cross-user paths return 403.
+
+**Detection:** Claude Haiku 4.5 vision API. Custom moderation system prompt classifies into `safe / explicit / violent / csam_suspect / non_food / unclear`. Not a specialized CSAM detector (Microsoft PhotoDNA / Thorn Safer would be the upgrade); satisfies "a method for filtering objectionable material" for the small-app bar at launch.
+
+**Fail-closed semantics:** any of (Haiku timeout 15s, parse failure, network error, scan returns non-`safe`) → storage object is `delete`d server-side, audit row written to `moderation_events` with `verdict='rejected'` or `'error'`, response is non-200. The caller (client / bot) treats non-200 as "the upload was thrown away" and surfaces a UX error.
+
+**Response (200, safe):**
+```json
+{ "ok": true }
+```
+
+**Response (422, rejected):**
+```json
+{ "error": "image_rejected", "message": "That image can't be uploaded. Please pick a different photo.", "category": "explicit" | "violent" | "csam_suspect" | "non_food" | "unclear" }
+```
+
+**Response (503, scan failure):**
+```json
+{ "error": "scan_failed", "message": "Could not verify image. Please try again." }
+```
+
+**Audit table:** `moderation_events` (service-role only — RLS denies all client access). One row per scan with `verdict`, `reason`, raw `model_response` (capped at 1KB), `tokens_used`, `created_at`. NCMEC review queue: `select * from moderation_events where reason='csam_suspect' order by created_at desc;`.
+
+**Cost:** ~$0.001-0.005 per scan (Haiku tokens for one image + small prompt). At 1k uploads/mo = $1-5/mo.
+
+**Out of scope v1:** PDFs (rely on Anthropic's own document moderation in extract-recipe), retroactive scanning of existing storage objects.
+
 **Response (200):**
 ```json
 {

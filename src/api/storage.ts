@@ -73,6 +73,13 @@ async function uploadAndSign(
     .upload(path, body, { contentType, upsert: false });
   if (upErr) throw new ApiError(upErr.message, 'storage_upload_failed');
 
+  // Image moderation gate (Apple Guideline 1.2). Skip for non-image
+  // content types — PDFs go through Anthropic's own document
+  // moderation, no separate scan needed.
+  if (contentType.startsWith('image/')) {
+    await moderateOrThrow(BUCKET, path);
+  }
+
   const { data: signed, error: signErr } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
@@ -80,6 +87,35 @@ async function uploadAndSign(
     throw new ApiError(signErr?.message ?? 'Could not sign upload URL', 'storage_sign_failed');
   }
   return { storagePath: path, signedUrl: signed.signedUrl };
+}
+
+/**
+ * Calls the `moderate-image` Edge Function. On any non-200, the
+ * Edge Function has already deleted the storage object — this just
+ * surfaces the error. Throws `ApiError` with a friendly message.
+ */
+async function moderateOrThrow(bucket: string, path: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<
+    { ok: true } | { error: string; message?: string; category?: string }
+  >('moderate-image', { body: { bucket, path } });
+  if (error) {
+    // FunctionsHttpError surfaces the response body on `error.context`.
+    let body: { error?: string; message?: string } = {};
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+      if (ctx?.json) body = (await ctx.json()) as typeof body;
+    } catch { /* noop */ }
+    if (body.error === 'image_rejected') {
+      throw new ApiError(body.message ?? "That image can't be uploaded.", 'image_rejected');
+    }
+    if (body.error === 'scan_failed') {
+      throw new ApiError(body.message ?? 'Could not verify image. Please try again.', 'scan_failed');
+    }
+    throw new ApiError(body.message ?? error.message, body.error ?? 'moderation_failed');
+  }
+  if (!data || !('ok' in data)) {
+    throw new ApiError('Image moderation returned no result', 'moderation_failed');
+  }
 }
 
 async function fileToArrayBuffer(uri: string): Promise<ArrayBuffer> {

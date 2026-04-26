@@ -318,6 +318,15 @@ async function uploadOnePhoto(
     return null;
   }
 
+  // Image moderation gate (Apple Guideline 1.2). Failure deletes the
+  // storage object server-side, so we just need to bail with a UX
+  // message. Fails closed: any non-200 = no recipe extracted.
+  const modRes = await moderateImage(SCREENSHOTS_BUCKET, storagePath, userId);
+  if (!modRes.ok) {
+    await telegram.sendMessage(chatId, modRes.replyMessage).catch(noop);
+    return null;
+  }
+
   const { data: signed, error: signErr } = await supabaseAdmin.storage
     .from(SCREENSHOTS_BUCKET)
     .createSignedUrl(storagePath, IMAGE_URL_TTL_SECONDS);
@@ -331,3 +340,41 @@ async function uploadOnePhoto(
 }
 
 function noop(): void { /* swallow telegram send failures (e.g. user blocked the bot) */ }
+
+/**
+ * Calls the moderate-image Edge Function via X-Spoon-Bot-Secret. On
+ * any non-200, the function has already deleted the storage object
+ * server-side. We just translate the verdict into a user-facing
+ * Telegram reply.
+ */
+async function moderateImage(
+  bucket: string,
+  path: string,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; replyMessage: string }> {
+  try {
+    const res = await fetch(`${config.supabaseUrl}/functions/v1/moderate-image`, {
+      method: 'POST',
+      headers: {
+        'X-Spoon-Bot-Secret': config.botSharedSecret,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user_id: userId, bucket, path }),
+    });
+    if (res.status === 200) return { ok: true };
+    let body: { error?: string; message?: string } = {};
+    try { body = await res.json(); } catch { /* ignore */ }
+    const errCode = body.error ?? `http_${res.status}`;
+    if (errCode === 'image_rejected') {
+      return { ok: false, replyMessage: body.message ?? "That image can't be processed. Try a different photo." };
+    }
+    if (errCode === 'scan_failed') {
+      return { ok: false, replyMessage: 'AI is having trouble reviewing that image — try again in a minute.' };
+    }
+    console.error('[bot] moderate-image error', errCode, body);
+    return { ok: false, replyMessage: "Couldn't process that image. Try again." };
+  } catch (e) {
+    console.error('[bot] moderate-image fetch failed', e);
+    return { ok: false, replyMessage: "Couldn't process that image. Try again." };
+  }
+}

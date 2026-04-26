@@ -12,6 +12,42 @@ Scan the QR with iPhone Camera → opens Expo Go. SDK 54 bundles Skia / Reanimat
 
 ---
 
+## Image moderation gate (landed 2026-04-25)
+
+Prereqs:
+- Signed-in user.
+- `moderate-image` Edge Function deployed.
+- Migration `20260425000004_moderation_events.sql` applied.
+
+Every photo upload (Photo tab + Telegram bot) now passes through Haiku before the signed URL is generated. Failures delete the storage object server-side.
+
+### 1. Happy path — Photo tab
+- Add tab → Import → Photo → "Choose Photos" → pick a normal recipe screenshot.
+- ✅ Expect: upload spinner has no extra delay user-noticeable beyond the existing ~1s. Live Type-tab pre-fill works.
+- SQL check: `select verdict, reason from moderation_events where user_id='<your-uid>' order by created_at desc limit 1` → `safe / safe`.
+
+### 2. Happy path — Telegram bot
+- DM the bot a recipe screenshot.
+- ✅ Expect: existing "Got it! Reading this for you…" → "Saved! …" timing, plus one extra audit row.
+
+### 3. Rejected — non-recipe image
+- Photo tab → pick a random non-food photo (selfie, landscape, meme).
+- ✅ Expect: error toast "This doesn't look like a recipe. Try a different photo." Recipe is NOT created. Storage bucket has no orphan file (verify via dashboard).
+
+### 4. Rejected — explicit content
+- Don't actually try this on the prod project. Trust the prompt classifier; covered in commit message + BACKEND.md spec.
+
+### 5. Scan-failure path
+- Temporarily revoke `ANTHROPIC_API_KEY` in Supabase secrets (or set to a bogus value).
+- Try to upload a photo.
+- ✅ Expect: error "Could not verify image. Please try again." Storage object deleted. `moderation_events` row with `verdict='error'`. Restore the key after testing.
+
+### 6. Cross-user path injection
+- Curl moderate-image with a forged user_id pointing at someone else's folder.
+- ✅ Expect: 403 `forbidden — path does not match user folder`. No storage operation runs.
+
+---
+
 ## JSON bulk import tab (landed 2026-04-25)
 
 Prereqs:
