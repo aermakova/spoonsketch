@@ -875,6 +875,127 @@ Acceptance criteria:
 
 ---
 
+## Compliance & legal — pre-launch
+
+> **Source for Ukraine items:** legal-research output 2026-04-25. Reference: Ukrainian Law on Personal Data Protection (No. 2297-VI), language law (No. 2704-VIII), Draft Law No. 8153 (GDPR harmonization, pending second reading). Items also marked best-practice for EU/GDPR alignment.
+
+### C1 · Legal documents (Privacy Policy + Terms of Service)
+
+> **🔴 LAUNCH BLOCKER for Ukrainian users.** Cannot accept signups from Ukraine without these.
+
+- **Privacy Policy** must disclose:
+  - Data categories collected (account, content, behavioral, payment, location implicit via IP)
+  - Lawful basis per category (consent for AI, contract for print, legitimate interest for analytics)
+  - Cross-border transfers to US vendors (Anthropic, OpenAI, Supabase, Stripe, RevenueCat, Sentry, PostHog) — reference DPAs / SCCs as the safeguard mechanism
+  - **AI processing disclosure**: "We send recipe text / photos / PDFs to Anthropic Haiku for extraction; selected photos to OpenAI gpt-image-1 for stylized effects. Your data is not used to train AI models." Both vendors' opt-out-of-training terms cited.
+  - Data subject rights: access, correction, deletion, portability — and the in-app surfaces that fulfil each (Settings → Delete account / Export data / Email change)
+  - Retention periods (account active = retained; deletion = 30-day soft delete then purge)
+  - Contact: `privacy@spoonsketch.app` (set up the mailbox)
+- **Terms of Service** must include:
+  - Print orders are personalized goods → **14-day withdrawal right does NOT apply** (EU CRD exemption). State this explicitly in checkout copy.
+  - Subscription auto-renewal disclosure (App Store rules + FTC click-to-cancel)
+  - User-content licensing (we display + print user content; we do NOT use it for marketing without separate opt-in)
+- **Ukrainian translations** of both documents — required by Ukraine's language law for any consumer-facing service operating in Ukraine. English-only is non-compliant.
+- **Hosting**: served from a stable HTTPS URL (e.g. `spoonsketch.app/privacy` / `/terms`). Linked in: app footer, sign-up screen, App Store listing, every marketing email.
+
+Acceptance criteria:
+- [ ] Privacy Policy + ToS drafted by legal counsel (lawyer review, not just an AI draft)
+- [ ] Both documents available in EN + UK at stable URLs
+- [ ] Linked from sign-up, Settings → About, App Store listing
+- [ ] Effective date + last-updated timestamp on each
+
+### C2 · Granular consent + marketing opt-in
+
+> **🔴 LAUNCH BLOCKER for Ukrainian users.** Bundling consent into a single "I agree to ToS" checkbox is non-compliant under Ukraine's data protection law and ePrivacy.
+
+Sign-up flow (Onboarding §00 step 7) gains 4 separate, **unchecked** checkboxes:
+1. **Required**: "I agree to the Terms of Service and Privacy Policy" (cannot proceed without)
+2. **Optional**: "Process my recipes / photos / PDFs through AI services (Anthropic, OpenAI) so the app can extract structured recipes and generate stylized stickers/borders." — required for any AI feature; if unchecked, AI tabs (URL/Photo/File/JSON, Make-me-Sketch, watercolor) are disabled with a soft prompt to enable in Settings.
+3. **Optional**: "Use my mailing address to fulfil print orders (sent to Lulu xPress)." — required only when placing a print order; can defer.
+4. **Optional**: "Send me product updates and tips by email or push." — gates marketing channel; transactional emails (order status, password recovery) always send regardless.
+
+Settings → Privacy panel mirrors all four toggles; user can revoke at any time. Revoking #2 disables AI features client-side AND clears any cached AI artifacts within 24h.
+
+Acceptance criteria:
+- [ ] All four boxes are unchecked by default
+- [ ] Each toggle persists to a new `users.consent_*` column or `user_consents` table with timestamp + version-of-PP-at-time-of-consent
+- [ ] Revoking AI consent disables Make-me-Sketch / URL import / Photo import / File import / JSON import / watercolor immediately
+- [ ] Revoking marketing consent unsubscribes from PostHog email + push within 24h
+- [ ] Consent log retained for audit (date, version, IP at time of grant) per Art. 7 GDPR + Ukraine equivalent
+
+### C3 · Data subject rights — operational
+
+Most surfaces are already specced; a few operational additions are needed.
+
+- **In-app deletion** (§15) ✅ planned — satisfies both Apple Guideline 5.1.1(v) and Ukraine deletion right.
+- **Data export** (§19) ✅ planned — satisfies GDPR Art. 20 portability right.
+- **Email change** (§20) ✅ planned — satisfies rectification right.
+- **NEW: Change-notification flow** — Ukraine law requires notifying users of any changes affecting their personal data within **10 business days**. Implementation: a transactional email triggered when a privileged operation runs on a user's data (e.g. service-role admin action, terms update with material change, third-party data sharing change). For v1, just send an email when ToS/PP change materially.
+- **NEW: `privacy@spoonsketch.app` mailbox** — set up + monitor. SLA: 30 days to respond per GDPR / 30 days under Ukrainian law. Document the inbound flow (auto-acknowledge + ticket).
+- **NEW: Ombudsman filing** — Ukrainian DPA notification (free, 30 working days from start of processing) IF processing user-uploaded photos qualifies as "high-risk" data. Form at `ombudsman.gov.ua`. Decision: file proactively to be safe.
+
+Acceptance criteria:
+- [ ] `privacy@spoonsketch.app` exists and routes to a real human
+- [ ] ToS/PP-change email template exists, tested
+- [ ] Ombudsman filing submitted (or documented decision not to)
+
+### C4 · Vendor Data Processing Agreements (DPAs)
+
+Sign DPAs with every vendor that processes user data on our behalf. Most are click-through or auto-included in standard ToS; some require manual signing.
+
+| Vendor | DPA path | Status |
+|---|---|---|
+| Anthropic | Auto-included in API ToS (zero-retention by default for Workbench / API) | ⏳ Verify ZDR opt-in for our org |
+| OpenAI | DPA at platform.openai.com → Settings → Data controls; requires DPA email | ⏳ Pending |
+| Supabase | Self-serve at supabase.com/dpa | ⏳ Pending |
+| RevenueCat | Self-serve at app.revenuecat.com → Settings → Compliance | ⏳ Pending |
+| Stripe | Auto-included in Stripe Services Agreement; verify via dashboard | ⏳ Pending |
+| Lulu xPress | Contact account manager; standard form | ⏳ Pending |
+| PostHog | Self-serve at posthog.com/handbook/legal/dpa | ⏳ Pending |
+| Sentry | Self-serve at sentry.io/legal/dpa | ⏳ Pending |
+| Railway (bot host) | Self-serve at railway.com/legal | ⏳ Pending |
+| Telegram (BotFather) | Telegram is the controller for handle/ID we receive; reference their privacy policy in ours; no DPA needed | n/a |
+
+Acceptance criteria:
+- [ ] All DPAs signed and stored in a shared drive (path documented in this section)
+- [ ] Privacy Policy lists every vendor + its purpose
+
+### C5 · App Store Connect configuration
+
+> **🔴 LAUNCH BLOCKER — submission will be rejected without these.**
+
+- **Privacy Nutrition Labels** — fill out App Store Connect's data collection questionnaire to match what's actually collected:
+  - Identifiers: User ID (Supabase UUID), Device ID (PostHog session)
+  - Contact Info: Email (account), Physical Address (print orders only)
+  - User Content: Photos, Recipes, Drawings — linked to identity, used for App Functionality
+  - Purchases: linked to identity
+  - Usage Data: linked to identity (PostHog), App Functionality + Analytics
+  - Diagnostics: Crash Data (Sentry), App Functionality
+- **Age rating: 12+** — UGC = Yes (users post photos + text); Frequent/Intense Mature/Suggestive Themes = No; gambling = No.
+- **Sign in with Apple** — required if any social login exists (Guideline 4.8). Add to onboarding §00 step 7. Already noted as launch blocker but call out under Apple too.
+- **Restore Purchases** button — already specced in §18 Manage Subscription. Apple Guideline 3.1.1.
+- **In-app account deletion** (§15) — Apple Guideline 5.1.1(v). Already specced.
+- **Subscription disclosure** near the subscribe button (Plans §16): price, renewal cadence, free-trial terms, link to ToS+PP. Apple Guideline 3.1.2(a).
+- **Push notification consent** flow per `expo-notifications` standard. No marketing-only push without separate opt-in (covered by §C2 box 4).
+- **App Tracking Transparency (ATT)** prompt — only required if any third-party SDK does cross-app tracking. PostHog + Sentry don't by default; verify config.
+- **Subscription pricing display** must match what App Store charges (RevenueCat fetches Apple's product, so this stays in sync as long as we don't hardcode prices in the app — already the case).
+- **Privacy Policy URL** in App Store Connect listing (same URL as in §C1).
+
+Acceptance criteria:
+- [ ] Privacy Nutrition Labels match the actual collection on first submission
+- [ ] Age rating set 12+
+- [ ] Subscription disclosure copy reviewed against Guideline 3.1.2(a) checklist
+- [ ] Push opt-in does not solicit marketing pushes without explicit consent
+- [ ] ATT prompt shown ONLY if a tracking SDK is detected (verify with Xcode privacy report)
+
+### C6 · Watch list — Draft Law No. 8153 (Ukraine)
+
+Ukrainian Parliament adopted as basis November 2024. If passed before launch, our app will need a **local Ukrainian representative** (similar to GDPR Art. 27 EU Representative). Re-evaluate this section quarterly until the law passes or is shelved.
+
+Implementation hint: services like `gdprlocal.com`, `prighter.com`, or local Ukrainian privacy-services firms offer "EU/UK Rep" packages — same shape will likely emerge for Ukraine. Budget: ~€100-300/month if we end up needing one.
+
+---
+
 ### 00 · Onboarding (first launch only)
 
 > **🔴 LAUNCH BLOCKER — not yet implemented.** First-launch carousel + sign-up is required before TestFlight / App Store submission. The 7-step structure below is an engineering placeholder; **final copy + visuals come from the marketing team** (4-6 killer-feature screens before "Get Started", then setup + sign-up). Engineering work after marketing delivers: carousel layout, MMKV `onboarding_complete` flag, Apple Sign In on the final step, deep-link bypass for already-authenticated users.
@@ -1490,6 +1611,7 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
 | 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
 | 10.8 | Account management surfaces (order history, subscription manage, GDPR export, email change) | — | 🔴 **Launch blocker — not started** | Four account surfaces missing from the plan: (a) **Order history** `/me/orders` listing all `print_orders` rows with status + tracking; (b) **Manage subscription** `/me/subscription` showing current plan, renewal date, cancel button + **Restore Purchases** (Apple Store requires this for any IAP); (c) **GDPR data export** "Download my recipes + cookbooks as JSON" — required for EU users; (d) **Email change / recovery** flow — magic-link auth has no passwords but users still lose access to their email. Spec'd in §17, §18, §19, §20 below. **All four needed before App Store submission.** |
+| 10.9 | Compliance & legal (Ukraine launch) | — | 🔴 **Launch blocker — not started** | Privacy Policy + ToS (English + Ukrainian per language law), granular consent at sign-up (account / print / AI / marketing), AI-processing disclosure, vendor DPAs, marketing opt-in, App Store Connect privacy labels + age rating, Ombudsman filing if user-photo processing qualifies. Spec'd in §C1-§C5 below. **Cannot accept Ukrainian users until §C1+§C2 land. Cannot submit to App Store until §C5 lands.** |
 | 11 | Testing + launch prep | Week 17–18 | ⬜ Not started | North-star test passes under 20 minutes, no crashes on iOS + Web |
 
 Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
