@@ -1,6 +1,6 @@
 # Where I left off — next steps
 
-Pick this up whenever. Everything here is what the user (Angy) needs to do personally — code is already written + committed. Last updated: 2026-04-24.
+Pick this up whenever. Everything here is what the user (Angy) needs to do personally — code is already written + committed. Last updated: 2026-04-26.
 
 ## Status at a glance
 
@@ -13,37 +13,38 @@ Pick this up whenever. Everything here is what the user (Angy) needs to do perso
 | Phase B | Full canvas atomization (9-atom set per template) + schemaVersion: 3 migration |
 | Phase E | Paper pattern (blank/lined/dotted/grid) at cookbook level |
 | Phase F (client) | PDF export via expo-print: all 6 templates, embedded fonts, stickers as base64, drawing strokes as SVG, preset-aware fonts, corner leaf, dots + badges as inline SVG |
-| Phase 7.1 | AI URL import (FAB → Paste Link) — Edge Function live, credits flowing |
-| Phase 7.2 | Make me Sketch (auto-sticker) — tested on device |
-| Phase 8.0 | `extract-recipe` accepts `image_url`; `telegram-screenshots` bucket created |
-| Phase 8.1 | `telegram-auth` Edge Function + `telegram_auth_tokens` table |
-| Phase 8.2 | Bot service code (Telegraf + BullMQ + Upstash-ready + in-process fallback) |
-| Phase 8.3 | Connect Telegram UI in Me tab |
-| Phase 8.4 | Realtime subscription on `recipes` |
-| Shelves redesign | Phase 1 — books-on-wooden-shelves grid, long-press action sheet |
-| Phase 8.2 (bot running locally) | Bot started end-to-end — Connect Telegram + recipe URL import work on device |
-| 22 bug fixes | BUG-001 → BUG-022 all ✅ Fixed (see BUGS.md) |
+| **Phase 7 — all 5 import tabs** | Paste Link · Type · Photo (≤10 imgs) · File (PDF + .txt) · JSON (bulk ≤20 recipes) · Make me Sketch — `extract-recipe` Edge Function accepts URL / `image_urls[]` / `pdf_url` / `text_content` modes |
+| **Phase 8 — Telegram bot end-to-end** | Bot proven on device: URL imports, photo imports (single + media_group batch), CSAM gate, Realtime push to library, deep links via Universal Links. Phases 8.0–8.4 all ✅. Production deploy (Railway + Upstash) still pending — see §3 below. |
+| **Edit recipe** | Pencil ✎ icon in Clean view → `/recipe/edit/[id]` with delete-recipe flow |
+| Shelves redesign | Phase 1 — books-on-wooden-shelves grid, long-press action sheet (Phase 2 sprig PNGs landed 2026-04-25) |
+| **Phase 10.9 engineering — compliance scaffolding (2026-04-25)** | Sign in with Apple code, granular consent UI + server gate, CSAM `moderate-image` Edge Function, in-app account deletion, GDPR Art. 20 data export, EU cookie consent banner. Engineering ✅; legal/admin still pending — see PLAN §C. |
+| Marketing brief (2026-04-25) | `MARKETING_BRIEF.md` shipped — handoff to marketing team for the 4-6 onboarding killer-feature screens |
+| **Living-doc audit (2026-04-26)** | Synced PLAN / FEATURES / BACKEND / ARCHITECTURE / SCREENS / USER_FLOW / BUGS / CLAUDE / NEXT_STEPS to current code reality. CLAUDE rule #8 strengthened — all 9 docs named + enforcement clause. |
+| **26 bug fixes** | BUG-001 → BUG-026 all ✅ Fixed (see BUGS.md). All commit SHAs filled in 2026-04-26 audit. |
 
 ### In progress 🟡
 
 | Area | Where it's at | What's blocking |
 |---|---|---|
-| Phase 8 polish (8.5) | Connect + URL import working; screenshot import + bot copy pass + doc closeout still pending | Walk through MANUAL_TESTS Phase 8 scenarios, log any issues as new bugs |
-| Phase 8 production (Railway + Upstash) | Local bot proven; needs always-on host | Sign up Upstash + Railway, paste env, deploy |
+| Phase 8 production (Railway + Upstash) | Local bot proven and works end-to-end; needs always-on host | Angy: sign up Upstash + Railway, paste env, deploy (§3 below, ~30 min, $5/mo) |
+| Phase 10.5 — Editor UX polish (2/4) | ✅ Help overlay, ✅ Edit recipe from Clean view. Pending: custom colour picker (~16 colours + wheel), Apple Pencil pressure | Not started — fits anywhere in Week 16 |
+| Phase 10.7 — Onboarding screens | Marketing brief shipped 2026-04-25; engineering scaffolding ready | **Waiting on marketing** — 4-6 killer-feature screens (Figma + copy + assets) |
+| Phase 10.8 — Account-management surfaces (2/4) | ✅ §19 GDPR data export, ✅ §15 in-app account deletion. Pending: §17 Order history, §18 Manage subscription + Restore Purchases, §20 Email change | RevenueCat install gates §18; the other two are 1-day each |
+| Phase 10.9 — Compliance & legal | Engineering ✅. Pending **legal/admin**: lawyer-drafted PP+ToS (EN+UK), EU Rep contract, vendor DPAs, App Store Connect privacy labels + age rating, RoPA, 72h breach runbook, Stripe Tax wire, Report Content button | Mostly Angy's-court work — see PLAN §C / `.claude/research/legal-compliance-research.md` |
 
 ### Next up ⏳
 
 | Priority | Item | Blocker / size |
 |---|---|---|
-| **Next** | Run the bot locally, test end-to-end | Section 1 below (~10 min) |
-| **Next** | Phase 8.5 — MANUAL_TESTS Phase 8 scenarios + FEATURES/BACKEND doc updates | Section 2 (~30 min) |
-| Soon | Phase 8 production — Upstash Redis + Railway | Section 3 (~30 min, $5/mo) |
-| Later | Shelves Phase 2 — `cover_color` + `cover_sprig` DB columns + pickers | Angy to drop sprig PNGs + wood PNG into `assets/` first |
-| Later | Phase 9 — PDF print order via Lulu xPress | Depends on Phase F server renderer (BUG-010) |
-| Later | Phase 10 — Cook mode (screen-on cooking view) | Not started |
-| Later | Phase 10.5 remaining — expanded colour picker, Apple Pencil pressure | Not started |
-| Later | MVP integrations — RevenueCat, Apple/Google/magic-link sign-in, push, MMKV, PostHog, Sentry, i18n, password reset | Each is its own 2-hour to 1-day effort |
-| Later | Phase 11 — Launch prep: north-star test, device regression, store assets | Everything else first |
+| **Next (you)** | §3.5 below — Apple Sign In external setup (Apple Dev portal + Supabase Dashboard) | ~30 min, no code. **Launch blocker.** |
+| **Next (you)** | §3 below — Phase 8 production deploy (Upstash + Railway) | ~30 min, $5/mo |
+| **Next (marketing)** | Phase 10.7 — 4-6 onboarding killer-feature screens | Brief in `MARKETING_BRIEF.md` |
+| Soon (code) | RevenueCat install — IAP wire-up + tier UI + paywall card | ~half day. Gates §18 Manage subscription. |
+| Soon (code) | Lulu xPress integration (Phase 9) — print order flow | 2–3 days. Closes the gift loop. Depends on Phase F server PDF renderer (BUG-010). |
+| Later (code) | Phase 8.5 — sticker pack expansion + recipe photo + frames + watercolor (5 sub-phases, ~46h) | Phase 8.5A (stickers, ~6h) is the standalone candidate to ship before TestFlight |
+| Later (code) | Phase 10 — Cook mode (screen-on cooking view) | Not started |
+| Later (code) | MVP integrations — magic-link sign-in, password reset, push notifications, PostHog, Sentry, Google sign-in, i18n | Each is 2-hour to 1-day. None blocking north-star test. |
+| Later (code) | Phase 11 — Launch prep: north-star test, device regression, store assets | Everything else first |
 
 ### Known deferrals 🟠
 
@@ -52,6 +53,7 @@ Pick this up whenever. Everything here is what the user (Angy) needs to do perso
 | BUG-010 — paper pattern missing from exported PDF | Needs Phase F server-side Puppeteer renderer; client-side expo-print doesn't handle this cleanly |
 | Phase F server renderer | Needed for bulk book export + Lulu. Non-blocking for single-recipe export, which ships today |
 | Tab bar icon swap (emojis → line icons) | Cosmetic; ~15 min whenever |
+| Phase 8.5 detail plan file | `.claude/plans/wise-spinning-creek.md` was overwritten twice (cookie banner → marketing brief). Re-create as `.claude/plans/phase-8.5-stickers-photos.md` when sub-phase A starts. The 5-bullet summary in PLAN.md §Phase 8.5 is the current source of truth. |
 
 ---
 
@@ -116,15 +118,9 @@ If any step fails, tail the Mac terminal for the error. The first failure is usu
 
 ---
 
-## 2. Phase 8 — Telegram bot: polish (~30 min) *(optional, do this when tests pass)*
+## 2. ~~Phase 8 — Telegram bot: polish~~ ✅ Done (2026-04-26)
 
-Plan sub-phase 8.5 — not code-critical, but needed to close out the plan cleanly.
-
-- Walk through the Phase 8 scenarios in `MANUAL_TESTS.md` (they don't exist yet — write them as you test).
-- Update `FEATURES.md` §1.7 (limits) + §13 (integrations) with Telegram.
-- Update `BACKEND.md` with a cross-reference to the new `telegram_auth_tokens` table + shared-secret pattern.
-- Flip `PLAN.md` Phase 8 row to ✅ Done.
-- Log any bugs surfaced during device testing in `BUGS.md`.
+All polish items from the previous session shipped — Phase 8 scenarios in `MANUAL_TESTS.md`, `FEATURES.md` §13 (integrations), `BACKEND.md` (telegram_auth_tokens + shared-secret pattern), `PLAN.md` Phase 8 row updated. Bugs surfaced during testing logged as BUG-022 through BUG-026 (all ✅ Fixed). Production deploy is the only remaining bot work — see §3.
 
 ---
 

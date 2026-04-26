@@ -76,6 +76,14 @@ create table public.users (
   telegram_id      bigint unique,
   recipes_count    integer not null default 0,
   cookbooks_count  integer not null default 0,
+  -- Consent state (added 2026-04-25, GDPR Art. 7 + UA PDP Law)
+  consent_tos          boolean not null default false,
+  consent_ai           boolean not null default false,
+  consent_print        boolean not null default false,
+  consent_marketing    boolean not null default false,
+  consent_pp_version   text,                       -- pinned PP version at time of consent
+  -- Throttle for GDPR Art. 20 portability export
+  last_data_export_at  timestamptz,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -124,7 +132,8 @@ create table public.recipes (
   source_type      text not null default 'manual'
                      check (source_type in (
                        'manual','url_import','screenshot_import',
-                       'telegram_link','telegram_screenshot'
+                       'telegram_link','telegram_screenshot',
+                       'pdf_import','text_import','json_import'
                      )),
   cover_image_url  text,
   ingredients      jsonb not null default '[]',
@@ -361,7 +370,10 @@ create table public.ai_jobs (
   id               uuid primary key default gen_random_uuid(),
   user_id          uuid references public.users(id) on delete cascade,
   job_type         text not null
-                     check (job_type in ('url_extract','image_extract','auto_sticker')),
+                     check (job_type in (
+                       'url_extract','image_extract','pdf_extract',
+                       'json_import','auto_sticker','csam_moderation'
+                     )),
   input_data       jsonb,
   output_data      jsonb,
   status           text not null default 'queued'
@@ -373,6 +385,55 @@ create table public.ai_jobs (
   updated_at       timestamptz not null default now()
 );
 create index on public.ai_jobs(user_id);
+
+-- ================================================================
+-- USER CONSENTS — GDPR Art. 7(1) audit log (added 2026-04-25)
+-- One row per consent change. Current state mirrored on public.users.
+-- ================================================================
+create table public.user_consents (
+  id                 uuid primary key default gen_random_uuid(),
+  user_id            uuid not null references public.users(id) on delete cascade,
+  kind               text not null
+                       check (kind in ('tos','ai','print','marketing')),
+  granted            boolean not null,
+  consent_pp_version text,
+  source             text,                          -- 'signup' | 'me_tab' | 'admin'
+  granted_at         timestamptz not null default now()
+);
+create index on public.user_consents(user_id, kind);
+
+-- RPC: record_consent_audit — call from client to atomically write
+-- the audit row. Service-role check inside the function.
+
+-- ================================================================
+-- MODERATION EVENTS — CSAM scan audit log (added 2026-04-25)
+-- Apple Guideline 1.2 + 18 U.S.C. § 2258A NCMEC review queue.
+-- Service-role only — RLS denies all client reads + writes.
+-- ================================================================
+create table public.moderation_events (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid references public.users(id) on delete cascade,
+  storage_path    text,                              -- the object path scanned
+  verdict         text not null
+                    check (verdict in ('safe','rejected','error')),
+  reason          text,                              -- 'csam_suspect' | 'parse_error' | etc.
+  model_response  text,                              -- raw Haiku output, ≤ 1KB
+  tokens_used     integer,
+  created_at      timestamptz not null default now()
+);
+create index on public.moderation_events(user_id, created_at desc);
+create index on public.moderation_events(reason) where reason = 'csam_suspect';
+
+-- ================================================================
+-- TELEGRAM AUTH TOKENS — short-lived /start tokens (added 2026-04-23)
+-- ================================================================
+create table public.telegram_auth_tokens (
+  token       text primary key,
+  user_id     uuid not null references public.users(id) on delete cascade,
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now()
+);
+create index on public.telegram_auth_tokens(user_id);
 ```
 
 ---
@@ -506,8 +567,10 @@ All Edge Functions share a set of helpers under `supabase/functions/_shared/`:
 - `cors.ts` — preflight + shared headers
 - `errors.ts` — `jsonError` / `jsonResponse` wrappers with the consistent `{ error, message, ... }` shape
 - `auth.ts` — `requireUser(req)` returns `{ userId, jwt, supabaseAdmin }` from the `Authorization: Bearer` header or a ready-to-return 401
-- `ai.ts` — shared Anthropic client (`HAIKU_MODEL = 'claude-haiku-4-5-20251001'`) + `logAiJob(...)` writer
-- `tier.ts` — `getQuota` / `checkQuotaAllowed` / `checkRateLimit` and the `FREE_MONTHLY_LIMITS` table (20 url_extract, 20 image_extract, 5 auto_sticker)
+- `ai.ts` — shared Anthropic client (`HAIKU_MODEL = 'claude-haiku-4-5-20251001'`) + `logAiJob(...)` writer; recognises job types `url_extract`, `image_extract`, `pdf_extract`, `json_import`, `auto_sticker`, `csam_moderation`
+- `tier.ts` — `getQuota` / `checkQuotaAllowed` / `checkRateLimit` and the `FREE_MONTHLY_LIMITS` table (20 url_extract, 20 image_extract, 20 pdf_extract, 5 json_import, 5 auto_sticker)
+- `consent.ts` — `requireAiConsent(supabaseAdmin, userId)` reads `users.consent_ai` and returns `403 ai_consent_missing` if false. Called from every AI-using function. Also exports `CURRENT_PP_VERSION = '2026-04-25-pre-launch'` (paired with the same constant in `src/api/consent.ts`).
+- `recipeSanitize.ts` — strict HTML strip + length caps + URL whitelist for inbound recipe data. Used by `import-recipes-json`. Length caps: title 200, description 2000, ingredient name 200, instruction text 2000, ≤ 50 ingredients, ≤ 50 instructions, ≤ 5 tags. Forbidden fields (`cover_image_url`, `is_favorite`, `cookbook_id`, `id`, `user_id`) silently dropped.
 
 Secrets to set on the Supabase project:
 - `ANTHROPIC_API_KEY` — set manually via `supabase secrets set`

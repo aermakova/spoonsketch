@@ -113,6 +113,11 @@ See Appendix A for the full list. Highlights:
 - Drawing layers ≤ 5 per recipe
 - Canvas undo history ≤ 50 snapshots
 - Cookbook cover + table-of-contents pages: ≤ 1 of each per cookbook
+- Free-tier monthly AI caps: URL imports 20, Photo imports 20, PDF imports 20, JSON bulk imports 5 (each = up to 20 recipes), Make me Sketch 5
+- Photo import: ≤ 10 photos per call; resized to ≤ 1600px JPEG q=0.85 before upload
+- File import: PDF ≤ 10MB; .txt ≤ 100KB
+- JSON import payload ≤ 500KB; ≤ 20 recipes per call
+- GDPR data export: 1 / 24h per user
 
 ### 1.8 Realtime
 
@@ -145,21 +150,39 @@ None. The app does not subscribe to server-push changes on any table. Data is pu
 | Password | password | Yes | — | ≥ 6 characters | — | masked |
 | Confirm password | password | Yes | — | Must match Password | — | masked |
 
+**Consent rows (Create account only):** four `ConsentRow` toggles render above the Create account button. The user must toggle the two required ones on before the button enables.
+
+| Toggle | Required | Notes |
+|---|---|---|
+| I agree to the Privacy Policy | Yes | Links out to the live PP. Stored as `users.consent_pp = true` + version pinned in `users.consent_pp_version`. |
+| I agree to the Terms of Service | Yes | Links out to the live ToS. Stored as `users.consent_tos = true`. |
+| Process my data with AI services (Anthropic / OpenAI) so the app can extract recipes, suggest stickers, and convert photos | No | Stored as `users.consent_ai`. When unchecked, all AI tabs (URL/Photo/File/JSON, Make-me-Sketch, watercolor when shipped) are disabled with a soft "Enable in Settings" prompt. Editable later in the Me tab. |
+| Send me occasional emails about features and tips | No | Stored as `users.consent_marketing`. Editable later in the Me tab. |
+
+Toggles persist via the Supabase trigger `handle_new_user` reading `raw_user_meta_data->'consents'`. Each change to a consent column also writes a row to `user_consents` audit table for GDPR Art. 7(1) auditability.
+
 **Submit:** "Create account" button. On success an alert reads "Check your email to confirm" and the form switches back to the Sign in tab. Email confirmation is handled by Supabase — the user clicks the link in their inbox, which does not return them into the app (no deep link flow yet).
 
-### 2.4 Actions
+### 2.4 Sign in with Apple
+
+A "Continue with Apple" button renders below the email/password form, but only on builds where `AppleAuthentication.isAvailableAsync()` returns true. In Expo Go the button auto-hides because `expo-apple-authentication` is a native module that requires the Apple capability baked into the build — testing requires a custom EAS dev client or a TestFlight build.
+
+- Implementation: `signInWithApple()` in `src/api/auth.ts`. Uses a nonce-hashed flow per Supabase Apple OAuth requirements. App side requests `FULL_NAME` + `EMAIL` claims.
+- Consents: when a new user is created via Apple, the four consents from §2.3 default to `pp=true`, `tos=true`, `ai=false`, `marketing=false` because the consent UI hasn't been collected yet — first authenticated screen could prompt for AI / marketing later. (Currently we don't, the user toggles on Me tab.)
+- External setup required: Apple Developer portal (Service ID + Key + Return URL) + Supabase Dashboard (Authentication → Providers → Apple). Runbook in `NEXT_STEPS.md` §3.5.
+
+### 2.5 Actions
 
 - **Sign out** lives on the Me tab (see §7). Guarded against double-submit.
 
-### 2.5 Not implemented
+### 2.6 Not implemented
 
 - Password reset / forgot-password flow
-- Magic-link sign-in
-- "Sign in with Apple"
+- Magic-link sign-in (planned per `SCREENS.md` §00 step 7 — current auth is email+password as a placeholder)
 - "Sign in with Google"
 - In-app email confirmation (deep linking back from confirmation email)
 
-### 2.6 Realtime / Permissions / Limits
+### 2.7 Realtime / Permissions / Limits
 
 - **Realtime:** —
 - **Permissions:** unauthenticated users can only reach the auth screen; everything else is gated
@@ -327,20 +350,61 @@ Each cookbook renders as a shelf-like row with its palette accent.
 ### 7.1 Full page
 
 - **Route:** `/(tabs)/me`
-- **Status:** placeholder profile. Shows "Profile — coming soon" text and a single secondary-style "Sign out" button.
-- **No account settings UI today.** There is no palette picker, no paper-texture picker, no profile editing, no tier display, and no account deletion.
+- **Layout:** vertical scroll on paper background. Top: greeting + email. Then a stack of cards in this order: Telegram, Privacy, Export Data, Delete Account. Sign out at the bottom.
+- **No tier display, no palette picker, no profile name editing yet** (those are post-launch).
 
-### 7.2 Actions
+### 7.2 Card — Telegram
+
+| State | What the user sees |
+|---|---|
+| Not connected | "Connect Telegram" primary clay button. Tap → opens `https://t.me/spoonsketch_bot?start=<token>` (Universal Link). Bot replies "Connected, @yourhandle!" and the card flips to the connected state via `useRecipesRealtime` → next focus refetch. |
+| Connected | "Connected as @{telegram_handle}" handwritten subtitle + secondary "Open Telegram bot" link (`https://t.me/spoonsketch_bot`). Disconnect is intentionally not surfaced in v1. |
+| Token expired / error | Soft alert "Hmm, couldn't connect that. Try again from the app." — user retries. |
+
+### 7.3 Card — Privacy (consents)
+
+A single card titled "Privacy" with four toggles. Each toggle persists immediately on change via `setConsent(kind, granted)` (`src/api/consent.ts`); the row briefly shows a small spinner during the round-trip. Each change writes a row to `user_consents` for audit.
+
+| Toggle | Required | Notes |
+|---|---|---|
+| Privacy Policy | Yes | Read-only ✓ once accepted at sign-up. Cannot be turned off without deleting the account. Tap row → open live PP. |
+| Terms of Service | Yes | Same as PP — read-only ✓. |
+| AI processing | No | Toggling off immediately disables Make-me-Sketch / URL import / Photo import / File import / JSON import / watercolor (when shipped). The Edge Functions check via `requireAiConsent(supabaseAdmin, userId)` and return a soft error. |
+| Marketing emails | No | Toggling off updates `users.consent_marketing`. Used by the future tracking-pixel-free email pipeline. |
+
+### 7.4 Link — Export your data
+
+Subtle terracotta-underlined link "Export your data". Tap → calls `exportUserData()` (`src/api/auth.ts` → `export-user-data` Edge Function). Server compiles full JSON (recipes, cookbooks, canvas elements, drawing strokes, consent log, ai_jobs history) plus signed URLs for any user-uploaded images, returns a single payload. Client hands the JSON file to `expo-sharing` so the user can save to Files / iCloud Drive / email.
+
+- Throttle: 1 export per 24 hours per user (server checks `users.last_data_export_at`).
+- Error states: "You've exported recently — wait 24 hours" / "Export is taking longer than expected. We'll notify you" (rare).
+
+### 7.5 Section — Delete account (destructive)
+
+A separate card visually de-emphasised (red-on-paper text). Tap "Delete account…" → bottom-sheet confirmation modal:
+
+- Heading: "This can't be undone."
+- Body: list of what gets deleted (recipes, cookbooks, canvas, photos, account).
+- Required: a text field where the user must type the literal word `DELETE` (caps-sensitive) to enable the destructive button.
+- Buttons: **Cancel** · **Delete forever** (destructive red). Spinner while in flight.
+
+On confirm: calls `deleteAccount()` (`src/api/auth.ts` → `delete-account` Edge Function). Server cleans up all Storage objects (recipe-photos, telegram-screenshots, canvas-thumbnails, user-images), then `auth.admin.deleteUser` cascades the public schema rows via `on delete cascade`. Session token cleared client-side; user lands on the auth screen.
+
+### 7.6 Actions
 
 | Action | Confirmation | Effect |
 |---|---|---|
 | Sign out | — (immediate) | Ends the session and returns the user to the auth screen. Button shows a spinner and is disabled while in flight. |
+| Connect Telegram | — | Opens Universal Link to bot |
+| Toggle a Privacy switch | — | Writes consent + audit row |
+| Export your data | — | Generates JSON + share-sheet handoff |
+| Delete account | typed-DELETE modal | Cascade delete + session clear |
 
-### 7.3 Realtime / Permissions / Limits
+### 7.7 Realtime / Permissions / Limits
 
-- **Realtime:** —
-- **Permissions:** signed-in users only
-- **Limits:** —
+- **Realtime:** Telegram card flips on `useRecipesRealtime` user-row update.
+- **Permissions:** signed-in users only.
+- **Limits:** Export 1 / 24h per user.
 
 ---
 
@@ -805,30 +869,37 @@ A read-only list of recipe pages with auto-numbered page positions. Empty state:
 
 | Integration | What it does |
 |---|---|
-| **Supabase Auth** | Email + password sign-up and sign-in, session persistence, auto-refresh gated by app foreground state |
-| **Supabase Postgres** | Storage for recipes, cookbooks, book pages, per-recipe canvas overrides; row-level security scopes every read and write to the signed-in user |
-| **Supabase Storage** | Image uploads (recipe cover images, sticker / stock imagery) are served over Supabase's public URLs |
-| **Expo SecureStore** | iOS Keychain storage of the Supabase session token |
+| **Supabase Auth** | Email + password sign-up/in, Sign in with Apple (auto-hidden in Expo Go), session persistence, auto-refresh gated by app foreground state |
+| **Supabase Postgres** | Recipes, cookbooks, book pages, canvas overrides, consent log, moderation events, ai_jobs; RLS scopes every read/write to the signed-in user |
+| **Supabase Storage** | Three buckets used today: `recipe-images` (cover photos, public CDN), `telegram-screenshots` (private, per-user RLS, used by both bot and in-app Photo/File tabs) |
+| **Supabase Realtime** | `recipes` table subscription powers Telegram-bot deep-link → app library push; Telegram-card connect-state flip |
+| **Supabase Edge Functions** | `extract-recipe` (URL/image_urls[]/pdf_url/text_content modes), `auto-sticker`, `telegram-auth`, `import-recipes-json`, `moderate-image`, `delete-account`, `export-user-data` |
+| **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) | Recipe extraction + auto-sticker + photo CSAM moderation. Called only from Edge Functions; key never in client bundle. `max_tokens=4096` for long Cyrillic recipes. |
+| **Telegram bot** (`@spoonsketch_bot`) | Telegraf.js + BullMQ + in-process fallback. Handlers: `/start` (one-time auth token), URL → recipe, photo (single + media_group batch buffer + `processPhotoBatch`), CSAM gate before queueing. Currently runs on dev laptop; production deploy (Railway + Upstash) pending. |
+| **Image moderation (CSAM gate)** | Every photo upload (in-app or via bot) is scanned by `moderate-image` Edge Function. Fail-closed: any non-safe verdict deletes the Storage object before any signed URL is generated. Audit trail in `moderation_events` table. |
+| **GDPR data export** | `export-user-data` returns full user JSON + signed image URLs; client hands off via `expo-sharing`. 1/24h throttle. |
+| **In-app account deletion** | `delete-account` runs Storage cleanup + `auth.admin.deleteUser` cascade. UI is the typed-DELETE modal in the Me tab. |
+| **EU cookie / tracker consent banner** | First-launch bottom-sheet via `TrackingConsentBanner.tsx` (Zustand+MMKV state). No tracker SDK is wired yet (PostHog/Sentry deferred); banner is ready for when one lands. |
+| **Apple Universal Links** | Telegram connect flow uses `https://t.me/...` Universal Links (the older `tg://` scheme didn't work in Expo Go). |
+| **Expo SecureStore** | iOS Keychain storage of the Supabase session token. |
+| **MMKV** | Persists Zustand canvas store, drawing store, theme, tracking-consent state. Fast-path local cache. |
 
 ### 13.2 Not yet wired
 
 These appear in the project's planning docs but are **not present in the app today**:
 
 - **Push notifications.** The `expo-notifications` SDK is not a dependency, no push-token registration code exists, and no push token is ever written from the client. The database reserves a column for a future token, but nothing populates it.
-- **Claude (Haiku) AI** — for "Make me Sketch" styling, photo → recipe OCR, and URL import. No Edge Function calls in the client today.
-- **RevenueCat** — no IAP or subscription SDK is integrated; there is no tier concept surfaced in the UI.
+- **RevenueCat** — no IAP or subscription SDK is integrated; there is no tier UI in the client. Tier caps are server-enforced today via `ai_jobs` row counts in the current UTC month, but the upgrade button on the paywall card opens a placeholder `/upgrade` screen.
 - **PostHog** — no analytics SDK wired; no event instrumentation today.
 - **Sentry** — no error tracking wired; errors surface only via in-app error boundaries and `Alert.alert`.
 - **Lulu xPress print-on-demand** — no export or order flow; the Export button in Book Builder is a stub.
-- **Telegram recipe bot** — no inbound flow from a bot today. All recipes are created manually in the app.
+- **OpenAI `gpt-image-1`** — Phase 8.5 watercolor + sticker pack generation (not yet started).
 - **Stripe** — not integrated on the client.
-- **Apple / Google sign-in** — not implemented.
-- **Magic-link sign-in** — not implemented.
+- **Google sign-in** — not implemented.
+- **Magic-link sign-in** — not implemented (planned per `SCREENS.md` §00 step 7; current auth is email+password).
 - **Password reset / forgot password** — not implemented.
-- **Realtime subscriptions** — the app does not subscribe to any Supabase realtime channels.
-- **Internationalisation (i18n)** — English only.
-- **PDF export** — placeholder "Coming soon" alert only.
-- **MMKV** — not installed; the fast-cache layer planned for onboarding flags is not in place.
+- **Internationalisation (i18n)** — English only. Ukrainian translation planned per `PLAN.md` §C1.
+- **PDF export server-side** — client-side `expo-print` works for single recipes; full server renderer (Puppeteer Edge Function) needed for cookbook export + Lulu order, see BUG-010.
 
 ---
 
@@ -852,9 +923,19 @@ These appear in the project's planning docs but are **not present in the app tod
 | Built-in stickers | 16 (Essentials pack, all free) |
 | Drawing blend modes | 5 (Normal, Multiply, Overlay, Screen, Soft light) |
 | URL recipe imports | Free: 20 / month; Premium: unlimited (server-enforced in `extract-recipe`) |
+| Photo recipe imports (image_urls[]) | Free: 20 / month; Premium: unlimited |
+| PDF / .txt recipe imports | Free: 20 / month; Premium: unlimited |
+| JSON bulk imports (≤20 recipes each) | Free: 5 / month; Premium: unlimited (so up to 100 recipes/month free via this path) |
 | Auto-sticker ("Make me Sketch") calls | Free: 5 / month; Premium: unlimited (server-enforced in `auto-sticker`) |
 | AI rate limit (any user, any AI function) | 1 call / 10 seconds (server-enforced) |
 | Scraped page cap (URL import) | 200 KB downloaded, 20 000 characters fed to Haiku, 10s fetch timeout, ≤ 3 redirects |
+| Photos per import call | ≤ 10 |
+| Photo upload size | resized to ≤ 1600px JPEG q=0.85 before upload |
+| PDF import size | ≤ 10MB |
+| .txt import size | ≤ 100KB |
+| JSON import payload | ≤ 500KB; ≤ 20 recipes per call |
+| Anthropic max_tokens (recipe extraction) | 4096 (long Cyrillic recipes) |
+| GDPR data export | 1 / 24h per user |
 
 ---
 

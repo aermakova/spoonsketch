@@ -42,7 +42,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** JSON tab → paste any AI response that contains `"…"` instead of `"…"` (visible by eye; copy from ChatGPT's chat bubble does this automatically) → live preview shows red "Invalid JSON: …" → Import button stays disabled.
 - **Root cause:** `previewJson` in `src/components/import/JsonTab.tsx` called `JSON.parse(stripped)` directly on the user's paste. `JSON.parse` is strict about quote codepoints — only U+0022 (`"`) is accepted. ChatGPT's chat renderer converts `"` to `"` (U+201C) / `"` (U+201D) and `'` to `'` (U+2019) via the same smart-quote pass it applies to plain text.
 - **Fix:** new `normalizeJsonText(text)` helper runs before `JSON.parse`. Replaces `" " „ ‟ ″ ‶` with `"`, `' ' ‚ ‛ ′ ‵` with `'`, also strips BOM + zero-width spaces, and folds in the existing markdown-fence trim. Global replace, so a literal U+201C inside a recipe string would also get converted — acceptable trade-off (recipe text rarely contains typographic quotes deliberately, and breaking that edge case is better than rejecting every ChatGPT paste).
-- **Commit:** _(this commit)_
+- **Commit:** `8c78bd1`
 - **Test:** new `MANUAL_TESTS.md` scenario — paste JSON containing curly quotes (e.g. copy ChatGPT response straight from the chat) → live preview shows "N recipes detected" → import succeeds. Also: paste a string containing `«mom's special»` (legitimate French/typographic quotes inside a recipe title) → import succeeds; the inner quotes get normalized to straight (cosmetic loss, acceptable).
 
  — Multi-recipe sources merged into one bloated extraction
@@ -52,7 +52,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Paste Link tab → `https://rud.ua/consumer/recipe/desertu/milk-pancakes-71/` → Import. ✅ Expected: one recipe (the primary "Простий рецепт"). Actual: one recipe titled "Млинці на молоці" with 20 ingredients spanning all three variations on the page (`group` field correctly identifies the variant; UI shows them all stacked).
 - **Root cause:** The system prompt at `extract-recipe/index.ts:18-37` had no rule about multi-recipe sources. Haiku saw three recipes, dutifully extracted all three, and emitted them as a flat ingredient list with `group` set per source recipe. PDF mode had a per-mode rule ("extract only the first/most prominent") but URL and Photo modes didn't.
 - **Fix:** Universal system-prompt rule: *"If the source contains MULTIPLE DISTINCT RECIPES (e.g., a webpage listing several variations like Classic / Yeast / Thin; a cookbook page with two recipes; a roundup article), extract ONLY the PRIMARY/FIRST recipe. Do not merge ingredients or steps from different recipes into a single output."* Tightens behavior across URL, Photo, AND PDF modes consistently. The PDF-specific user prompt rule is now redundant but kept as a hint.
-- **Commit:** _(this commit)_
+- **Commit:** `10a3979`
 - **Test:** new `MANUAL_TESTS.md` scenario — re-import the Ukrainian rud.ua URL (or any roundup like NYT Cooking's "5 Ways To Cook X") → exactly one recipe extracted with the page's primary title; ingredients are NOT duplicated; `group` field is null or names sub-sections of one recipe (not different recipes). Future polish (segmentation): "import all 3 recipes" as a Premium feature, paralleling the bot's deferred Phase 2 plan.
 
  — Haiku output truncated, parsed as partial
@@ -62,7 +62,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Send 2 screenshots of a Russian or Ukrainian recipe to the bot. Bot replies "Got a partial read — open in app to fill in the rest." Recipe row in DB has `title='Untitled Recipe'`, `ingredients=[]`, `instructions=[]`. `ai_jobs.output_data.raw` shows valid-looking JSON cut off mid-string.
 - **Root cause:** `extract-recipe/index.ts` hardcoded `max_tokens: 1024` on the Anthropic call. Anthropic's tokenizer uses ~3x more tokens for Cyrillic than for Latin scripts (each Cyrillic character ≈ multiple BPE tokens). A typical Russian recipe with 8-10 ingredients + 5 instructions easily exceeds 1024 output tokens. Multi-image input also adds modest pressure (more tokens spent on the system+image-context portion of the budget? No — that's input — but Haiku's response still got cut). The truncated raw text reached `safeJsonParse`, failed, and fell through to the explicit-partial branch.
 - **Fix:** Bump `max_tokens` to `4096`. Covers the largest realistic recipe across all supported languages. Cost is per actual output token used (not per cap), so no cost penalty for English/short recipes.
-- **Commit:** _(this commit)_
+- **Commit:** `4e01554`
 - **Test:** new `MANUAL_TESTS.md` Phase 8 scenario — send a Russian or Ukrainian recipe screenshot, verify full extraction (no "Got a partial read"). Also adds: "send a 5-ingredient English recipe → still works" regression check.
 
  — AI-extracted ingredients had no client id
@@ -74,7 +74,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Fix:**
   - **Server**: `extract-recipe/index.ts` post-parse normalization assigns `crypto.randomUUID()` to each ingredient that doesn't already have an id. New AI imports come back with valid ids.
   - **Client read**: `src/api/recipes.ts` `normalizeIngredients()` ensures every ingredient on `fetchRecipes` / `fetchRecipe` has an id (and validated `name`/`amount`/`unit`/`group`). Defense in depth + handles legacy rows already in the DB.
-- **Commit:** _(this commit)_
+- **Commit:** `4e01554`
 - **Test:** import a recipe via Telegram bot → open in Library → no React warning, ingredient tap-to-edit works. New `MANUAL_TESTS.md` Phase 8 scenario adds a verification step.
 
 
@@ -84,7 +84,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Bot running locally with all four env vars set. From phone: Me tab → Connect Telegram → Telegram opens → tap Start. ✅ Expected: "Connected, @yourhandle!". Actual: "Hmm, couldn't connect that. Try again from the app." Bot log (after temporary diagnostic): `[bot] telegram-auth non-200: 401 {"code":"UNAUTHORIZED_NO_AUTH_HEADER"}`.
 - **Root cause:** Supabase's Edge Function gateway enforces `verify_jwt = true` by default. It rejects any request without an `Authorization: Bearer <jwt>` header *before the function code runs*. The bot only sends `X-Spoon-Bot-Secret` (the function-level auth scheme documented in Phase 8.1). The Phase 8 plan never accounted for the gateway in front of the function. Compounding factor: this Supabase project was created with new-format API keys (`sb_publishable_*`, `sb_secret_*`) which are NOT JWTs and don't satisfy the gateway either, so "send the anon key as Bearer" doesn't work as a workaround.
 - **Fix:** `supabase/config.toml` adds per-function `verify_jwt = false` for `telegram-auth` and `extract-recipe`. Both functions are redeployed with `--no-verify-jwt`. Gateway now routes the request straight to the function; the function self-authenticates via `X-Spoon-Bot-Secret` (as designed in Phase 8.1). Defense surface unchanged for app-client calls — `requireUser` in the function still parses and validates the user's JWT independently of the gateway.
-- **Commit:** _(this commit)_
+- **Commit:** `2d7c264`
 - **Test:** new Phase 8 connect-flow scenario in `MANUAL_TESTS.md`. Negative checks: with valid bot secret + nonsense token → function returns `404 token_not_found` (function-level error, not gateway). With wrong bot secret → `401 Invalid bot secret` (function-level).
 
 
@@ -93,7 +93,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Open any recipe with the default `caveat` font preset → Scrapbook → Export PDF. Compare the ingredients list / method list font in the PDF vs the editor preview. Editor: handwritten Caveat. PDF (before fix): sans-serif Nunito.
 - **Root cause:** `renderRecipePage.ts` baseCSS hardcoded `font-family` per template-block selector (Fraunces for `.block-title`, Caveat for descriptions / headings, Nunito for `.block-ingredients-list` / `.block-method-list` / pills, etc.). The editor doesn't work that way — it applies `preset.title` (e.g. `Caveat_700Bold`) to the title and `preset.section` (e.g. `Caveat_400Regular`) to all body text via inline `{ fontFamily: f }` overrides. So the PDF only matched the editor by coincidence on the section font, and only for description / headings; ingredients / method / pills were always wrong.
 - **Fix:** Append a per-preset CSS override block at the end of `baseCSS`. New `presetFonts(key)` maps each preset to `{ title: { family, weight }, section: { family, weight } }`. New `presetOverrideCSS(template, presetKey)` emits CSS with the same specificity as the template-block rules but later in the cascade, so it wins. Title gets `preset.title`; description / pills / both list blocks / both headings / step-row / ing-row / tags / pill labels / step badges all get `preset.section`. `.pill strong` and `.step-badge` keep their existing bold weight from the template CSS for the visual emphasis on prep/cook numbers and step numbers.
-- **Commit:** _(this commit)_
+- **Commit:** `dd6800b`
 - **Test:** export PDF in each of the 4 font presets (Caveat / Marck / Bad Script / Amatic) → ingredients-list and method-list font matches the editor's preset.section. Title matches preset.title.
 
 ## BUG-020 — Font-size bump didn't grow text-heavy blocks
@@ -102,7 +102,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Repro:** Editor → Layout → Arrange Blocks → select description (or pills, or any text-heavy block other than `method-list` / `ingredients-list`) → tap A+ a few times. ✅ Expected: block grows to fit the larger text. Actual: block stayed the same height; bigger text rendered but bottom lines hidden under the next block.
 - **Root cause:** `GestureBlock.animStyle` set `height: measuredH.value` on the outer `Animated.View`. That height became a Yoga constraint on the inner `<View onLayout={onContentLayout}>` — the inner View's measured size couldn't exceed the parent's explicit height. So once `measuredH` settled at the initial measurement, every subsequent `onLayout` after a font bump reported the same constrained height, and `measuredH` never grew. `method-list` accidentally worked because its template default `h` was generous (≥ 32 % of usable page height) and the constraint was rarely hit; for `description` (8 %) the constraint hit on the very first measurement.
 - **Fix:** Drop `height` from `animStyle` for text-heavy blocks. The Animated.View now sizes to its content (matching StaticBlock's behaviour). Top-anchor still uses `h` (template default) so the visible top edge doesn't jump when content grows downward. Non-text-heavy blocks (image / photo) still get an explicit height — they need fixed bounds because their child (FoodImage) has no intrinsic size to drive growth.
-- **Commit:** _(this commit)_
+- **Commit:** `fd206f0`
 - **Test:** new scenario in `MANUAL_TESTS.md § Editor stability` (next pass): select each of description / pills / ingredients-heading / method-heading → A+ until text wraps to N+1 lines → block visibly grows; selection ring grows with it; no visual clipping at the bottom.
 
 ## BUG-019 — PDF export visually diverged from Scrapbook preview
@@ -123,7 +123,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
   - **Page bg fallback**: `.page { background: ${palettePaper} || '#faf4e6'; }` plus `@media print { .page { background: ... !important; } }`.
   - **Corner sticker**: new `renderCornerDecoration` always emits a positioned `<img class="corner-leaf">` with the leaf sticker — matches the Scrapbook hardcoded `<Sticker kind="leaf">` at `app/recipe/[id].tsx:84`. `exportRecipePdf` always pre-resolves `'leaf'` even when the recipe has no user-placed stickers.
   - **Schema**: `RecipePageStyle.paletteBg2` field added; serializer populates from `palette.bg2`.
-- **Commit:** _(this commit)_
+- **Commit:** `720bdf4` (with follow-up `f906a91` for inline-SVG dots + step badges)
 - **Test:** new scenario in `MANUAL_TESTS.md § PDF export — preview parity` (next commit). Smoke test: same recipe, Scrapbook view → Export PDF → open in Files. Verify Fraunces title, cream page, watercolor stickers, terracotta circular step badges, dotted ingredient bullets, leaf in bottom-right.
 
 ---
@@ -133,7 +133,7 @@ When automated tests land (Jest / Detox / Playwright), each row here should map 
 - **Severity:** Low — visual; sticker tray partially clipped at the bottom, still usable.
 - **Repro:** Editor → Stickers mode. The bottom panel is 148pt + safe-area, but Phase 7.2 added a Make-me-Sketch button above the horizontal sticker tray, pushing the tray into the clipped area.
 - **Root cause:** `panelHeight` in `app/editor/[recipeId].tsx` was sized for the old content (tray only). Phase 7.2 added the Make-me-Sketch button + success/error toasts without updating the height.
-- **Fix:** bump stickers-mode height from 148 to 210 (matching Draw mode). Commit: (this commit).
+- **Fix:** bump stickers-mode height from 148 to 210 (matching Draw mode). Commit: `e7e4d63`.
 - **Test scenario:** `MANUAL_TESTS.md § Phase 7.2 #1` already asserts the button is visible with the tray below — will catch regressions here.
 
 ---

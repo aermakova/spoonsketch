@@ -265,7 +265,7 @@ prototype internal structure.
 
 | Layer | Package | Reason |
 |---|---|---|
-| Framework | Expo SDK 52 + TypeScript | iOS + Android + Web from one codebase |
+| Framework | Expo SDK 54 + TypeScript | iOS + Android + Web from one codebase |
 | Navigation | Expo Router (file-based) | Works with web SSR, deep links |
 | Canvas / drawing | `@shopify/react-native-skia` | Runs on iOS, Android, Web (WebAssembly/CanvasKit). Handles sticker rendering, path drawing, layer compositing, blend modes, snapshot to PNG |
 | Stroke smoothing | `perfect-freehand` (MIT, 2KB) | Smooth pressure-sensitive strokes from raw pointer events. No bezier math needed. |
@@ -1730,12 +1730,12 @@ These rules apply to every developer on this project. They come from `ARCHITECTU
 | 4.5c | Draggable recipe blocks | — | ✅ Done | All 6 templates use absolute-positioned BlockElements; blocks are drag/rotate/scale/delete-able; positions persist per recipe; "Arrange Blocks" toggle + Reset in Layout tab; template change requires confirmation if overrides exist |
 | 5 | Drawing + layers | Week 8–9 | ✅ Done | Freehand drawing, eraser with layer isolation, 3 layers, blend modes, undo/redo |
 | 6 | Book builder | Week 10–11 | ✅ Done | All page types, drag reorder, cookbook CRUD, swipe edit/delete, recipe page → editor → back |
-| 7 | AI: auto-sticker + recipe import | Week 12 | 🔄 In progress | "Make me Sketch" places ≥3 relevant stickers ✅; link import ✅; Photo + File tabs ✅; JSON bulk-import tab ✅ (2026-04-25) — all 5 Import tabs live |
-| 8 | Telegram bot | Week 13 | ⬜ Not started | Send link to bot → recipe appears in app within 30s |
-| 8.5 | Photos, frames & watercolor | Week 13.5 | ⬜ Not started | User uploads 1 photo per recipe; placeable on canvas with 1 of 8 frames; premium users convert to watercolor via OpenAI; 4 sticker packs (~76 stickers); see `.claude/plans/wise-spinning-creek.md` |
+| 7 | AI: auto-sticker + recipe import | Week 12 | ✅ **Done (2026-04-25)** | All 5 Import tabs live: Paste Link · Type · Photo (≤10 imgs) · File (PDF + .txt) · JSON (bulk, ≤20 recipes/import) · Make me Sketch (auto-sticker). `extract-recipe` Edge Function accepts `url` / `image_urls[]` / `pdf_url` / `text_content` modes. Multi-recipe URL detection landed in BUG-025; Cyrillic max_tokens fix in BUG-024. |
+| 8 | Telegram bot | Week 13 | 🔄 **In progress (code shipped)** | Bot runs end-to-end on device (commit `d2f61a6`): URL imports, photo imports (single + media_group batch), `moderate-image` CSAM gate, Realtime push to library. Connect Telegram UI live in Me tab. **Pending:** production deployment (Railway + Upstash, ~30 min, $5/mo) — see `NEXT_STEPS.md` §3. Until then bot lives on dev laptop only. |
+| 8.5 | Photos, frames & watercolor | Week 13.5 | ⬜ Not started | User uploads 1 photo per recipe; placeable on canvas with 1 of 8 frames; premium users convert to watercolor via OpenAI; 4 sticker packs (~76 stickers). 5 sub-phases (~46h total) summarized inline below. |
 | 9 | PDF export + print order | Week 14–15 | ⬜ Not started | Generate scrapbook PDF, clean PDF, Lulu order placed and tracked |
 | 10 | Cook mode + polish | Week 16 | ⬜ Not started | Cook mode with screen-on, step checklist, all 4 palettes applied throughout |
-| 10.5 | Editor UX polish | Week 16 | ⬜ Not started | Help overlay, custom colour picker, drawing colours expanded; see details below |
+| 10.5 | Editor UX polish | Week 16 | 🟡 **In progress (2/4)** | Done: Help overlay (`HelpSheet.tsx`, 2026-04-22), Edit recipe from Clean view (`/recipe/edit/[id]`, 2026-04-25). Pending: custom colour picker (~16 colours + wheel), Apple Pencil pressure (`e.pressure` → `StrokePoint.pressure`). |
 | 10.7 | Onboarding flow (4-6 killer-feature screens + Get Started + sign-up) | — | 🔴 **Launch blocker — not started** | First-launch carousel showing the gift angle, Make-me-Sketch, multi-source import, palette picker. Screens are marketing-team-provided; engineering wires the carousel + MMKV `onboarding_complete` flag + Apple Sign In on the final step. See SCREENS.md §00 for the existing 7-step spec — current spec is the engineering placeholder; final copy/visuals come from marketing. **Cannot ship to TestFlight without this.** |
 | 10.8 | Account management surfaces (order history, subscription manage, GDPR export, email change) | — | 🟡 **In progress (2/4)** | Four account surfaces specced — done: (b) ✅ §19 GDPR data export (2026-04-25 share-sheet handoff), (c) ✅ §15 in-app account deletion (2026-04-25, full cascade). Pending: (a) §17 Order history list, (d) §18 Manage subscription + Restore Purchases (gated on RevenueCat), §20 Email change. **§17 + §18 + §20 still required before App Store submission.** |
 | 10.9 | Compliance & legal (Ukraine + USA + EU + Apple Store) | — | 🟡 **In progress (engineering done; legal/admin pending)** | Engineering pieces ✅ (2026-04-25): §C2 granular consent UI + server gate, §C8 Sign in with Apple code (awaits Apple Dev portal + Supabase config per NEXT_STEPS §3.5), §C9 CSAM photo moderation via `moderate-image`, §15 in-app deletion, §19 data export. Still pending **legal/admin**: §C1 lawyer-drafted PP+ToS (EN+UK), §C7 EU Rep contract + cookie consent banner UI, §C4 vendor DPAs sign-off, §C5 CCPA/COPPA/California-ARL copy + Stripe Tax wire, §C5 App Store Connect privacy labels + age rating, §C9 RoPA + 72h breach runbook + Stripe Tax + Report Content button. Full P0/P1/P2/P3 checklist in §C-sections + bottom-of-section table. Source: `.claude/research/legal-compliance-research.md`. |
@@ -1747,7 +1747,7 @@ Status legend: ⬜ Not started · 🔄 In progress · ✅ Done · 🚧 Blocked
 
 ## Phase 8.5 — Photos, Frames & Watercolor
 
-Detailed plan: `.claude/plans/wise-spinning-creek.md`. Five sub-phases, ~46h total:
+Five sub-phases, ~46h total. (Detailed plan file at `.claude/plans/phase-8.5-stickers-photos.md` to be created when sub-phase A starts; the inline summary below is the current source of truth.)
 
 - **A — Sticker expansion** (~6h): 16 → ~76 PNGs across 4 packs (Essentials free + Baking / Herbs / Holiday premium), generated via a `gpt-image-1` dev script. Premium packs gated server-side in `auto-sticker` Edge Function.
 - **B — Recipe photo upload** (~8h): new private `recipe-photos` Storage bucket; `user_images.recipe_id` + `user_images.role` columns; new "Photo" tab in editor's bottom tray (upload / replace / remove).
@@ -1782,12 +1782,63 @@ Items intentionally skipped during Phase 5 to keep scope tight. Implement before
 
 ---
 
-## Current state — handoff notes (updated 2026-04-20, Phase 4.5c added)
+## Current state — handoff notes (updated 2026-04-25)
 
 > **New Claude instance: read this before touching any code.**
 > This section is the authoritative record of what was built and what is blocked.
 
 ### What is done
+
+**Phase 10.9 engineering — compliance scaffolding (added 2026-04-25):**
+
+Engineering pieces of the Ukraine + USA + EU + Apple compliance gate landed in commits `3549bf7` → `149718d`:
+
+- **Sign in with Apple** (`3549bf7`) — `signInWithApple()` in `src/api/auth.ts`, button on `/login`, app.json `usesAppleSignIn: true`, `expo-apple-authentication`. Auto-hides in Expo Go via `isAvailableAsync()`. External setup (Apple Dev portal + Supabase Dashboard) still pending — runbook in `NEXT_STEPS.md` §3.5.
+- **Image moderation / CSAM gate** (`f10c16e`) — `moderate-image` Edge Function fail-closed via Claude Haiku vision; called after every photo upload (in-app `src/api/storage.ts` + Telegram bot `processPhotoBatch`). `moderation_events` audit table service-role only.
+- **Granular consent UI + server gate** (`21fd152`) — 4 ConsentRow toggles on Create Account form (PP, ToS required; AI, marketing optional), 4-toggle PrivacyCard on Me tab, `requireAiConsent` gate in `extract-recipe` / `auto-sticker` / `import-recipes-json` / `moderate-image`. Migrations: `users.consent_*` columns + `user_consents` audit table + `record_consent_audit` RPC.
+- **In-app account deletion** (`3f2d111`) — `delete-account` Edge Function does Storage cleanup + `auth.admin.deleteUser` cascade; UI in Me tab DeleteAccountSection with typed-DELETE confirmation modal.
+- **GDPR data export** (`29bee89`) — `export-user-data` Edge Function returns full JSON + signed Storage URLs; Me tab ExportDataLink uses share-sheet handoff. 24h throttle via `users.last_data_export_at`.
+- **EU cookie consent banner** (`149718d`) — `TrackingConsentBanner.tsx` mounted in `app/_layout.tsx`, Zustand+MMKV state in `src/lib/trackingConsent.ts`. No tracker SDK is wired yet; banner is ready for when PostHog/Sentry land.
+
+---
+
+**Phase 8 — Telegram bot end-to-end (added 2026-04-23 → 2026-04-25):**
+
+`telegram-bot/` runs on the dev laptop and works end-to-end via `npm run dev`:
+
+| File | What it does |
+|---|---|
+| `telegram-bot/src/bot.ts` | Telegraf handlers — `/start` token-claim, URL message → queue, photo (single + media_group batch buffer + `processPhotoBatch`), CSAM `moderateImage` gate before queueing |
+| `telegram-bot/src/queue.ts` | BullMQ + Upstash Redis queue (when `REDIS_URL` set) **OR** in-process worker fallback (no-Redis dev mode) |
+| `telegram-bot/src/worker.ts` | Job processor — calls `extract-recipe` Edge Function, replies in chat with deep link `https://t.me/...` |
+| `telegram-bot/src/extract.ts` | Edge Function client; payload shape includes `imageUrls[]` for media_group batches |
+| `telegram-bot/src/config.ts` | `dotenv/config` import (tsx watch doesn't auto-load) |
+
+`telegram-auth` Edge Function (`supabase/functions/telegram-auth/`) issues short-lived signed tokens; per-function `verify_jwt = false` because modern Supabase keys aren't JWTs (BUG-022 root cause).
+
+**Pending:** Railway + Upstash production deploy (`NEXT_STEPS.md` §3).
+
+---
+
+**Phase 7 — All 5 import tabs (added 2026-04-22 → 2026-04-25):**
+
+`/recipe/import` is now a 5-tab modal (`app/recipe/import.tsx`):
+
+| Tab | Surface | Notes |
+|---|---|---|
+| Paste Link | URL → `extract-recipe(url)` | 6 wordmarks (Allrecipes, NYT Cooking, etc.); free 20/mo |
+| Type | Manual entry | Form lives in `src/components/recipe/RecipeFormFields.tsx` (shared with edit screen) |
+| Photo | ≤10 images → `extract-recipe(image_urls[])` | Multi-image picker via `expo-image-picker`; `expo-image-manipulator` resize to 1600px; per-user RLS on `telegram-screenshots` bucket; CSAM gate via `moderate-image` |
+| File | PDF (≤10MB) or .txt (≤100KB) → `extract-recipe(pdf_url \| text_content)` | `expo-document-picker`; PDF via Anthropic `document` content block; new `pdf_extract` job type |
+| JSON | Bulk paste → `import-recipes-json` (no Haiku call on our side) | User runs their own ChatGPT/Claude/Gemini against multi-recipe PDF, pastes resulting JSON; sanitized via `_shared/recipeSanitize.ts`; ≤20 recipes/import; smart-quote normalization (BUG-026); free 5/mo |
+
+`extract-recipe` now `max_tokens=4096` for long Cyrillic recipes (BUG-024); ingredient `id`s assigned server-side (BUG-023); multi-recipe URL split rule in system prompt (BUG-025).
+
+`auto-sticker` / Make me Sketch unchanged from Phase 7.2; consent-gated.
+
+Edit recipe screen (`/recipe/edit/[id]`) reuses `RecipeFormFields`; pencil ✎ entry in Clean view.
+
+---
 
 **Phase 4.5c — Draggable recipe blocks (added 2026-04-20):**
 
@@ -1880,29 +1931,11 @@ Also added explicit single-finger handles: rotation (↻, top-center drag) and s
 
 ### What is blocked
 
-**Phase 5 is code-complete but untested.**
+Nothing. All shipped phases (1–7, partial 8 + 10.5 + 10.8 + 10.9) are working on device. Three external blockers remain before TestFlight:
 
-Blocker: sign-in fails in the iOS Simulator. When the user taps the sign-in button, an error is shown (exact message unknown — screenshot taken but not transcribed). The error prevents reaching any authenticated screen, so Phase 5 drawing features cannot be reached or verified.
-
-Secondary symptom: "Network request failed" errors appear in Metro logs for Supabase API calls. The Supabase project is confirmed alive. Root cause may be Simulator network sandbox restrictions, or a sign-in configuration issue.
-
-**What to do next (for next Claude instance):**
-1. Investigate and fix the sign-in error in the Simulator (check `src/api/auth.ts`, Supabase URL/anon key in `.env`, Expo dev client network settings)
-2. Once sign-in works: run Phase 5 verification checklist (listed in the snappy-percolating-hellman plan file at `~/.claude-personal/plans/snappy-percolating-hellman.md`)
-3. If all 11 verification steps pass → mark Phase 5 ✅ Done in this file
-4. Commit all Phase 5 files + editor changes
-
-### Files to verify exist before testing
-
-```
-src/types/drawing.ts
-src/lib/drawingStore.ts
-src/components/canvas/SkiaCanvas.tsx
-src/components/canvas/DrawingLayer.tsx
-src/components/canvas/DrawingStroke.tsx
-src/components/canvas/DrawingToolbar.tsx
-src/components/canvas/LayerPanel.tsx
-```
+1. **Apple Sign In external setup** — Apple Dev portal + Supabase Dashboard config (`NEXT_STEPS.md` §3.5). Code is shipped; button is hidden in Expo Go until external setup lands.
+2. **Marketing-team onboarding screens** — engineering scaffolding ready; waiting on 4-6 killer-feature designs (see `MARKETING_BRIEF.md`).
+3. **Legal/admin compliance** — lawyer-drafted PP+ToS (EN+UK), EU Rep contract, vendor DPAs, App Store Connect privacy labels. See PLAN §C / Phase 10.9.
 
 ---
 

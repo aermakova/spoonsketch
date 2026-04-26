@@ -77,7 +77,21 @@ This is the most important flow. A user who reaches a decorated recipe page with
   ✦ Show a small preview of "your cookbook is waiting" above the form — social proof of what they've set up.
   ✦ Magic link = no password = lowest possible friction. Prioritise this over Apple/Google visually.
   ✦ "Continue with Apple" must be present (App Store requirement) but don't make it the hero option.
-  📊 Event: signup_started { method: "magic_link" | "apple" | "google" }
+  ✦ Today's implementation diverges: live screen ships email+password (with confirm-password) instead of magic link;
+    deep-link return from Supabase confirmation email isn't wired yet. Magic link is targeted for v1.1.
+  ✦ Apple Sign In auto-hides in Expo Go (`isAvailableAsync()` returns false there); appears in custom dev client + TestFlight builds.
+  📊 Event: signup_started { method: "email_password" | "magic_link" | "apple" | "google" }
+
+  [Consent rows — required before button enables]
+    ↓  User toggles 4 consent switches:
+       - Privacy Policy (required) — disables Create button until ON; tap row → opens live PP
+       - Terms of Service (required) — same
+       - AI processing (optional, default OFF) — toggling OFF post-signup disables every AI tab + Make me Sketch
+       - Marketing emails (optional, default OFF)
+    ⚠ DROP-OFF: If consent rows are buried below the fold or look like fine print, users skip and can't tap Create. Make them visible.
+    ✦ Required toggles must be reachable without scroll. AI/marketing can sit below.
+    ✦ Each change writes a row to `user_consents` audit table for GDPR Art. 7(1).
+    📊 Event: consent_set { kind: "tos" | "ai" | "marketing", granted: bool }
 
   [Sign up — Email submitted]
     ↓  User taps "Send magic link"
@@ -452,6 +466,67 @@ Push: "Mother's Day is in 2 weeks 💐 Make her a cookbook →"
     ✦ No "are you sure?" on background — let the native app switching be invisible.
     ✦ Only ask confirmation if user taps ✕ or back explicitly.
 ```
+
+---
+
+## Flow 10 — Export your data (GDPR Art. 20 portability)
+
+```
+[Me tab] → tap "Export your data"
+  ↓
+  📊 Event: data_export_requested
+  Client calls `exportUserData()` → `export-user-data` Edge Function
+  ↓
+  Server compiles JSON: recipes, cookbooks, canvas elements, drawing strokes,
+    consent log, ai_jobs history + signed URLs for any user-uploaded images
+  ↓
+  Server checks `users.last_data_export_at` → if < 24h ago → 429
+  ↓
+  Returns JSON file (≤ ~10MB typical) → client passes to expo-sharing
+  ↓
+  [iOS share sheet]
+    User picks Files / iCloud Drive / email / AirDrop
+  ✦ Throttle: 1 export per 24h per user — surface as "You've exported recently — try again tomorrow"
+  ✦ Success toast: "Your data is ready to share."
+  📊 Event: data_export_completed { size_kb }
+```
+
+**Drop-off risk:** ⚪ Low. Most users will never tap this; it exists to satisfy GDPR Art. 20 + Apple privacy expectations + Ukrainian PDP Law.
+
+---
+
+## Flow 11 — Delete account (GDPR Art. 17 + Apple Guideline 5.1.1(v))
+
+```
+[Me tab] → scroll to "Delete account" section (visually de-emphasised, red text)
+  ↓  Tap "Delete account…"
+  📊 Event: delete_account_started
+  → [Confirmation modal — bottom sheet]
+       Heading: "This can't be undone."
+       Body: list of what gets deleted
+              (recipes, cookbooks, canvas, photos, account)
+       Required: text field — user must type literal "DELETE" (caps-sensitive)
+       Buttons: [Cancel]  [Delete forever]   ← destructive button disabled until typed
+  ↓  User types DELETE → button enables → tap [Delete forever]
+  ⚠ DROP-OFF: A typed-confirm is intentional friction — most accidental taps die here.
+  ↓  Spinner; client calls `deleteAccount()` → `delete-account` Edge Function
+  ↓
+  Server:
+    1. Deletes Storage objects across recipe-images / telegram-screenshots / canvas-thumbnails
+    2. Calls `auth.admin.deleteUser(user_id)` — this cascades the public schema:
+       users → cookbooks → recipes → recipe_canvases → canvas_elements / drawing_layers / drawing_strokes
+              / book_pages / pdf_exports / user_images / ai_jobs / telegram_connections / telegram_jobs
+              / telegram_auth_tokens / moderation_events / user_consents / print_orders
+    3. Returns 200 ok
+  ↓
+  Client clears Supabase session (SecureStore) + Zustand stores
+  → [Auth screen]  (user is signed out automatically)
+  📊 Event: delete_account_completed
+  ✦ No "you have 30 days to undo" — deletion is immediate and irreversible per Apple 5.1.1(v).
+  ✦ Pre-existing print orders survive (Lulu shipping is decoupled — see future Flow 12).
+```
+
+**Drop-off risk:** 🟡 Medium *for the user trying to delete* — the typed-DELETE step adds friction that's intentional. **Critical mitigation:** the Edge Function MUST work even if Storage cleanup partially fails — `auth.admin.deleteUser` is the source-of-truth deletion; orphaned storage objects are mopped up by a periodic cleanup job (planned, not yet built).
 
 ---
 

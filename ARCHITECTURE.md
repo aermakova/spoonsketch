@@ -9,8 +9,8 @@
 
 | Concern | Choice | Why |
 |---|---|---|
-| Framework | Expo SDK 52 + TypeScript strict | iOS + Android + Web, one codebase. Managed workflow until we hit a native wall. |
-| Navigation | Expo Router v3 (file-based) | Deep links, web SSR, typed routes out of the box. No manual linking config. |
+| Framework | Expo SDK 54 + TypeScript strict | iOS + Android + Web, one codebase. Managed workflow until we hit a native wall. |
+| Navigation | Expo Router v6 (file-based) | Deep links, web SSR, typed routes out of the box. No manual linking config. |
 | Canvas / Drawing | @shopify/react-native-skia | GPU-accelerated, runs on web via CanvasKit WASM. Only option that handles blend modes + snapshot. |
 | Server state | TanStack Query v5 | Caching, background refetch, optimistic updates. Kills 80% of manual loading/error state. |
 | Client state | Zustand | Canvas transforms, undo/redo, theme, drawing tools. Tiny, no boilerplate, easy to test. |
@@ -82,13 +82,15 @@ spoonsketch/
 │   │   ├── canvases.ts
 │   │   ├── books.ts
 │   │   ├── print.ts
-│   │   ├── ai.ts                 # AI job triggers (Edge Functions)
-│   │   ├── auth.ts
-│   │   └── storage.ts            # File upload helpers
+│   │   ├── ai.ts                 # AI job triggers — extractRecipeFromImages, extractRecipeFromDocument, importRecipesFromJson
+│   │   ├── auth.ts               # signIn/signUp + signInWithApple + deleteAccount + exportUserData
+│   │   ├── consent.ts            # fetchConsents, setConsent, CURRENT_PP_VERSION  (added 2026-04-25)
+│   │   └── storage.ts            # uploadRecipeScreenshot, uploadPdfForExtraction (CSAM-gated)
 │   │
 │   ├── hooks/                    # React hooks (data + behaviour)
 │   │   ├── queries/              # TanStack Query hooks
 │   │   │   ├── useRecipes.ts
+│   │   │   ├── useRecipesRealtime.ts   # Supabase Realtime subscription on recipes
 │   │   │   ├── useCookbook.ts
 │   │   │   ├── useCanvas.ts
 │   │   │   └── usePrintOrder.ts
@@ -97,6 +99,9 @@ spoonsketch/
 │   │   │   ├── useSaveCanvas.ts
 │   │   │   └── usePlaceOrder.ts
 │   │   ├── useAuth.ts
+│   │   ├── useConsents.ts              # consent toggle mutation (added 2026-04-25)
+│   │   ├── useExtractFromImages.ts     # multi-image AI extraction (added 2026-04-25)
+│   │   ├── useImportRecipesJson.ts     # bulk JSON import (added 2026-04-25)
 │   │   ├── useTheme.ts
 │   │   ├── useUndo.ts
 │   │   └── useAnalytics.ts
@@ -120,11 +125,21 @@ spoonsketch/
 │   │   │   ├── ElementTransformer.tsx
 │   │   │   ├── DrawingLayer.tsx
 │   │   │   ├── ContextToolbar.tsx
+│   │   │   ├── HelpSheet.tsx     # Mode-aware help bottom sheet (added 2026-04-22)
 │   │   │   └── BottomToolPanel.tsx
 │   │   ├── recipe/
 │   │   │   ├── RecipeCard.tsx
 │   │   │   ├── IngredientRow.tsx
+│   │   │   ├── RecipeFormFields.tsx    # Shared by Type tab + Edit screen (added 2026-04-25)
 │   │   │   └── StepRow.tsx
+│   │   ├── import/                     # Import-modal tabs (added 2026-04-22 → 04-25)
+│   │   │   ├── ImportTabs.tsx          # Tab switcher
+│   │   │   ├── PasteLinkTab.tsx
+│   │   │   ├── TypeTab.tsx
+│   │   │   ├── PhotoTab.tsx            # Multi-image picker
+│   │   │   ├── FileTab.tsx             # PDF / .txt picker
+│   │   │   └── JsonTab.tsx             # Bulk paste + smart-quote normalization
+│   │   ├── TrackingConsentBanner.tsx   # First-launch cookie/tracker banner (added 2026-04-25)
 │   │   └── shared/
 │   │       ├── LoadingSticker.tsx # Thematic loading state
 │   │       ├── EmptyState.tsx
@@ -151,8 +166,13 @@ spoonsketch/
 │   │   ├── analytics.ts          # PostHog wrapper
 │   │   ├── sentry.ts             # Sentry init + helpers
 │   │   ├── revenuecat.ts         # RevenueCat init + purchase helpers
-│   │   ├── mmkv.ts               # MMKV instance + typed helpers
+│   │   ├── mmkv.ts               # MMKV instance + typed helpers; also `canvasStorage` Zustand persist wrapper
 │   │   ├── pdf.ts                # PDF export trigger (calls Edge Function)
+│   │   ├── canvasStore.ts        # Zustand canvas store (persist via MMKV, keyed by recipeId)
+│   │   ├── drawingStore.ts       # Zustand drawing store (persist via MMKV, keyed by recipeId)
+│   │   ├── recipeForm.ts         # valuesToRecipeInput, recipeToFormValues helpers (added 2026-04-25)
+│   │   ├── jsonImportPrompt.ts   # JSON_IMPORT_PROMPT — the prompt user copies into ChatGPT/Claude (added 2026-04-25)
+│   │   ├── trackingConsent.ts    # Zustand+MMKV state for cookie banner (added 2026-04-25)
 │   │   └── deeplink.ts           # Universal link parsing
 │   │
 │   └── types/
@@ -162,17 +182,32 @@ spoonsketch/
 │
 ├── supabase/
 │   ├── functions/                # Edge Functions (Deno)
-│   │   ├── extract-recipe/       # URL + image → Claude Haiku
+│   │   ├── _shared/              # Shared helpers
+│   │   │   ├── ai.ts             # Anthropic client + logAiJob
+│   │   │   ├── auth.ts           # requireUser
+│   │   │   ├── consent.ts        # requireAiConsent + CURRENT_PP_VERSION (added 2026-04-25)
+│   │   │   ├── cors.ts
+│   │   │   ├── errors.ts
+│   │   │   ├── recipeSanitize.ts # HTML strip + length caps + URL whitelist (added 2026-04-25)
+│   │   │   └── tier.ts           # Quota + rate-limit helpers
+│   │   ├── extract-recipe/       # URL / image_urls[] / pdf_url / text_content → Haiku
 │   │   ├── auto-sticker/         # Recipe → sticker placement
-│   │   ├── generate-pdf/         # Canvas snapshots → PDF
-│   │   └── lulu-webhook/         # Lulu print order status updates
-│   └── migrations/               # SQL migration files
+│   │   ├── import-recipes-json/  # Bulk JSON ingest, no Haiku call (added 2026-04-25)
+│   │   ├── moderate-image/       # CSAM gate via Haiku vision (added 2026-04-25)
+│   │   ├── delete-account/       # Storage cleanup + auth.admin.deleteUser (added 2026-04-25)
+│   │   ├── export-user-data/     # GDPR Art. 20 portability JSON (added 2026-04-25)
+│   │   ├── telegram-auth/        # Issues short-lived bot tokens
+│   │   ├── generate-pdf/         # Canvas snapshots → PDF (planned)
+│   │   └── lulu-webhook/         # Lulu print order status updates (planned)
+│   └── migrations/               # SQL migration files (latest batch dated 2026-04-25)
 │
 ├── telegram-bot/                 # Separate Node.js service (Railway)
 │   ├── src/
-│   │   ├── bot.ts                # Telegraf setup
-│   │   ├── handlers.ts           # Message handlers
-│   │   └── queue.ts              # BullMQ producer
+│   │   ├── bot.ts                # Telegraf — /start auth, URL, photo (single + media_group), CSAM gate
+│   │   ├── queue.ts              # BullMQ + Upstash OR in-process fallback
+│   │   ├── worker.ts             # Job processor — calls extract-recipe
+│   │   ├── extract.ts            # Edge Function client; image_urls[] payload
+│   │   └── config.ts             # `import 'dotenv/config'` (tsx watch doesn't auto-load)
 │   └── package.json
 │
 ├── .env.local                    # Never committed
@@ -224,6 +259,18 @@ export function useCreateRecipe() {
 ```
 
 **Rule:** If it lives in Supabase, TanStack Query owns it. No `useState` for server data.
+
+### Persisted Zustand stores via MMKV `canvasStorage` wrapper
+
+Three stores persist to device storage so user edits survive app restart and screen switch:
+
+- **`canvasStore`** — per-recipe canvas elements, selection, template key, font preset, block overrides, step/ingredient text overrides, undo history (≤50). Keyed map by `recipeId`.
+- **`drawingStore`** — per-recipe drawing layers (≤5), active layer, tool, stroke settings, undo history. Keyed map by `recipeId` (BUG-014 fix: previously a single global state, lost when switching recipes).
+- **`trackingConsent`** — cookie-banner state (one-time accept/reject record).
+
+All three use a thin `canvasStorage` wrapper around `react-native-mmkv` to satisfy Zustand's `persist` API. SecureStore is reserved for the auth session token only.
+
+The wrapper's TS contract is `getItem` / `setItem` / `removeItem` returning `Promise<string | null>`; we hand-roll JSON encoding because MMKV is sync but Zustand's `persist` wants async.
 
 ### Zustand — client state
 
@@ -851,3 +898,4 @@ jobs:
 5. **TypeScript strict mode, always.** `supabase gen types` keeps DB types in sync. No `any`.
 6. **One analytics call per meaningful user action.** See `AnalyticsEvent` union type — adding an event requires updating the type first.
 7. **Error boundaries wrap every tab and the editor.** A crash in the canvas must not crash the whole app.
+8. **Living docs stay current in the same commit as the code.** See `CLAUDE.md` rule #8 for the full enforcement clause and the canonical doc list (PLAN, FEATURES, BACKEND, ARCHITECTURE, SCREENS, USER_FLOW, BUGS, MANUAL_TESTS, plus the active plan file). When you add a hook / api file / component / Edge Function / migration, the matching section here gets updated in the SAME commit.

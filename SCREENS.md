@@ -153,9 +153,14 @@
 - Magic link email input (Nunito 16px, inset shadow, placeholder: "your@email.com")
 - "Send magic link" primary button
 - Divider: `or`
-- "Continue with Apple" (black button, required for App Store)
+- "Continue with Apple" (black button, required for App Store) — auto-hidden if `AppleAuthentication.isAvailableAsync()` returns false (Expo Go); appears in custom dev client + TestFlight builds.
 - "Continue with Google" (white/outlined)
-- Legal text (12px, `--inkFaint`): "By continuing you agree to our Terms and Privacy Policy."
+- **Consent rows** (rendered above the buttons, 4 toggle rows on paper-card style):
+  - **Privacy Policy** — required. Tap row → opens live PP. Toggle disabled-on by default; user must turn ON to enable Create button.
+  - **Terms of Service** — required. Same pattern.
+  - **AI processing** — optional. "Let us process your recipes / photos / text via Anthropic / OpenAI." Default OFF. Toggling OFF post-signup disables AI tabs in the app.
+  - **Marketing emails** — optional. Default OFF.
+- Legal text (12px, `--inkFaint`): "By continuing you agree to our Terms and Privacy Policy." — kept as a backstop label even though the consent rows above already cover it.
 
 **Empty state:** Email field empty → button disabled
 
@@ -180,7 +185,10 @@
 **Cleanliness notes:**
 - Sign up is the LAST step, not the first — user already sees value
 - Legal text is present but tiny and non-intrusive
-- No password field, no confirm password, no username — magic link only
+- No password field, no confirm password, no username — magic link only (target UX)
+
+**Today's implementation (2026-04-25 — diverges from spec above):**
+The live `/login` screen ships email + password (with confirm-password on Create) instead of magic link, because deep-link return from Supabase confirmation email isn't wired yet. Apple Sign In, the 4 consent rows, and the legal text DO match the spec. Magic link is targeted for v1.1 once Universal Links + the post-confirmation deep-link handler are built.
 
 ---
 
@@ -658,4 +666,59 @@ Install
 
 ---
 
-*Remaining screens (Library 02a/02b, Detail 04a/04b, Cook Mode 06, Drawing Mode 05c, Collections 07, My Elements 08, PDF Export 09, Book Page Editors 11a-d, Telegram Connect 13, Settings 15, Plans 16, Tablet Editor 18) to be designed in the next pass.*
+*Remaining screens (Library 02a/02b, Detail 04a/04b, Cook Mode 06, Drawing Mode 05c, Collections 07, My Elements 08, PDF Export 09, Book Page Editors 11a-d, Plans 16, Tablet Editor 18) to be designed in the next pass.*
+
+---
+
+## Screen 04c — Edit Recipe (stub spec)
+
+**Route:** `/recipe/edit/[id]` (presented modally; reached via the ✎ pencil icon in Clean view top-right of `/recipe/[id]`).
+
+**Status:** Live since 2026-04-25. Behavior fully documented in `FEATURES.md` §9.6. Visual UX spec deferred to next design pass — for now the screen reuses the Type tab form layout from Import a Recipe (`src/components/recipe/RecipeFormFields.tsx`).
+
+**Critical points (do not redesign without coordination):**
+- Form pre-fills once on mount via `fetchRecipe(id)`; subsequent refetches don't clobber unsaved edits.
+- "Save changes" primary at the bottom; "Delete recipe" subtle terracotta-underlined link below it (typed-confirmation alert before destructive action).
+- Structured ingredient amount/unit/group flattens to a single string in `name` after a save round-trip — visible text preserved, structure lost. Planned fix is post-launch (separate amount/unit fields).
+
+---
+
+## Screen 15 — Me tab (stub spec)
+
+**Route:** `/(tabs)/me`
+
+**Status:** Live since 2026-04-25. Behavior fully documented in `FEATURES.md` §7. Visual UX spec deferred — current implementation uses paper-card stack with no decorative chrome.
+
+**Top-down stack:**
+1. Greeting + email (Caveat 18px greeting, Nunito 14px email)
+2. **Telegram card** — connect-state aware (Connect button OR "Connected as @handle" + "Open bot" link)
+3. **Privacy card** — 4 toggle rows (PP, ToS, AI, marketing). PP/ToS read-only ✓. AI/marketing live-editable.
+4. **Export your data** — terracotta-underlined link, opens share sheet with JSON file. 1/24h throttle.
+5. **Delete account** — destructive-styled section, opens typed-DELETE confirmation modal.
+6. **Sign out** — secondary button at the bottom.
+
+**Future polish (post-launch):**
+- Tier display ("Free" / "Premium" badge with manage-subscription link → Screen 16)
+- Profile name + avatar editing
+- App-wide palette picker (today only the cookbook palette is selectable — `/(tabs)/me` does not offer it)
+
+---
+
+## Screen 18 — Cookie / tracker consent banner (stub spec)
+
+**Route:** Modal-style banner mounted in `app/_layout.tsx` via `<TrackingConsentBanner />`. Renders only when `trackingConsent.decided === false` (first launch).
+
+**Status:** Live since 2026-04-25 (commit `149718d`). State persisted in MMKV via `src/lib/trackingConsent.ts`. Banner renders **before** any non-essential tracker initializes — currently no tracker SDK is wired (PostHog/Sentry deferred), so the banner is structural insurance.
+
+**UI (one bottom-sheet):**
+- Heading: "Privacy choices"
+- Body: brief explanation + link to Privacy Policy.
+- Primary "Accept all" (clay button, terracotta) — sets `analytics: true`, `errors: true`.
+- Secondary "Reject all" — sets both to false.
+- Tertiary "Customize" link — expands to per-category toggles (Analytics / Crash reports / Marketing). Each category links to a vendor list.
+- Once a choice is recorded, the banner never reappears unless the user changes the selection in the Privacy card on Me tab (future polish — not surfaced today).
+
+**Compliance notes (ePrivacy / EU):**
+- Banner blocks UI on first launch but does NOT block the user from using the app — both buttons immediately dismiss.
+- Per-category toggles default to OFF in "Customize" (no pre-checked).
+- Reject is as easy as Accept (single tap each).

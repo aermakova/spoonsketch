@@ -39,8 +39,8 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 
 | Layer | Choice |
 |---|---|
-| Framework | Expo SDK 52 + TypeScript strict |
-| Navigation | Expo Router v3 (file-based, typed routes) |
+| Framework | Expo SDK 54 + TypeScript strict |
+| Navigation | Expo Router v6 (file-based, typed routes) |
 | Canvas + drawing | `@shopify/react-native-skia` (iOS + Android + Web via CanvasKit WASM) |
 | Stroke smoothing | `perfect-freehand` (MIT, 2KB) |
 | Server state | TanStack Query v5 |
@@ -69,15 +69,23 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 5. **TypeScript strict, always.** Run `supabase gen types` after every migration. No `any`.
 6. **One `AnalyticsEvent` type entry per new event.** Type lives in `src/lib/analytics.ts`. Update the type first.
 7. **Error boundaries on every tab root and the editor.** Canvas crash must not crash the app.
-8. **Keep the living docs current in the same commit as the code.** Four docs at repo root + one folder are the source of truth for "what the app is, what's broken, what's tested, what we're working on". Never let them drift from the code:
+8. **Keep the living docs current in the SAME commit as the code.** Nine docs are the source of truth for "what the app is, how it works, what's broken, what's tested, what we promise marketing". Drift between any of them and the code is a bug. The canonical set:
 
-   - **`FEATURES.md`** — any user-visible change (new route / modal row / form field / enum / limit / action / empty+error state) updates the matching section, including Appendix A for limits and Appendix B for enums.
-   - **`BUGS.md`** — the moment a bug is found (device test, user report, or audit), add a row with the next `BUG-NNN`, severity, status `🔴 Open`, and a full detail block (repro, root cause once known). Fix it; then fill in the fix commit SHA, flip status to `✅ Fixed`, and add the Test column pointer (the automated test or the `MANUAL_TESTS.md` scenario that locks it). A bug is not fixed until this row is complete.
-   - **`MANUAL_TESTS.md`** — every new phase or user-visible feature adds its test scenarios under the matching phase heading. Every `BUGS.md` row should either point at an existing scenario here or add a new one.
-   - **`.claude/plans/<plan>.md`** — the active plan's "what's landed" and "next up" sections get updated as work ships. New multi-commit work gets its own plan file here before coding starts.
-   - **`.claude/plans/automated-testing.md`** — this is the test strategy; new bug clusters or feature contracts get added here as they emerge.
+   - **`PLAN.md`** — master roadmap. Phase tracker statuses, "Current state — handoff notes". When a phase ships, flip the row + add a handoff sub-section.
+   - **`FEATURES.md`** — user-visible surface (routes, modals, forms, enums, limits, integrations). Any user-visible change updates the matching section + Appendix A (limits) + Appendix B (enums).
+   - **`BACKEND.md`** — schema, migrations (with one-line purposes), Edge Functions, shared helpers, RLS policies, auth model. Any new function / migration / shared file gets added here.
+   - **`ARCHITECTURE.md`** — client folder structure, state management patterns, navigation, API + auth layer. Any new client module (api / hooks / lib / components) goes in the folder structure list.
+   - **`SCREENS.md`** — screen-level UX specs. New screen or major UX change adds or updates the matching screen number.
+   - **`USER_FLOW.md`** — end-to-end user journeys. New flow (auth path, account-mgmt action, etc.) adds or updates the matching Flow.
+   - **`BUGS.md`** — bug registry. The moment a bug is found, add a row with the next `BUG-NNN`, severity, status `🔴 Open`, and a full detail block (repro, root cause once known). Fix it; then fill in the fix commit SHA, flip status to `✅ Fixed`, and add the Test column pointer to a `MANUAL_TESTS.md` scenario. A bug is not fixed until this row is complete.
+   - **`MANUAL_TESTS.md`** — phone test scenarios per phase. Every new phase / user-visible feature / `BUGS.md` row points at a scenario here.
+   - **`.claude/plans/<plan>.md`** — the active plan file (this one). Multi-commit work gets its own plan file here before coding starts.
 
-   If any of the above drifts, the automated-test plan breaks and you end up re-running every phone scenario by hand. Don't do that.
+   **Enforcement:** If a commit touches user-visible code, an Edge Function, a migration, or a new client module, the matching doc section MUST be updated in the SAME commit. Don't ship code with a "will update docs later" TODO — it never happens, and the next Claude/human walks into a 10-day drift.
+
+   **`MARKETING_BRIEF.md`** is a separate animal — it's a snapshot for the marketing team, NOT auto-synced with every commit. Treat it as a periodic-review doc: re-check it whenever you ship a feature it claims, or whenever marketing is about to start a new round of screen design. It is allowed to lag the code by a few weeks; the others are not.
+
+   **Never over-promise in `MARKETING_BRIEF.md`** — if a section claims a feature exists, that feature must actually be in the code on the day the brief is shared. The "Don't-promise list" inside the brief is load-bearing; respect it.
 
 ---
 
@@ -96,12 +104,11 @@ The emotional hook: *"Make mom a cookbook for Mother's Day."*
 
 ## Current state
 
-Nothing is built yet. All files are **planning and design documents only**.
-The design prototype lives in `.claude/samples/spoonsketch-design/` — HTML/CSS/JSX files.
-Do not run or screenshot the prototype. Read its source directly for design tokens.
+**Phases 1–7 are shipped; Phase 8 (Telegram bot) ships locally + needs production deploy; Phase 10.5 / 10.8 / 10.9 are in progress.** See the Phase tracker + "Current state — handoff notes" section in `PLAN.md` for the authoritative status.
 
-Phase 1 (Foundation + design system) is the starting point.
-See the Phase tracker in `PLAN.md` for the full 11-phase roadmap.
+Pre-TestFlight launch blockers: Phase 10.7 (onboarding — waiting on marketing screens, see `MARKETING_BRIEF.md`), Apple Sign In external setup (`NEXT_STEPS.md` §3.5), legal/admin compliance items (`PLAN.md` §C).
+
+The design prototype lives in `.claude/samples/spoonsketch-design/` — HTML/CSS/JSX files. Do not run or screenshot the prototype. Read its source directly for design tokens.
 
 ---
 
