@@ -22,6 +22,7 @@ import { PageTemplate } from '../../src/components/canvas/PageTemplates';
 import { PaperPattern } from '../../src/components/canvas/PaperPattern';
 import { TemplatePicker } from '../../src/components/canvas/TemplatePicker';
 import { FontPicker } from '../../src/components/canvas/FontPicker';
+import { CanvasPageZoom } from '../../src/components/canvas/CanvasPageZoom';
 import { useCanvasStore } from '../../src/lib/canvasStore';
 import type { BlockOverride } from '../../src/lib/blockDefs';
 import { getBlockDefs, FONT_SCALE_MIN, FONT_SCALE_MAX } from '../../src/lib/blockDefs';
@@ -35,7 +36,10 @@ import { fonts } from '../../src/theme/fonts';
 type EditorMode = 'stickers' | 'draw' | 'layout';
 
 export default function EditorScreen() {
-  const { recipeId } = useLocalSearchParams<{ recipeId: string }>();
+  const { recipeId, dropSticker } = useLocalSearchParams<{
+    recipeId: string;
+    dropSticker?: string;
+  }>();
   const router = useRouter();
   const { palette } = useThemeStore();
   const insets = useSafeAreaInsets();
@@ -46,6 +50,9 @@ export default function EditorScreen() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [blockEditMode, setBlockEditMode] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  // Editor-only state: page zoom level surfaced for the indicator pill.
+  // Saved snapshots always render at scale=1 — see CanvasPageZoom comments.
+  const [pageZoom, setPageZoom] = useState(1);
 
   const canvasWidth = sw - 48;
   const canvasHeight = Math.round(canvasWidth * 1.4142);
@@ -114,6 +121,19 @@ export default function EditorScreen() {
       initDrawing(recipeId);
     }
   }, [recipeId]);
+
+  // Handoff from Stash → drop one sticker on this recipe and clear the param.
+  // Runs once when the param is present + canvas dimensions are known.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!dropSticker || !recipeId || !canvasWidth || !canvasHeight) return;
+    const x = canvasWidth / 2 + (Math.random() - 0.5) * 80;
+    const y = canvasHeight / 2 + (Math.random() - 0.5) * 80;
+    addSticker(dropSticker, x, y);
+    setEditorMode('stickers');
+    // Strip the param so a re-render or back navigation doesn't drop again.
+    router.setParams({ dropSticker: undefined as never });
+  }, [dropSticker, recipeId, canvasWidth, canvasHeight]);
 
   // Precedence: per-recipe override (recipe_canvases) → cookbook default → fallback.
   // Server is authoritative; runs silently, without pushing a history snapshot.
@@ -278,6 +298,15 @@ export default function EditorScreen() {
         </View>
       </View>
 
+      {/* Zoom indicator — only visible when zoomed in. Tap-anywhere on the
+          page (double-tap empty paper) is the canonical reset, so this is a
+          read-only hint. Sits at top-right just below the topBar. */}
+      {pageZoom > 1.01 && (
+        <View pointerEvents="none" style={[styles.zoomPill, { top: insets.top + 60 }]}>
+          <Text style={styles.zoomPillText}>{Math.round(pageZoom * 100)}%</Text>
+        </View>
+      )}
+
       {/* Canvas area */}
       <ScrollView
         contentContainerStyle={styles.canvasScroll}
@@ -285,6 +314,16 @@ export default function EditorScreen() {
         showsVerticalScrollIndicator={false}
       >
         <GestureDetector gesture={canvasTapGesture}>
+          <CanvasPageZoom
+            width={canvasWidth}
+            height={canvasHeight}
+            // Page zoom only fights with sticker scale when a sticker is
+            // selected — disable page-pinch when something's selected so the
+            // 2-finger gesture goes to the sticker. Also off in draw + block
+            // modes for the same reason.
+            pinchEnabled={selectedId === null && editorMode !== 'draw' && !blockEditMode}
+            onScaleChange={setPageZoom}
+          >
           <View style={[styles.canvas, { width: canvasWidth, height: canvasHeight, backgroundColor: colors.paper }]}>
             {/* Paper pattern — sits under all content */}
             <PaperPattern
@@ -344,6 +383,7 @@ export default function EditorScreen() {
               />
             ))}
           </View>
+          </CanvasPageZoom>
         </GestureDetector>
       </ScrollView>
 
@@ -468,6 +508,21 @@ export default function EditorScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1a1209' },
+  zoomPill: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: 'rgba(59,42,31,0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    zIndex: 10,
+  },
+  zoomPillText: {
+    color: '#faf4e6',
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 11,
+    letterSpacing: 0.4,
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

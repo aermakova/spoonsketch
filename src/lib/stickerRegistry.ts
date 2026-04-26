@@ -58,3 +58,62 @@ export function getFreeStickers(): StickerDef[] {
 export function getStickersByPack(packId: string): StickerDef[] {
   return STICKER_PACKS.find(p => p.id === packId)?.stickers ?? [];
 }
+
+// ─── Pack metadata (always present, regardless of whether PNGs are committed) ───
+//
+// Lives separately from STICKER_PACKS so the Stash page can render all 4 packs
+// even before the premium PNGs are generated. As soon as the assets land + the
+// matching arrays are added to STICKER_PACKS above, getStickersByPack() will
+// return real stickers and the cards light up.
+
+export interface PackMetadata {
+  id: string;
+  name: string;
+  isPremium: boolean;
+  // Expected total when fully populated. Used in pack-card footer.
+  stickerCount: number;
+  // 4 representative sticker IDs used as preview thumbnails on the pack card.
+  // Each ID renders only if its PNG is in the registry (Sticker handles
+  // missing sources gracefully — returns null).
+  previewIds: readonly string[];
+  description: string;
+}
+
+export const PACK_METADATA: readonly PackMetadata[] = [
+  {
+    id: 'core',
+    name: 'Essentials',
+    isPremium: false,
+    stickerCount: 16,
+    previewIds: ['tomato', 'lemon', 'wheat', 'heart'],
+    description: 'The kitchen basics — fruits, herbs, and your everyday tools.',
+  },
+  {
+    id: 'baking',
+    name: 'Baking',
+    isPremium: true,
+    stickerCount: 20,
+    previewIds: ['rolling-pin', 'cupcake', 'croissant', 'cookie'],
+    description: 'Pastry, dough, and sweet finishes for cakes, cookies, and bread.',
+  },
+  {
+    id: 'herbs',
+    name: 'Herbs & Garnish',
+    isPremium: true,
+    stickerCount: 20,
+    previewIds: ['rosemary', 'mint', 'lime', 'chili-pepper'],
+    description: 'Fresh herbs, citrus, and seasonings to garnish any plate.',
+  },
+  {
+    id: 'holiday',
+    name: 'Holiday & Seasonal',
+    isPremium: true,
+    stickerCount: 20,
+    previewIds: ['pumpkin', 'gingerbread-man', 'snowflake', 'wreath'],
+    description: "For Mother's Day, Christmas, Easter, birthdays, and the rest.",
+  },
+];
+
+export function getPackMetadata(id: string): PackMetadata | null {
+  return PACK_METADATA.find(p => p.id === id) ?? null;
+}

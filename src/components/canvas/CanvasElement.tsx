@@ -6,6 +6,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Sticker } from '../stickers/Sticker';
 import type { CanvasEl } from '../../lib/canvasStore';
+import { STICKER_MIN_SCALE, STICKER_MAX_SCALE } from '../../lib/canvasStore';
 
 const SIZE = 64;
 const HANDLE = 22;
@@ -76,7 +77,9 @@ export function CanvasElement({ el, selected, disabled = false, onSelect, onUpda
 
     const pinch = Gesture.Pinch()
       .onStart(() => { savedSc.value = sc.value; })
-      .onChange(e => { sc.value = Math.max(0.3, Math.min(4, savedSc.value * e.scale)); })
+      .onChange(e => {
+        sc.value = Math.max(STICKER_MIN_SCALE, Math.min(STICKER_MAX_SCALE, savedSc.value * e.scale));
+      })
       .onEnd(() => { runOnJS(stableUpdate)({ scale: sc.value }); });
 
     const tap = Gesture.Tap().onEnd(() => runOnJS(stableSelect)());
@@ -103,7 +106,7 @@ export function CanvasElement({ el, selected, disabled = false, onSelect, onUpda
       .onStart(() => { savedSc.value = sc.value; })
       .onChange(e => {
         const delta = (e.translationX + e.translationY) * 0.008;
-        sc.value = Math.max(0.3, Math.min(4, savedSc.value * (1 + delta)));
+        sc.value = Math.max(STICKER_MIN_SCALE, Math.min(STICKER_MAX_SCALE, savedSc.value * (1 + delta)));
       })
       .onEnd(() => { runOnJS(stableUpdate)({ scale: sc.value }); }),
   []);

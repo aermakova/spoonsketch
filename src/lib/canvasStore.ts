@@ -15,6 +15,19 @@ export interface CanvasEl {
   zIndex: number;
 }
 
+// Sticker scale bounds. The MAX is set so that 512px source PNGs stay crisp
+// when printed at Lulu's 300 DPI (covers ~1.7" sticker on the page). Future
+// element types (Phase 8.5C photos / watercolor recipe images) will define
+// their own higher caps because they ship at 1024px native — those don't
+// share this constant.
+export const STICKER_MIN_SCALE = 0.3;
+export const STICKER_MAX_SCALE = 3.0;
+
+export function clampStickerScale(s: number): number {
+  if (!Number.isFinite(s)) return 1;
+  return Math.max(STICKER_MIN_SCALE, Math.min(STICKER_MAX_SCALE, s));
+}
+
 export type TemplateKey = 'classic' | 'photo-hero' | 'minimal' | 'two-column' | 'journal' | 'recipe-card';
 export type FontPresetKey = 'caveat' | 'marck' | 'bad-script' | 'amatic';
 
@@ -258,8 +271,13 @@ export const useCanvasStore = create<CanvasState>()(
 
         updateEl(id, patch) {
           pushSnap();
+          // Clamp scale at the store boundary so callers can't exceed the
+          // print-quality cap (gestures clamp visually too — this is defense
+          // in depth in case a future code path skips the gesture).
+          const clamped: Partial<CanvasEl> =
+            patch.scale !== undefined ? { ...patch, scale: clampStickerScale(patch.scale) } : patch;
           set(s => {
-            const elements = s.elements.map(el => el.id === id ? { ...el, ...patch } : el);
+            const elements = s.elements.map(el => el.id === id ? { ...el, ...clamped } : el);
             return {
               elements,
               recipeStates: commitRecipeState(s.recipeStates, s.recipeId, { elements }),

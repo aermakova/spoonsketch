@@ -178,3 +178,39 @@ export async function exportUserData(): Promise<Record<string, unknown>> {
   }
   return data as Record<string, unknown>;
 }
+
+export type UserTier = 'free' | 'premium';
+
+/**
+ * Reads the current user's tier from the public.users row. RLS allows the
+ * user to read their own row only, so this is safe to call from the client.
+ * Returns 'free' on any error or missing row — fail-safe default keeps
+ * premium gating closed when the network is sketchy.
+ */
+export async function fetchUserTier(userId: string): Promise<UserTier> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('tier')
+    .eq('id', userId)
+    .single<{ tier: UserTier }>();
+  if (error || !data) return 'free';
+  return data.tier === 'premium' ? 'premium' : 'free';
+}
+
+/**
+ * Initiates an email-address change. Supabase sends a confirmation email
+ * to the NEW address — the change isn't applied to `auth.users` until the
+ * user clicks the link in that email. The session keeps the old email
+ * until then.
+ *
+ * Throws ApiError on any failure (invalid email format, address already in
+ * use by another account, network).
+ */
+export async function changeEmail(newEmail: string): Promise<void> {
+  const trimmed = newEmail.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(trimmed)) {
+    throw new ApiError('That doesn\'t look like a valid email.', 'invalid_email');
+  }
+  const { error } = await supabase.auth.updateUser({ email: trimmed });
+  if (error) throw new ApiError(error.message, error.code ?? 'email_change_failed');
+}

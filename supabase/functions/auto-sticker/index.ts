@@ -5,18 +5,49 @@ import {
   checkQuotaAllowed,
   checkRateLimit,
   getQuota,
+  getUserTier,
+  type Tier,
 } from '../_shared/tier.ts';
 import { anthropic, HAIKU_MODEL, logAiJob } from '../_shared/ai.ts';
 import { requireAiConsent } from '../_shared/consent.ts';
 
-const VALID_STICKER_KEYS = [
+// MUST stay in sync with src/lib/stickerRegistry.ts on the client. Adding a
+// sticker means: (1) drop the PNG into assets/stickers/<pack>/<id>.png,
+// (2) add the entry to stickerRegistry.ts, (3) add the key here, (4) add a
+// keyword line to the matching guidance block.
+const FREE_STICKER_KEYS = [
   'tomato', 'lemon', 'garlic', 'basil', 'whisk', 'spoon',
   'pan', 'wheat', 'strawberry', 'flower', 'leaf', 'heart',
   'star', 'mushroom', 'bread', 'cherry',
 ] as const;
-type StickerKey = typeof VALID_STICKER_KEYS[number];
+type FreeStickerKey = typeof FREE_STICKER_KEYS[number];
 
-const STICKER_AI_GUIDANCE = `
+const PREMIUM_STICKER_KEYS = [
+  // Baking pack
+  'rolling-pin', 'stand-mixer', 'oven-mitt', 'flour-bag', 'sugar', 'butter',
+  'egg', 'dough-ball', 'yeast-jar', 'vanilla-pod', 'chocolate-chip', 'cake-slice',
+  'croissant', 'cupcake', 'muffin', 'donut', 'pretzel', 'scone', 'cookie', 'pie-slice',
+  // Herbs & garnish pack
+  'rosemary', 'thyme', 'sage-leaf', 'mint', 'parsley', 'dill', 'oregano',
+  'chives', 'cilantro', 'cinnamon-stick', 'peppercorn', 'salt-shaker',
+  'pepper-mill', 'lime', 'orange-slice', 'lavender', 'fennel', 'ginger-root',
+  'chili-pepper', 'vanilla-bean',
+  // Holiday pack
+  'pumpkin', 'gingerbread-man', 'candy-cane', 'snowflake', 'holly-sprig',
+  'pinecone', 'roast-turkey', 'christmas-tree', 'easter-egg', 'heart-balloon',
+  'birthday-candle', 'ribbon-bow', 'gift-box', 'champagne-flute', 'party-hat',
+  'autumn-leaf', 'acorn', 'snowman', 'wreath', 'sparkler',
+] as const;
+type PremiumStickerKey = typeof PREMIUM_STICKER_KEYS[number];
+
+type StickerKey = FreeStickerKey | PremiumStickerKey;
+
+const ALL_STICKER_KEYS: readonly string[] = [
+  ...FREE_STICKER_KEYS,
+  ...PREMIUM_STICKER_KEYS,
+];
+
+const FREE_GUIDANCE = `
 Built-in sticker catalogue and typical matches:
 - tomato: tomato, pasta, sauce, pizza, marinara, bruschetta
 - lemon: lemon, citrus, lime, curd, sorbet, dressing
@@ -36,14 +67,111 @@ Built-in sticker catalogue and typical matches:
 - cherry: cherry, berry, clafoutis, pie, dessert
 `;
 
-const AUTO_STICKER_SYSTEM_PROMPT = `You are a scrapbook sticker picker. Given a recipe's title, description, ingredients, and tags, pick 3 to 5 stickers from the exact catalogue below that best decorate the page.
+const PREMIUM_GUIDANCE = `
+Built-in sticker catalogue and typical matches.
 
-${STICKER_AI_GUIDANCE}
+ESSENTIALS pack:
+- tomato: tomato, pasta, sauce, pizza, marinara, bruschetta
+- lemon: lemon, citrus, lime, curd, sorbet, dressing
+- garlic: garlic, aioli, roast, mediterranean, italian
+- basil: basil, pesto, italian, caprese, herb
+- whisk: cake, baking, eggs, custard, meringue, batter
+- spoon: soup, stew, porridge, sauce, risotto
+- pan: fry, sauté, stir-fry, pancake, omelette
+- wheat: bread, pasta, flour, pizza, baking, grain
+- strawberry: strawberry, berry, jam, smoothie, dessert
+- flower: floral, lavender, elderflower, rose, chamomile
+- leaf: salad, green, herb, vegetarian, vegan, fresh
+- heart: favourite, love, family, special, grandma
+- star: special, celebration, birthday, christmas, festive
+- mushroom: mushroom, umami, risotto, forager, fungi
+- bread: bread, sourdough, toast, sandwich, bake
+- cherry: cherry, berry, clafoutis, pie, dessert
+
+BAKING pack:
+- rolling-pin: pastry, dough, pie, scones, baking
+- stand-mixer: cake, batter, frosting, dough, baking
+- oven-mitt: roast, baking, oven, hot
+- flour-bag: bread, pizza, pastry, baking, flour
+- sugar: dessert, baking, cookies, sweet
+- butter: pastry, baking, croissant, cookies, sauté
+- egg: omelette, frittata, baking, breakfast, custard
+- dough-ball: pizza, bread, pasta, fresh dough
+- yeast-jar: bread, fermented, sourdough, brew
+- vanilla-pod: dessert, ice cream, custard, vanilla
+- chocolate-chip: chocolate, cookie, cake, dessert
+- cake-slice: cake, dessert, birthday, celebration
+- croissant: pastry, breakfast, french, brunch
+- cupcake: cupcake, party, dessert, frosting
+- muffin: muffin, breakfast, blueberry, brunch
+- donut: donut, fried, glaze, sweet, brunch
+- pretzel: pretzel, salty, snack, baked, beer
+- scone: scone, tea, brunch, british, dried fruit
+- cookie: cookie, biscuit, dessert, baked, snack
+- pie-slice: pie, tart, dessert, fruit pie
+
+HERBS pack:
+- rosemary: roast, chicken, lamb, herb, mediterranean
+- thyme: thyme, herb, roast, mediterranean, stuffing
+- sage-leaf: sage, brown butter, pasta, stuffing, herb
+- mint: mint, mojito, lamb, salad, dessert
+- parsley: parsley, garnish, herb, italian
+- dill: dill, fish, salmon, pickle, ukrainian
+- oregano: oregano, italian, pizza, mediterranean, greek
+- chives: chives, potato, onion, herb, garnish
+- cilantro: cilantro, mexican, asian, salsa, herb
+- cinnamon-stick: cinnamon, mulled, autumn, spice, dessert
+- peppercorn: pepper, spice, savoury, seasoning
+- salt-shaker: salt, seasoning, savoury, kitchen basic
+- pepper-mill: pepper, spice, seasoning, kitchen basic
+- lime: lime, citrus, mexican, mojito, asian
+- orange-slice: orange, citrus, dessert, salad
+- lavender: lavender, floral, herbal, dessert, tea
+- fennel: fennel, italian, mediterranean, salad, anise
+- ginger-root: ginger, asian, spice, immune, tea
+- chili-pepper: chili, spicy, mexican, asian, hot
+- vanilla-bean: vanilla, dessert, ice cream, custard
+
+HOLIDAY pack:
+- pumpkin: pumpkin, autumn, halloween, thanksgiving, pie
+- gingerbread-man: gingerbread, christmas, holiday, cookie
+- candy-cane: candy cane, christmas, peppermint, holiday
+- snowflake: snowflake, winter, christmas, holiday
+- holly-sprig: holly, christmas, holiday, decorative
+- pinecone: pinecone, autumn, winter, festive
+- roast-turkey: turkey, thanksgiving, christmas, roast, holiday
+- christmas-tree: christmas, holiday, festive, tree
+- easter-egg: easter, spring, holiday, decorated egg
+- heart-balloon: valentine, love, anniversary, romantic
+- birthday-candle: birthday, celebration, party, candle
+- ribbon-bow: gift, present, ribbon, decorative
+- gift-box: gift, present, holiday, celebration
+- champagne-flute: champagne, new year, celebration, party
+- party-hat: party, birthday, celebration, festive
+- autumn-leaf: autumn, fall, thanksgiving, seasonal
+- acorn: autumn, fall, woodland, seasonal
+- snowman: winter, christmas, snow, holiday
+- wreath: christmas, holiday, decorative, festive
+- sparkler: new year, celebration, party, festive
+`;
+
+function buildSystemPrompt(guidance: string): string {
+  return `You are a scrapbook sticker picker. Given a recipe's title, description, ingredients, and tags, pick 3 to 5 stickers from the exact catalogue below that best decorate the page.
+
+${guidance}
 
 Rules:
 - Pick only from that catalogue — never invent sticker names.
 - Prefer variety. Don't pick 3 produce stickers for a produce dish; mix in a tool (whisk, spoon, pan) or a mood (heart, star, flower).
 - Return JSON only — no prose, no markdown fences — with this exact shape: [{ "sticker_key": "...", "reasoning": "short phrase" }]. Between 3 and 5 entries.`;
+}
+
+const SYSTEM_PROMPT_FREE = buildSystemPrompt(FREE_GUIDANCE);
+const SYSTEM_PROMPT_PREMIUM = buildSystemPrompt(PREMIUM_GUIDANCE);
+
+function allowedKeysForTier(tier: Tier): readonly string[] {
+  return tier === 'premium' ? ALL_STICKER_KEYS : FREE_STICKER_KEYS;
+}
 
 const MAX_STICKERS = 5;
 const MIN_STICKERS = 3;
@@ -104,6 +232,12 @@ Deno.serve(async (req) => {
     return jsonError(422, 'recipe_empty', 'Nothing to match on yet — add a title or ingredients first.');
   }
 
+  // Tier-aware prompt: free users only see Essentials suggestions so what
+  // the AI suggests matches what they can actually use in their canvas.
+  const tier = await getUserTier(ctx.supabaseAdmin, ctx.userId);
+  const systemPrompt = tier === 'premium' ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE;
+  const allowedKeys = allowedKeysForTier(tier);
+
   let haikuResponse;
   try {
     haikuResponse = await anthropic.messages.create({
@@ -113,7 +247,7 @@ Deno.serve(async (req) => {
       system: [
         {
           type: 'text',
-          text: AUTO_STICKER_SYSTEM_PROMPT,
+          text: systemPrompt,
           cache_control: { type: 'ephemeral' },
         },
       ],
@@ -138,7 +272,7 @@ Deno.serve(async (req) => {
     (haikuResponse.usage?.input_tokens ?? 0) +
     (haikuResponse.usage?.output_tokens ?? 0);
 
-  const picks = parseStickerPicks(rawText);
+  const picks = parseStickerPicks(rawText, allowedKeys);
   if (!picks.length) {
     await logAiJob({
       supabaseAdmin: ctx.supabaseAdmin,
@@ -209,7 +343,7 @@ interface Pick {
   reasoning: string;
 }
 
-function parseStickerPicks(raw: string): Pick[] {
+function parseStickerPicks(raw: string, allowedKeys: readonly string[]): Pick[] {
   let trimmed = raw.trim();
   if (trimmed.startsWith('```')) {
     trimmed = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
@@ -237,7 +371,9 @@ function parseStickerPicks(raw: string): Pick[] {
     const reasoning = (entry as { reasoning?: unknown }).reasoning;
     if (typeof key !== 'string') continue;
     const normalized = key.toLowerCase().trim();
-    if (!(VALID_STICKER_KEYS as readonly string[]).includes(normalized)) continue;
+    // Defense in depth: even if Haiku hallucinates a premium key into a free
+    // user's response, the tier-appropriate allowed-set drops it silently.
+    if (!allowedKeys.includes(normalized)) continue;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
     picks.push({

@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { useThemeStore } from '../../src/lib/store';
 import { fonts } from '../../src/theme/fonts';
@@ -9,12 +10,20 @@ import { useRecipesRealtime } from '../../src/hooks/useRecipesRealtime';
 
 const TAB_BAR_HEIGHT = 64;
 
-function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focused: boolean }) {
+function TabIcon({
+  icon,
+  label,
+  focused,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  focused: boolean;
+}) {
   const { palette } = useThemeStore();
   const active = focused ? palette.accent : colors.inkFaint;
   return (
     <View style={[styles.tabItem, { minWidth: 70 }]}>
-      <Text style={[styles.tabEmoji, { opacity: focused ? 1 : 0.55 }]}>{emoji}</Text>
+      <Feather name={icon} size={20} color={active} />
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -79,13 +88,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="Home" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="home" label="Home" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="shelves"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📚" label="Shelves" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="book-open" label="Shelves" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -95,15 +104,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="elements"
+        name="stash"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="✦" label="Elements" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="grid" label="Stash" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="me"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Me" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="user" label="Me" focused={focused} />,
         }}
       />
     </Tabs>
@@ -115,10 +124,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
-  },
-  tabEmoji: {
-    fontSize: 22,
-    lineHeight: 26,
   },
   tabLabel: {
     fontFamily: fonts.bodyMedium,
