@@ -22,6 +22,11 @@ import { colors } from '../src/theme/colors';
 import { useAuth } from '../src/hooks/useAuth';
 import { TrackingConsentBanner } from '../src/components/TrackingConsentBanner';
 import { isOnboardingComplete } from '../src/lib/onboardingFlag';
+import { ensureI18n } from '../src/i18n';
+
+// Bootstrap i18next once per app launch. Idempotent — safe to call from
+// module top-level so the very first render already has translations.
+ensureI18n();
 
 const queryClient = new QueryClient({
   defaultOptions: {

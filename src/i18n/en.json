@@ -1,0 +1,64 @@
+{
+  "tabs": {
+    "home": "Home",
+    "shelves": "Shelves",
+    "stash": "Stash",
+    "me": "Me"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "next": "Next",
+    "done": "Done",
+    "delete": "Delete",
+    "loading": "Loading…",
+    "back": "Back"
+  },
+  "onboarding": {
+    "splash": {
+      "title": "Make a cookbook someone will keep forever",
+      "body": "Turn family recipes, favourite dinners, and kitchen memories into a beautiful book — made by you.",
+      "cta": "Let's make one",
+      "signin": "I already have an account"
+    },
+    "import": {
+      "title": "Bring your recipes in",
+      "body": "Paste a link, snap a photo, upload a file, or type your own."
+    },
+    "sketch": {
+      "title": "Beautiful with one tap",
+      "body": "Hit \"Make me Sketch\" and your plain recipe becomes a scrapbook page."
+    },
+    "dedication": {
+      "title": "Add the note they'll read first",
+      "body": "Write a dedication, drop in a photo, and make it personal — in your own handwriting."
+    },
+    "book": {
+      "title": "A real book, in their hands",
+      "body": "Choose hardcover or softcover, type their address, and we'll do the rest.",
+      "hardcover": "Hardcover",
+      "softcover": "Softcover",
+      "cta": "Get started"
+    }
+  },
+  "cook": {
+    "step": "Step",
+    "next_step": "Done · next step →",
+    "finished": "Finished! 🎉",
+    "previous": "Previous",
+    "stop_title": "Stop cooking?",
+    "stop_body": "You're partway through. Your place won't be saved.",
+    "keep_cooking": "Keep cooking",
+    "stop": "Stop",
+    "tip": "Tip"
+  },
+  "stash": {
+    "title": "Your stash",
+    "subtitle": "Stickers, photos, and the things you come back to.",
+    "section_packs": "Sticker packs",
+    "section_favorites": "Your favorites",
+    "section_photos": "Your photos",
+    "favorites_empty": "Heart a sticker in the editor to save it here.",
+    "photos_empty": "Photos you upload to a recipe land here. Coming with the next update."
+  }
+}

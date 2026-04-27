@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { useThemeStore } from '../../src/lib/store';
 import { fonts } from '../../src/theme/fonts';
@@ -57,6 +58,7 @@ function FABButton() {
 export default function TabLayout() {
   const { palette } = useThemeStore();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const tabBarHeight = TAB_BAR_HEIGHT + (Platform.OS === 'ios' ? insets.bottom : 0);
 
   // Subscribe to live `recipes` changes for the signed-in user — when the
@@ -88,13 +90,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="home" label="Home" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="home" label={t('tabs.home')} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="shelves"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="book-open" label="Shelves" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="book-open" label={t('tabs.shelves')} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -106,13 +108,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stash"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="grid" label="Stash" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="grid" label={t('tabs.stash')} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="me"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="user" label="Me" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="user" label={t('tabs.me')} focused={focused} />,
         }}
       />
     </Tabs>
