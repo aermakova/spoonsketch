@@ -46,6 +46,69 @@ export async function signUp(
   if (error) throw new ApiError(error.message, error.code);
 }
 
+/**
+ * Sends a one-time-password (magic link) email. Supabase emails the user a
+ * link that, when tapped, deep-links into `spoonsketch://auth/callback`
+ * with the session token in the URL. The deep-link listener in
+ * app/_layout.tsx consumes the URL and the auth state listener picks up the
+ * new session.
+ *
+ * Required Supabase config: the redirect URL `spoonsketch://auth/callback`
+ * must be allowed in the Supabase Dashboard under Authentication → URL
+ * Configuration → Redirect URLs.
+ */
+export async function sendMagicLink(email: string): Promise<void> {
+  const trimmed = email.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(trimmed)) {
+    throw new ApiError("That doesn't look like a valid email.", 'invalid_email');
+  }
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    options: {
+      emailRedirectTo: 'spoonsketch://auth/callback',
+      // shouldCreateUser:false would block sign-up via magic link; we want
+      // sign-in OR sign-up (the user has agreed to consents at sign-up time
+      // either via password form or via Apple flow already, so OTP-only
+      // signups carry the same default consent state as Apple).
+      shouldCreateUser: true,
+    },
+  });
+  if (error) throw new ApiError(error.message, error.code ?? 'magic_link_failed');
+}
+
+/**
+ * Sends a password-reset email. Tapping the link deep-links into
+ * `spoonsketch://auth/reset`; the deep-link listener routes to the
+ * `/(auth)/reset-password` screen with a recovery session pre-loaded by
+ * Supabase, so the screen can call `updatePassword(newPassword)`.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const trimmed = email.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(trimmed)) {
+    throw new ApiError("That doesn't look like a valid email.", 'invalid_email');
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+    redirectTo: 'spoonsketch://auth/reset',
+  });
+  if (error) throw new ApiError(error.message, error.code ?? 'reset_request_failed');
+}
+
+/**
+ * Sets a new password for the currently-authenticated user. Used by the
+ * reset-password screen after the user taps the link in their inbox AND by
+ * any future "change password" surface in Me tab.
+ *
+ * The session must already be in the recovery state (Supabase moves the
+ * user there automatically when they consume the reset link).
+ */
+export async function updatePassword(newPassword: string): Promise<void> {
+  if (newPassword.length < 6) {
+    throw new ApiError('Password must be at least 6 characters.', 'password_too_short');
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new ApiError(error.message, error.code ?? 'password_update_failed');
+}
+
 export async function signIn(email: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new ApiError(error.message, error.code);

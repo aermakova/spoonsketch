@@ -7,7 +7,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { ClayButton } from '../../src/components/ui/ClayButton';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
 import { Sticker } from '../../src/components/stickers/Sticker';
-import { signIn, signInWithApple, signUp, ApiError } from '../../src/api/auth';
+import { signIn, signInWithApple, signUp, sendMagicLink, requestPasswordReset, ApiError } from '../../src/api/auth';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
@@ -83,6 +83,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [magicLoading, setMagicLoading] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   // Granular consents — required for Ukraine + EU sign-up. ToS+PP is the
@@ -100,6 +103,41 @@ export default function LoginScreen() {
       .then(setAppleAvailable)
       .catch(() => setAppleAvailable(false));
   }, []);
+
+  async function handleMagicLink() {
+    if (!email.trim() || magicLoading) return;
+    setMagicLoading(true);
+    try {
+      await sendMagicLink(email.trim().toLowerCase());
+      setMagicSent(true);
+      // Inline state ("Check your inbox") is the success surface — no Alert
+      // so the user can immediately tap Resend or switch to a different email.
+    } catch (e: any) {
+      Alert.alert('Magic link error', e?.message ?? 'Please try again.');
+    } finally {
+      setMagicLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert('Enter your email', 'Type the email on this account, then tap "Forgot password?" again.');
+      return;
+    }
+    if (resetLoading) return;
+    setResetLoading(true);
+    try {
+      await requestPasswordReset(email.trim().toLowerCase());
+      Alert.alert(
+        'Check your inbox',
+        `We sent a password-reset link to ${email.trim().toLowerCase()}. Tap it to set a new password.`,
+      );
+    } catch (e: any) {
+      Alert.alert('Reset request failed', e?.message ?? 'Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  }
 
   async function handleAppleSignIn() {
     setAppleLoading(true);
@@ -274,6 +312,45 @@ export default function LoginScreen() {
             style={styles.button}
           />
 
+          {/* Magic-link + Forgot password — only on Sign in. Skips the
+              password field entirely; the user clicks a link in their email. */}
+          {mode === 'signin' ? (
+            magicSent ? (
+              <View style={styles.magicNotice}>
+                <Text style={styles.magicNoticeTitle}>Check your inbox</Text>
+                <Text style={styles.magicNoticeBody}>
+                  We sent a sign-in link to <Text style={styles.magicNoticeEmail}>{email}</Text>.
+                  Tap it to come back here signed in.
+                </Text>
+                <TouchableOpacity onPress={handleMagicLink} disabled={magicLoading} hitSlop={6}>
+                  <Text style={styles.magicResend}>
+                    {magicLoading ? 'Sending…' : 'Resend'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <ClayButton
+                  label={magicLoading ? 'Sending…' : 'Send me a magic link'}
+                  variant="secondary"
+                  onPress={handleMagicLink}
+                  loading={magicLoading}
+                  disabled={!email.trim() || magicLoading || loading}
+                  style={styles.magicBtn}
+                />
+                <TouchableOpacity
+                  onPress={handleForgotPassword}
+                  disabled={resetLoading}
+                  hitSlop={6}
+                >
+                  <Text style={styles.forgotLink}>
+                    {resetLoading ? 'Sending reset link…' : 'Forgot password?'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )
+          ) : null}
+
           {appleAvailable ? (
             <>
               <View style={styles.divider}>
@@ -406,5 +483,47 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     color: colors.terracotta,
     textDecorationLine: 'underline',
+  },
+  magicBtn: {
+    marginTop: 10,
+  },
+  forgotLink: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  magicNotice: {
+    marginTop: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: colors.paperSoft,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  magicNoticeTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  magicNoticeBody: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  magicNoticeEmail: {
+    fontFamily: fonts.bodyMedium,
+    color: colors.ink,
+  },
+  magicResend: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.terracotta,
+    alignSelf: 'flex-start',
   },
 });

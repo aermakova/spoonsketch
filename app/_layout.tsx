@@ -23,10 +23,16 @@ import { useAuth } from '../src/hooks/useAuth';
 import { TrackingConsentBanner } from '../src/components/TrackingConsentBanner';
 import { isOnboardingComplete } from '../src/lib/onboardingFlag';
 import { ensureI18n } from '../src/i18n';
+import { useAuthDeepLink } from '../src/hooks/useAuthDeepLink';
+import { ensureSentry } from '../src/lib/sentry';
 
 // Bootstrap i18next once per app launch. Idempotent — safe to call from
 // module top-level so the very first render already has translations.
 ensureI18n();
+
+// Bootstrap Sentry. No-op without DSN env var, gated by user consent.
+// Safe to call before consent — it'll re-check internally and skip.
+ensureSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +48,11 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate() {
+  // Listen for incoming spoonsketch:// auth links the moment the gate mounts —
+  // a magic-link tap or password-reset link from the user's email lands here
+  // and either signs them in or routes to the reset screen.
+  useAuthDeepLink();
+
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
