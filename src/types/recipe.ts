@@ -20,7 +20,15 @@ export interface Recipe {
   title: string;
   description: string | null;
   source_url: string | null;
-  source_type: 'manual' | 'url_import' | 'screenshot_import' | 'telegram_link' | 'telegram_screenshot';
+  source_type:
+    | 'manual'
+    | 'url_import'
+    | 'screenshot_import'
+    | 'pdf_import'
+    | 'text_import'
+    | 'json_import'
+    | 'telegram_link'
+    | 'telegram_screenshot';
   cover_image_url: string | null;
   ingredients: Ingredient[];
   instructions: Instruction[];

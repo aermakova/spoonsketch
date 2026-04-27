@@ -8,6 +8,7 @@ import { ClayButton } from '../../src/components/ui/ClayButton';
 import { PaperGrain } from '../../src/components/ui/PaperGrain';
 import { Sticker } from '../../src/components/stickers/Sticker';
 import { signIn, signInWithApple, signUp, sendMagicLink, requestPasswordReset, ApiError } from '../../src/api/auth';
+import { track } from '../../src/lib/analytics';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
@@ -110,8 +111,10 @@ export default function LoginScreen() {
     try {
       await sendMagicLink(email.trim().toLowerCase());
       setMagicSent(true);
-      // Inline state ("Check your inbox") is the success surface — no Alert
-      // so the user can immediately tap Resend or switch to a different email.
+      // We track on send (not on link-click consumption) since the link-click
+      // happens in a separate process and useAuthDeepLink fires login_completed
+      // there. Send-event tracks intent regardless of whether the user
+      // actually completes the round-trip.
     } catch (e: any) {
       Alert.alert('Magic link error', e?.message ?? 'Please try again.');
     } finally {
@@ -128,6 +131,7 @@ export default function LoginScreen() {
     setResetLoading(true);
     try {
       await requestPasswordReset(email.trim().toLowerCase());
+      track('password_reset_requested');
       Alert.alert(
         'Check your inbox',
         `We sent a password-reset link to ${email.trim().toLowerCase()}. Tap it to set a new password.`,
@@ -143,6 +147,10 @@ export default function LoginScreen() {
     setAppleLoading(true);
     try {
       await signInWithApple();
+      // Apple is sign-in OR sign-up depending on whether the Apple ID has
+      // logged in before. Treating it as login_completed here covers both —
+      // the user reached the home screen either way.
+      track('login_completed', { method: 'apple', returning: true });
       // Auth state change listener (set up in app/_layout.tsx) takes
       // it from here — no manual nav.
     } catch (e: any) {
@@ -168,6 +176,10 @@ export default function LoginScreen() {
     try {
       if (mode === 'signin') {
         await signIn(email.trim().toLowerCase(), password);
+        // returning:true is the safe default — first-time sign-in via this
+        // path is rare since signup auto-routes back here; the event is
+        // primarily a returning-user marker.
+        track('login_completed', { method: 'password', returning: true });
       } else {
         if (!consentTos) {
           Alert.alert('Required', 'Please agree to the Terms and Privacy Policy to create an account.');
@@ -178,6 +190,7 @@ export default function LoginScreen() {
           print: consentPrint,
           marketing: consentMarketing,
         });
+        track('signup_completed', { method: 'password' });
         Alert.alert('Account created!', 'Check your email to confirm your account, then sign in.');
         setMode('signin');
         setPassword('');

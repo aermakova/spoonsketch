@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchRecipe } from '../../src/api/recipes';
 import { fetchCookbook } from '../../src/api/cookbooks';
 import { fetchRecipeCanvas, upsertRecipeCanvas } from '../../src/api/recipeCanvases';
+import { track } from '../../src/lib/analytics';
 import { CanvasElement } from '../../src/components/canvas/CanvasElement';
 import { StickerTray } from '../../src/components/canvas/StickerTray';
 import { MakeMeSketchButton } from '../../src/components/canvas/MakeMeSketchButton';
@@ -170,6 +171,10 @@ export default function EditorScreen() {
   }, [setScrollEnabled, select]);
 
   function goBack() {
+    // Fire canvas_saved on session end. Canvas/drawing state is already
+    // persisted to MMKV continuously — this event marks "user finished a
+    // decorating session" with the final element count for funnel analysis.
+    track('canvas_saved', { element_count: elements.length });
     if (router.canGoBack()) {
       router.back();
     } else {

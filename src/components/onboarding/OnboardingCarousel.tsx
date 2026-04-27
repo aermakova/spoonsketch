@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { colors } from '../../theme/colors';
 import { markOnboardingComplete } from '../../lib/onboardingFlag';
+import { track } from '../../lib/analytics';
 import { SplashScreen } from './SplashScreen';
 import { ImportScreen } from './ImportScreen';
 import { SketchScreen } from './SketchScreen';
@@ -30,6 +31,13 @@ export function OnboardingCarousel() {
   const [pageIdx, setPageIdx] = useState(0);
   const router = useRouter();
 
+  // Fire onboarding_started once on mount. This screen is only rendered
+  // when the MMKV flag is false, so this corresponds to "first-launch
+  // session reached the carousel".
+  useEffect(() => {
+    track('onboarding_started');
+  }, []);
+
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
     if (idx !== pageIdx) setPageIdx(idx);
@@ -49,6 +57,7 @@ export function OnboardingCarousel() {
   }, [router]);
 
   const finish = useCallback(async () => {
+    track('onboarding_completed', {});
     await markOnboardingComplete();
     router.replace('/(auth)/login');
   }, [router]);

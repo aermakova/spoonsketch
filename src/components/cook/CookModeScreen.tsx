@@ -7,7 +7,7 @@
 // Closing mid-cook (✕ tap or hardware back) prompts a confirm so the user
 // doesn't lose their place by accident. Background/foreground transitions
 // preserve currentStep silently (in-process state — no persistence needed).
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRecipe } from '../../api/recipes';
 import { fetchCookbook } from '../../api/cookbooks';
+import { track } from '../../lib/analytics';
 import { ClayButton } from '../ui/ClayButton';
 import { useThemeStore } from '../../lib/store';
 import {
@@ -56,6 +57,18 @@ export function CookModeScreen({ recipeId }: Props) {
     queryFn: () => fetchRecipe(recipeId),
     enabled: !!recipeId,
   });
+
+  // Fire start event once when the recipe + steps are loaded. Putting it in
+  // an effect (vs at component mount) ensures we have a real step_count and
+  // skips zero-step recipes which abort the screen.
+  useEffect(() => {
+    if (recipe && recipe.instructions.length > 0) {
+      track('cook_session_started', {
+        recipe_id: recipe.id,
+        step_count: recipe.instructions.length,
+      });
+    }
+  }, [recipe?.id, recipe?.instructions.length]);
 
   const { data: cookbook } = useQuery({
     queryKey: ['cookbook', recipe?.cookbook_id],
@@ -130,6 +143,9 @@ export function CookModeScreen({ recipeId }: Props) {
 
   const advance = () => {
     if (isLast) {
+      // Last step → finished. Fire completion event before closing so the
+      // recipe id + step count is captured exactly once per cook session.
+      track('cook_session_completed', { recipe_id: recipe.id, step_count: total });
       close(true);
       return;
     }

@@ -12,10 +12,30 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { createRecipe } from '../../api/recipes';
+import { track, type AnalyticsEventMap } from '../../lib/analytics';
 import { ClayButton } from '../ui/ClayButton';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/fonts';
 import type { Recipe, RecipeInsert } from '../../types/recipe';
+
+// Map the database source_type → the bucket used for analytics. Keep the
+// analytics enum compact (5 buckets) — the DB enum has fine-grained values
+// for legacy + provenance, but the funnel only cares about origin shape.
+type AnalyticsSource = AnalyticsEventMap['recipe_created']['source'];
+
+function analyticsSource(dbType: Recipe['source_type']): AnalyticsSource {
+  switch (dbType) {
+    case 'url_import': return 'url_import';
+    case 'screenshot_import': return 'photo';
+    case 'pdf_import':
+    case 'text_import': return 'pdf';
+    case 'json_import': return 'json';
+    case 'telegram_link':
+    case 'telegram_screenshot': return 'telegram';
+    case 'manual':
+    default: return 'manual';
+  }
+}
 
 export interface TypeFormValues {
   title: string;
@@ -64,6 +84,7 @@ export function TypeTab({
   const mutation = useMutation({
     mutationFn: createRecipe,
     onSuccess: (recipe: Recipe) => {
+      track('recipe_created', { source: analyticsSource(recipe.source_type) });
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       onClose();
       router.replace(`/recipe/${recipe.id}`);
