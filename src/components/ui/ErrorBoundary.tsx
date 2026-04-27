@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/fonts';
+import { captureError } from '../../lib/sentry';
 
 interface Props {
   children: React.ReactNode;
@@ -18,6 +19,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, message: error.message };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Report to Sentry — no-op until DSN is configured. We pass the
+    // boundary label as context so triage can locate which surface failed.
+    captureError(error, {
+      boundary: this.props.fallbackLabel ?? 'unlabeled',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   reset = () => this.setState({ hasError: false, message: '' });
