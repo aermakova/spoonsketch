@@ -1067,3 +1067,166 @@ Reset for testing: `AsyncStorage.removeItem('spoonsketch:onboarding_complete')` 
 ### 6. Sticker scale cap (print-quality companion)
 - ✅ Pinch a selected sticker beyond 3.0× → clean cap at `STICKER_MAX_SCALE = 3.0`.
 - ✅ Pinch a selected sticker below 0.3× → clean cap at `STICKER_MIN_SCALE = 0.3`.
+
+---
+
+## Cook Mode (Phase 10, landed 2026-04-26)
+
+### 1. Entry from Clean view
+- ✅ Open any recipe with at least one step → Clean view → "Start cooking →" primary terracotta button visible above Share + PDF.
+- ✅ Recipe with zero steps → no "Start cooking →" button (CTA hidden).
+- ✅ Tap → routes to `/cook/<recipeId>`. Top bar shows "Step 1 / N" centred, ✕ close on the left.
+
+### 2. Step navigation
+- ✅ Tap "Done · next step →" → step counter advances, step text updates, screen does not scroll back to top.
+- ✅ "Previous" link appears from step 2 onward; tap goes back one step.
+- ✅ On the last step the primary button label changes to "Finished! 🎉".
+- ✅ Tap Finished → returns to recipe detail (Clean view).
+
+### 3. Screen-on
+- ✅ Open Cook Mode → leave the device idle for >30 seconds → screen does NOT auto-dim or lock.
+- ✅ Close (back to detail) → screen returns to system auto-lock behaviour.
+
+### 4. Confirm-on-exit
+- ✅ On step 1, tap ✕ → instant exit (no confirm — they haven't started).
+- ✅ Advance to step 2+, tap ✕ → confirm alert "Stop cooking?" appears. "Keep cooking" stays. "Stop" leaves.
+- ✅ On the last step, tap ✕ → no confirm (they're at the end anyway).
+
+### 5. Ingredients drawer
+- ✅ Drawer collapsed by default (chevron-up).
+- ✅ Tap header → expands showing ingredients list (chevron-down). Tap again → collapses.
+- ✅ Long ingredients list scrolls within the drawer (drawer max-height 180).
+
+### 6. Tip surfacing
+- ✅ Steps with a `tip` field show a terracotta-bordered tip box below the step text.
+- ✅ Steps without a `tip` show no tip box.
+
+### 7. Background / foreground
+- ✅ Advance to step 3, swipe to background, return → still on step 3 (in-process state preserved).
+
+---
+
+## Magic-link sign-in (Phase 10.7a, landed 2026-04-26)
+
+### 1. Send the link
+- ✅ Sign-in tab → enter email (no password needed) → "Send me a magic link" button is the secondary CTA below the main Sign in button.
+- ✅ Empty email → both buttons disabled.
+- ✅ Tap → spinner → success state replaces the button: "Check your inbox" card showing the email + Resend link.
+
+### 2. Consume the link
+- ✅ Open the email → tap the link → app opens (Universal Link / `spoonsketch://`).
+- ✅ AuthGate sees the new session → routes to home directly. No login screen flicker.
+
+### 3. Resend
+- ✅ "Check your inbox" state → tap Resend → spinner → success card stays. Same email is reused.
+
+### 4. Errors
+- ✅ Invalid email format → inline alert "That doesn't look like a valid email."
+- ✅ Network down → alert "Magic link error: Failed to fetch." (or similar).
+- ✅ Expired link tapped → alert "Sign-in link issue" with the Supabase reason.
+
+### Pending Angy: Supabase Dashboard → Auth → URL Configuration → Redirect URLs must include `spoonsketch://auth/callback`.
+
+---
+
+## Password reset (Phase 10.7a, landed 2026-04-26)
+
+### 1. Request the link
+- ✅ Sign-in tab → enter email → tap "Forgot password?" link below the magic-link button.
+- ✅ Empty email field → alert "Enter your email" prompt.
+- ✅ Spinner while sending; success → alert "Check your inbox: We sent a password-reset link to {email}."
+
+### 2. Reset password screen
+- ✅ Tap the email link → app opens at `/(auth)/reset-password`.
+- ✅ Enter new password (≥6 chars) + confirm → tap Save → "Password updated" alert → routed back to login.
+- ✅ Sign in with the new password works.
+- ✅ The old password no longer works.
+
+### 3. Validation
+- ✅ Password < 6 chars → inline error "Password must be at least 6 characters."
+- ✅ Mismatch → inline error "Passwords don't match."
+
+### Pending Angy: `spoonsketch://auth/reset` must be in Supabase Redirect URLs.
+
+---
+
+## Custom colour picker (Phase 10.5b, landed 2026-04-26)
+
+### 1. Tray expansion
+- ✅ Editor → Draw mode → tray now shows 16 swatches in two rows of 8 (was 8 in one row).
+- ✅ Tapping any swatch sets it as active (white ring around the selected swatch).
+- ✅ Live preview dot in row 2 shows current colour + size.
+
+### 2. Custom picker modal
+- ✅ Tap the "+" tile at the end of row 3 → modal opens with a 7×7 HSL grid (49 tiles).
+- ✅ Tap any grid tile → modal dismisses, picked colour becomes active in the tray (no swatch in the main tray will ring around it; that's expected — the picked colour is custom).
+- ✅ Drawing immediately uses the picked colour.
+
+### 3. Modal dismissal
+- ✅ Tap the X in the modal corner OR tap outside the card → modal closes without changing colour.
+
+---
+
+## Email change (Phase 10.7c, landed 2026-04-26)
+
+### 1. Open + display
+- ✅ Me tab → Email row shows the current email + a "Change" link on the right.
+- ✅ Tap Change → modal "Change email" with current email shown read-only + "New email" input.
+
+### 2. Save flow
+- ✅ Empty new email → Save disabled.
+- ✅ Same as current email → inline error "That's already your email."
+- ✅ Invalid email format → inline error.
+- ✅ Valid new email → Save spinner → modal closes → alert "Check your inbox: We sent a link to {newEmail}".
+- ✅ Until the user clicks the confirm link, `auth.users.email` keeps the old value.
+
+### 3. Cancel
+- ✅ Tap Cancel during edit → modal closes; current email unchanged.
+
+---
+
+## i18n scaffolding (landed 2026-04-26)
+
+### 1. Tab labels
+- ✅ With device language = English: tab bar shows Home / Shelves / Stash / Me.
+- ✅ With device language = Ukrainian (Settings → General → Language → Українська → restart Expo): tab bar shows Дім / Полиці / Скриня / Я.
+
+### 2. Fallback behaviour
+- ✅ With device language = Ukrainian, navigate anywhere outside the tab bar (most strings haven't been translated yet) → text falls back to English (no missing-key brackets, no `[object Object]`).
+
+### 3. Adding a new translation
+- ✅ Drop a new key in `src/i18n/en.json` (e.g. `"foo": "Hello"`) → call `t('foo')` from a component → renders "Hello" in EN.
+- ✅ Same key missing from `uk.json` → renders "Hello" in UK too (fallback to EN).
+
+---
+
+## Telemetry instrumentation (landed 2026-04-27)
+
+These events fire today but are no-ops until `EXPO_PUBLIC_POSTHOG_KEY` is set. Once set, verify in PostHog → Events:
+
+### 1. Auth events
+- ✅ Complete signup via password → `signup_completed { method: 'password' }`.
+- ✅ Sign in via password → `login_completed { method: 'password', returning: true }`.
+- ✅ Sign in via Apple → `login_completed { method: 'apple', returning: true }`.
+- ✅ Tap "Forgot password?" + send → `password_reset_requested`.
+
+### 2. Onboarding events
+- ✅ First launch → carousel mounts → `onboarding_started`.
+- ✅ Tap "Get started" on screen 5 → `onboarding_completed { }`.
+
+### 3. Cook Mode events
+- ✅ Open `/cook/<id>` with steps → `cook_session_started { recipe_id, step_count }`.
+- ✅ Tap Finished on the last step → `cook_session_completed { recipe_id, step_count }`.
+- ✅ Exit mid-cook (Stop confirmation) → no completion event fires (correct behavior).
+
+### 4. Recipe + canvas events
+- ✅ Save a manual recipe → `recipe_created { source: 'manual' }`.
+- ✅ Save after URL import → `recipe_created { source: 'url_import' }`.
+- ✅ Save after photo extract → `recipe_created { source: 'photo' }`.
+- ✅ JSON bulk-import N recipes → N × `recipe_created { source: 'json' }`.
+- ✅ Done in editor → `canvas_saved { element_count }`.
+
+### 5. Identity + crash reporting
+- ✅ Sign in → PostHog `identify(userId)` called + Sentry user.id set.
+- ✅ Sign out → PostHog `reset()` + Sentry user cleared (no PII leak across users on the same device).
+- ✅ Render-time crash inside a tab → ErrorBoundary fallback shown + Sentry receives the exception with `boundary` + `componentStack` extras (post-DSN).
