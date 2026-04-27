@@ -137,10 +137,11 @@ function ScrapbookView({ recipe, palette, sectionTitles, paperType, onExport, ex
 }
 
 // ─── Clean View ───────────────────────────────────────────────────
-function CleanView({ recipe, palette, sectionTitles, onExport, exporting }: { recipe: Recipe; palette: Palette; sectionTitles: CookbookSectionTitles; onExport: () => void; exporting: boolean }) {
+function CleanView({ recipe, palette, sectionTitles, onExport, exporting, onCook }: { recipe: Recipe; palette: Palette; sectionTitles: CookbookSectionTitles; onExport: () => void; exporting: boolean; onCook: () => void }) {
   const totalTime = (recipe.prep_minutes ?? 0) + (recipe.cook_minutes ?? 0);
   const ingredientsTitle = sectionTitles.ingredients.trim() || DEFAULT_SECTION_TITLES.ingredients;
   const methodTitle = sectionTitles.method.trim() || DEFAULT_SECTION_TITLES.method;
+  const hasSteps = recipe.instructions.length > 0;
 
   async function handleShare() {
     const text = [
@@ -226,6 +227,16 @@ function CleanView({ recipe, palette, sectionTitles, onExport, exporting }: { re
               </View>
             ))}
           </>
+        )}
+
+        {/* Start cooking — primary CTA when steps exist */}
+        {hasSteps && (
+          <TouchableOpacity
+            style={[cl.cookBtn, { backgroundColor: palette.accent }]}
+            onPress={onCook}
+          >
+            <Text style={cl.cookBtnText}>Start cooking →</Text>
+          </TouchableOpacity>
         )}
 
         {/* Share + Export */}
@@ -372,7 +383,7 @@ export default function RecipeDetailScreen() {
       </View>
 
       {view === 'clean'
-        ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} onExport={handleExport} exporting={exporting} />
+        ? <CleanView recipe={recipe} palette={palette} sectionTitles={sectionTitles} onExport={handleExport} exporting={exporting} onCook={() => router.push(`/cook/${id}` as never)} />
         : <ScrapbookView recipe={recipe} palette={palette} sectionTitles={sectionTitles} paperType={paperType} onExport={handleExport} exporting={exporting} />
       }
     </View>
@@ -602,5 +613,24 @@ const cl = StyleSheet.create({
   },
   shareBtnDisabled: { opacity: 0.5 },
   shareBtnText: { fontFamily: fonts.bodyBold, fontSize: 15 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  // actionRow used to be marginTop:24 — now reduced because cookBtn (above)
+  // already has its own marginTop:24 separating it from the steps list.
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  cookBtn: {
+    marginTop: 24,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#3b2a1f',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  cookBtnText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 17,
+    color: '#fff6e8',
+    letterSpacing: 0.3,
+  },
 });

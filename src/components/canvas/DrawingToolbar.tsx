@@ -1,12 +1,24 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Feather } from '@expo/vector-icons';
 import { useDrawingStore } from '../../lib/drawingStore';
 import { fonts } from '../../theme/fonts';
+import { ColorPickerModal } from './ColorPickerModal';
 
+// 16 base swatches in two rows of 8. Curated for cookbook decoration:
+// - Inks (charcoal, sepia, soft brown, navy)
+// - Brand palette accents (terracotta, sage, plum, cobalt, rose, ochre)
+// - Brights (tomato, butter, mint)
+// - Neutrals (cream, white)
+// Tap "+" at the end to open the full HSL grid for any other colour.
 const COLORS = [
-  '#3b2a1f', '#8B6547', '#c46a4c', '#6f8a52',
-  '#c66a78', '#2f5c8f', '#faf4e6', '#ffffff',
+  // Row 1 — inks + warm brand
+  '#3b2a1f', '#8B6547', '#c46a4c', '#d9a441',
+  '#b94a38', '#d97b7b', '#c66a78', '#8a5f7a',
+  // Row 2 — cool brand + neutrals
+  '#6f8a52', '#88a06a', '#2f5c8f', '#3f75b0',
+  '#f2d98d', '#e9a488', '#faf4e6', '#ffffff',
 ];
 
 interface Props {
@@ -15,6 +27,7 @@ interface Props {
 
 export function DrawingToolbar({ onOpenLayers }: Props) {
   const { activeTool, strokeWidth, color, opacity, setTool, setStrokeWidth, setColor, setOpacity, undo } = useDrawingStore();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <View style={styles.root}>
@@ -45,9 +58,10 @@ export function DrawingToolbar({ onOpenLayers }: Props) {
         </View>
       </View>
 
-      {/* Row 2: color swatches */}
+      {/* Rows 2–3: 16 colour swatches in two rows of 8 + "+" custom-picker tile.
+          The active swatch shows a white ring; clicking "+" opens the HSL grid. */}
       <View style={styles.row}>
-        {COLORS.map(c => (
+        {COLORS.slice(0, 8).map(c => (
           <TouchableOpacity
             key={c}
             onPress={() => setColor(c)}
@@ -59,11 +73,36 @@ export function DrawingToolbar({ onOpenLayers }: Props) {
             ]}
           />
         ))}
-        {/* live preview dot — fixed 28×28 container so it never shifts layout */}
         <View style={styles.previewContainer}>
           <View style={[styles.previewDot, { backgroundColor: color, width: strokeWidth, height: strokeWidth, borderRadius: strokeWidth / 2 }]} />
         </View>
       </View>
+      <View style={styles.row}>
+        {COLORS.slice(8, 16).map(c => (
+          <TouchableOpacity
+            key={c}
+            onPress={() => setColor(c)}
+            style={[
+              styles.swatch,
+              { backgroundColor: c },
+              c === color && styles.swatchActive,
+              c === '#ffffff' && styles.swatchBorder,
+            ]}
+          />
+        ))}
+        <TouchableOpacity
+          onPress={() => setPickerOpen(true)}
+          style={styles.swatchPlus}
+        >
+          <Feather name="plus" size={14} color="rgba(255,255,255,0.85)" />
+        </TouchableOpacity>
+      </View>
+
+      <ColorPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={setColor}
+      />
 
       {/* Row 3: sliders */}
       <View style={styles.slidersGroup}>
@@ -144,6 +183,17 @@ const styles = StyleSheet.create({
   swatch: { width: 24, height: 24, borderRadius: 12 },
   swatchActive: { borderWidth: 2.5, borderColor: '#fff' },
   swatchBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  swatchPlus: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   previewContainer: { marginLeft: 'auto', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   previewDot: { opacity: 0.9 },
   slidersGroup: { gap: 0 },

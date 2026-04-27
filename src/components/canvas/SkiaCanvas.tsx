@@ -48,12 +48,20 @@ export function SkiaCanvas({ width, height, isDrawing, layersOverride }: Props) 
     setLivePoints([]);
   }, [commitStroke]);
 
+  // Apple Pencil sends a `pressure` field on every Pan event (0..1, low → hard).
+  // Finger touches don't, so we fall back to 0.5 — that's a neutral middle
+  // value perfect-freehand uses for uniform width when `simulatePressure:false`.
+  // The cast is needed because RNGH's TS types don't expose `pressure` even
+  // though the native side passes it through.
+  const readPressure = (e: { pressure?: number }): number =>
+    typeof e.pressure === 'number' ? e.pressure : 0.5;
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const drawGesture = useMemo(() =>
     Gesture.Pan()
       .minDistance(0)
-      .onBegin(e => runOnJS(beginStroke)({ x: e.x, y: e.y, pressure: (e as any).pressure ?? 0.5 }))
-      .onChange(e => runOnJS(addPoint)({ x: e.x, y: e.y, pressure: (e as any).pressure ?? 0.5 }))
+      .onBegin(e => runOnJS(beginStroke)({ x: e.x, y: e.y, pressure: readPressure(e as { pressure?: number }) }))
+      .onChange(e => runOnJS(addPoint)({ x: e.x, y: e.y, pressure: readPressure(e as { pressure?: number }) }))
       .onEnd(() => runOnJS(endStroke)()),
   []);
 

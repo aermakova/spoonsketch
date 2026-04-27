@@ -43,7 +43,8 @@
           "photosPermission": "Spoon & Sketch needs access to your photos so you can import recipe screenshots.",
           "cameraPermission": "Spoon & Sketch needs camera access to snap a recipe."
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }
