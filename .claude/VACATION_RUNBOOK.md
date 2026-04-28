@@ -22,6 +22,116 @@ You don't need Mac. You don't need SSH. You don't need Tailscale.
 
 ---
 
+## § Master launch-readiness table — everything left before the app is ready
+
+Sorted by gate. **iPad?** column tells you what you can knock off mid-vacation vs what has to wait.
+
+Legend: 🔴 blocker · 🟡 in progress · ⬜ not started · ✅ done.
+**T** = TestFlight build · **P** = public App Store launch · **—** = not blocking.
+
+### 1. Pre-TestFlight gates (you've already shipped one — these apply to the next build)
+
+| # | What | Status | Owner | Time | iPad? | Notes |
+|---|---|---|---|---|---|---|
+| 1 | Apple Developer Program — $99/y, account verified | 🟡 / ✅ if TF build cleared | You | 24h verify | Yes (developer.apple.com on Safari) | If TF build cleared, this is done. |
+| 2 | App Store Connect — bundle ID + app record | 🟡 / ✅ if TF build cleared | You | 5 min | Yes (appstoreconnect.apple.com) | Same as above. |
+| 3 | **Sign in with Apple — external setup** (Apple Dev portal Service ID + Key + Supabase Auth provider config) | ⬜ | You | 30 min | Yes (developer.apple.com + supabase.com) | Runbook in `NEXT_STEPS.md` §3.5. The Apple button is hidden in builds until this lands. **Required for TestFlight Apple-Sign-In to work.** |
+| 4 | **Supabase Auth Redirect URLs** — add `spoonsketch://auth/callback` and `spoonsketch://auth/reset` | ⬜ | You | 2 min | Yes (Supabase Dashboard) | Magic-link + password-reset deep links break without these. |
+| 5 | **Sticker registry update** — wire 17 new packs into `src/lib/stickerRegistry.ts` + auto-sticker Edge Function | ⬜ | Me (Claude) | 30 min | Yes (Codespaces) | Without this, the new sticker PNGs you generated won't appear in the app. |
+| 6 | EAS auto-managed credentials (one-time) | ✅ if TF build cleared | You | — | — | EAS handles this automatically the first time. |
+| 7 | Push the latest code to GitHub | 🔴 critical pre-vacation | You | 1 min | — | `git push origin main` on Mac before turning it off. |
+
+### 2. Pre-public-launch (App Store submission) — Apple P0 blockers
+
+These are non-negotiable for the public App Store. Apple rejects apps missing any of these.
+
+| # | What | Status | Owner | Time | iPad? | PLAN ref |
+|---|---|---|---|---|---|---|
+| 8 | Privacy Policy at stable URL (EN + UK), linked in App Store Connect | ⬜ | Lawyer + you | weeks | Partial — drafting Yes; lawyer review No | §C1 |
+| 9 | Terms of Service at stable URL (EN + UK) | ⬜ | Lawyer + you | weeks | Partial | §C1 |
+| 10 | App Store Connect Privacy Nutrition Labels — accurate per actual data flows | ⬜ | You | 30 min | Yes (App Store Connect web) | §C8 |
+| 11 | Age rating questionnaire — UGC = Yes (recipes are user content) | ⬜ | You | 5 min | Yes | §C8 |
+| 12 | Demo account credentials in App Review Notes | ⬜ | You | 5 min | Yes | §C8 |
+| 13 | Print orders confirmed as **physical goods** in App Review Notes (NOT in-app purchase) | ⬜ | You | 5 min | Yes | §C8 — gated on Lulu integration first |
+| 14 | RevenueCat — IAP install + tier UI + Restore Purchases on paywall + Settings | ⬜ | Me (Claude) + you | ~half day code + RevenueCat account | Yes (Codespaces + revenuecat.com) | P0 #3 |
+| 15 | Subscription disclosure copy adjacent to Subscribe button | ⬜ | Me (Claude) | ~1h, blocked on #14 | Yes | §C6 + §16 |
+| 16 | App Store screenshots (5+, real device or mockups) | ⬜ | You + designer | 1-2 days | Partial — design Yes; capturing screenshots from real device No | §C8 |
+| 17 | App Store description + keywords + support URL + marketing URL | ⬜ | You | 1h | Yes | §C8 |
+| 18 | App icon at 1024×1024 PNG | ⬜ / verify if exists | You | 5 min if exists | Yes (upload via App Store Connect) | §C8 |
+
+### 3. Pre-public-launch — P1 legal / GDPR / California / Apple
+
+Less likely to block submission outright, but enforcement risk if missing post-launch.
+
+| # | What | Status | Owner | Time | iPad? | PLAN ref |
+|---|---|---|---|---|---|---|
+| 19 | EU Representative contract (required if shipping to EU) | ⬜ | You + EU vendor | days | Partial — research/sign-up Yes; in-person No | §C7 |
+| 20 | DPAs signed with all data-processing vendors: **Anthropic, Supabase, OpenAI, Apple, Expo, RevenueCat, Lulu, Railway, Upstash, PostHog (when wired), Sentry (when wired)** | ⬜ | You | hours per vendor | Yes (most are click-through DPAs in their dashboards) | §C4 |
+| 21 | California ARL — auto-renewal disclosure copy in subscription UI | ⬜ | Me (Claude) | 2h, blocked on RevenueCat | Yes | §C6 |
+| 22 | COPPA age gate at registration ("I am 13+" checkbox) | ⬜ | Me (Claude) | 1h | Yes | §C6 |
+| 23 | Privacy Policy translated to Ukrainian (UA PDP Law) | ⬜ | Translator | days | Partial — coordinate Yes; final review No | §C1 |
+| 24 | Per-purpose consent checkboxes (engineering ✅, copy review pending) | 🟡 | You | 1h legal review | Yes | §C2 |
+| 25 | RoPA — Records of Processing Activities document | ⬜ | You + lawyer template | 2-3h | Yes (write in any markdown) | §C9 |
+| 26 | 72-hour breach notification runbook | ⬜ | You | 2h | Yes | §C9 |
+| 27 | "Report content" button on recipe detail (UGC moderation) | ⬜ | Me (Claude) | 2h | Yes | §C7 + §C8 + §C9 |
+| 28 | Stripe Tax wired for US print-order checkout | ⬜ | Me (Claude) | half day, blocked on Lulu + Stripe accounts | Yes | §C9 |
+
+### 4. Code work still pending (feature parity with marketing brief)
+
+| # | What | Status | Owner | Time | iPad? | PLAN ref |
+|---|---|---|---|---|---|---|
+| 29 | Sticker registry update for 17 packs | ⬜ | Me | 30 min | Yes | line above (#5 in TestFlight section) |
+| 30 | Telegram bot → Railway production deploy | ⬜ | You | 30 min, $5/mo | Yes (railway.app) | `NEXT_STEPS.md` §3 |
+| 31 | Onboarding GIFs — drop 5 into `assets/onboarding/` + replace `<HeroSlot caption=…>` lines | ⬜ | You + me | 5 min | Yes (Working Copy + Codespaces) | Phase 10.7 |
+| 32 | RevenueCat install (see #14 above) | ⬜ | Me + you | half day | Yes | §18 |
+| 33 | Lulu xPress integration (Phase 9) — print order flow + Phase F server-side PDF renderer | ⬜ | Me + you | 2-3 days + Lulu account | Yes (Codespaces + lulu.com) | Phase 9, BUG-010 |
+| 34 | Order history surface (§17) | ⬜ | Me | 1 day, blocked on Lulu | Yes | §17, P0 #13 |
+| 35 | Phase 8.5B–E — recipe photo upload + 8 frames + watercolor (OpenAI) + PDF catch-up | ⬜ | Me + you | ~32h | Yes (Codespaces + OpenAI key) | Phase 8.5 |
+| 36 | Push notifications — `expo-notifications` wire-up | ⬜ | Me | 1 day | Yes | Phase 11 |
+| 37 | Google Sign-In | ⬜ | Me + you | 1 day + Google Cloud account | Yes | §C8 |
+| 38 | Tab bar icon swap (emojis → Feather icons) ✅ | ✅ done 2026-04-26 | — | — | — | — |
+| 39 | i18n full Ukrainian translations (engineering scaffolded ✅) | 🟡 | You + translator | days | Partial | §C1 |
+
+### 5. Observability accounts (no-ops without keys)
+
+| # | What | Status | Owner | Time | iPad? | Notes |
+|---|---|---|---|---|---|---|
+| 40 | PostHog account → set `EXPO_PUBLIC_POSTHOG_KEY` in Codespace Secrets + `.env` | ⬜ | You | 5 min | Yes (posthog.com) | All instrumentation already wired (commit `fb98859`) — flips on the moment the key lands. |
+| 41 | Sentry account → set `EXPO_PUBLIC_SENTRY_DSN` | ⬜ | You | 5 min | Yes (sentry.io) | ErrorBoundary already pipes to Sentry. |
+
+### 6. Polish / nice-to-have (not blockers)
+
+| # | What | Status | Owner | Time | iPad? |
+|---|---|---|---|---|---|
+| 42 | Custom drawing colour picker (more colours + wheel) ✅ | ✅ done 2026-04-26 | — | — | — |
+| 43 | Apple Pencil pressure ✅ | ✅ done 2026-04-26 | — | — | — |
+| 44 | Cook Mode ✅ | ✅ done 2026-04-26 | — | — | — |
+| 45 | App Preview video (optional but boosts conversion) | ⬜ | You + designer | days | No |
+| 46 | North-star test (install → recipe → decorate → PDF in <5 min) | ⬜ | You | 30 min once everything ships | Yes — test on iPhone |
+| 47 | Device regression test on iPad + multiple iPhone models | ⬜ | You | hours | Partial |
+
+### 7. Post-launch / scale (P2, P3)
+
+| # | What | When | iPad? | PLAN ref |
+|---|---|---|---|---|
+| 48 | ATT prompt decision after PostHog audit | post-launch | Yes | §C6 + §C8 |
+| 49 | Stripe Tax (#28) — required at scale | when print orders exceed Stripe Tax threshold | Yes | §C9 |
+| 50 | EAA WCAG 2.1 AA audit | when crossing micro-enterprise threshold | Yes (audit), No (testing) | §C9 |
+| 51 | Ukrainian Ombudsman DPA notification | within 30 days of launching to Ukrainian users | Yes (filing) | §C3 |
+| 52 | Transfer Impact Assessments (TIAs) for Anthropic + OpenAI | post-launch documentation | Yes | §C9 |
+
+---
+
+### What this means for your vacation realistically
+
+- **From iPad alone, you can ship**: items 3, 4, 5 (asks me), 16, 17, 30, 31, 40, 41, plus any code work I pick up. Roughly **a week's worth of progress is genuinely doable from a hammock** with good WiFi and 2h/day.
+- **You CAN'T ship from iPad**: lawyer-drafted docs (8, 9, 25), in-person tasks (47 device regression), real screenshots without a phone in hand (16 partial), translations (23, 39).
+- **Critical path right now** to get the app actually shippable to the public App Store: items **3, 4, 5** (TestFlight Apple-Sign-In + sticker registry — all small) → then **14 RevenueCat** → then **8, 9 lawyer docs** in parallel → then **16, 17 store assets** → then **submit**.
+
+If you do **3, 4, 5 in the airport** + drop me items **14 (RevenueCat) and 30 (Railway) on day 1 of vacation**, you'd land 80% of the remaining engineering work over the trip.
+
+---
+
 ## § Critical pre-departure checklist (DO BEFORE TURNING MAC OFF)
 
 These are one-time actions that **must** happen on Mac. Once Mac is off, they're impossible.
